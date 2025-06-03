@@ -6,3 +6,4 @@ instance/*
 __pycache__/*
 Пользуны.xlsx
 employees.csv
+documents/*
