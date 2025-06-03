@@ -1,0 +1,16 @@
+# Dev environment
+pip
+autopep8
+pandas
+
+# App
+flask
+flask_login
+flask_sqlalchemy
+requests
+pymysql
+schedule
+python-docx
+openpyxl
+dotenv
+flask_apscheduler

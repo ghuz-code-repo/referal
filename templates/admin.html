@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <!-- Установка кодировки символов -->
+        <meta charset="UTF-8">
+        <!-- Адаптивный мета-тег -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!-- Заголовок страницы -->
+        <title>Панель администратора</title>
+        <!-- Подключение файлов стилей -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+        <!-- Подключение favicon -->
+        <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}"
+            type="image/x-icon">
+
+        <script>
+        function validatePassword() {
+            var password = document.getElementById("password").value;
+            var confirm_password = document.getElementById("confirm_password").value;
+            var message = document.getElementById("password-message");
+            var submitBtn = message.parentElement.querySelector("button[type='submit']");
+            
+            if (password && confirm_password) {
+                if (password !== confirm_password) {
+                    message.style.display = "block";
+                    submitBtn.disabled = true;
+                } else {
+                    message.style.display = "none";
+                    submitBtn.disabled = false;
+                }
+            }
+        }
+    </script>
+    </head>
+    <body>
+        <!-- Шапка сайта -->
+        <header class="header">
+            <div class="header_name">
+                <a href="{{ url_for('routes.main') }}" class="nav__link"> Реферальная программа для сотрудников Golden House </a>
+            </div>
+            <nav class="nav">
+                <ul class="nav__list">
+                    <li class="nav__item">
+                        <a href="{{ url_for('routes.main') }}" class="nav__link"><i class="fas fa-home"></i> Главная</a>
+                    </li>
+                    <li class="nav__item">
+                        <a href="{{ url_for('routes.profile') }}" class="nav__link"><i class="fas fa-user"></i> Профиль</a>
+                    </li>
+                    <li>
+                        <a href="/" class="nav__link"><i class="fas fa-th-list"></i> Меню сервисов</a>
+                    </li>
+                </ul>
+            </nav>
+        </header>
+        <div class="flash-message-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div id="flash-message"
+                class="{{ 'flash-message' if category == 'success' else 'error-message' }}">{{
+                message }}</div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+        </div>
+        <!-- Основной контент -->
+        <main class="main">
+            <div class="container">
+                <h1 class="admin-panel__title">Панель администратора</h1>
+                <h2 class="admin-panel__subtitle">Запросы на вывод средств</h2>
+                <div class="table-container">
+                    <table class="table">
+                        <thead class="table__head">
+                            <tr class="table__row">
+                                <th class="table__header">ID пользователя</th>
+                                <th class="table__header">ФИО</th>
+                                <th class="table__header">Номер телефона</th>
+                                <th class="table__header">Номер договора</th>
+                                <th class="table__header">Этап вывода</th>
+                                <th class="table__header">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody class="table__body">
+                            {% for request in withdrawal_requests %}
+                            <tr class="table__row">
+                                <td class="table__data">{{ request.user_id
+                                    }}</td>
+                                <td class="table__data">{{ request.full_name
+                                    }}</td>
+                                <td class="table__data">{{ request.phone_number
+                                    }}</td>
+                                <td class="table__data">{{
+                                    request.contract_number }}</td>
+                                <td class="table__data">{{ request.status_name
+                                    }}</td>
+                                <td class="table__data">
+                                    <form
+                                        action="{{ url_for('routes.update_withdrawal_stage', referral_id=request.id) }}"
+                                        method="POST" class="form">
+                                        <select name="withdrawal_stage" required
+                                            class="form__select">
+                                            {% for status in statuses %}
+                                            <option value={{ status.id }}>{{
+                                                status.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <input type="text"
+                                            name="rejection_reason"
+                                            placeholder="Причина отклонения"
+                                            style="display: none;"
+                                            class="form__input">
+                                        <button type="submit" class="button" {{
+                                            'disabled' if (request.status_id ==
+                                            200 or request.status_id == 500 )
+                                            else '' }}>Обновить</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Подвал сайта -->
+        <footer class="footer">
+            <p class="footer__text">&copy; 2025 Реферальная система</p>
+        </footer>
+
+        <!-- Модальное окно -->
+        <script>
+        // Получаем кнопку, которая открывает модальное окно
+        var btn = document.getElementById("myBtn");
+        // Скрипт для отображения/скрытия поля причины отклонения
+        document.querySelectorAll('.form__select[name="withdrawal_stage"]').forEach(select => {
+            select.addEventListener('change', function() {
+                const rejectionReasonInput = this.nextElementSibling;
+                if (this.value === 'Отклонено') {
+                    rejectionReasonInput.style.display = 'inline';
+                    rejectionReasonInput.required = true;
+                } else {
+                    rejectionReasonInput.style.display = 'none';
+                    rejectionReasonInput.required = false;
+                }
+            });
+        });
+    </script>
+    </body>
+</html>

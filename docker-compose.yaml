@@ -1,0 +1,25 @@
+services:
+  referal:
+    image: referal
+    container_name: referal
+    build:
+      context: .
+      dockerfile: Dockerfile
+    labels:
+      - "nginx.auth=true"
+    volumes:
+      - ./instance:/app/instance
+      - ./documents:/app/documents
+    env_file:
+      - .env
+    networks:
+      - service_network
+      - public_network
+
+networks:
+  service_network:
+    external: true
+    name: service_network
+  public_network:
+    external: true
+    name: public_network

@@ -1,0 +1,8 @@
+.env
+.idea/*
+.venv/*
+.vscode/*
+instance/*
+__pycache__/*
+Пользуны.xlsx
+employees.csv
