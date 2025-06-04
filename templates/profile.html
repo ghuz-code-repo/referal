@@ -197,7 +197,8 @@
                     <div class="modal-body">
                         <form action="{{ url_for('routes.get_referer_agreement') }}" method="POST">
                             <div class="modal_form_container">
-                                <input type="text" id="name" name="name" placeholder="ФИО" required>
+                                <input type="text" id="ref_name" name="ref_name" placeholder="Ваше ФИО" required>
+                                <input type="text" id="name" name="name" placeholder="ФИО реферала" required>
                                 <input type="text" id="passport_number" name="passport_number" placeholder="Номер паспорта" required>
                                 <input type="text" id="passport_giver" name="passport_giver" placeholder="Кем выдан" required>
                                 <input type="text" id="passport_date" name="passport_date" placeholder="Дата выдачи" required>

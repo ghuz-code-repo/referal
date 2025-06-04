@@ -283,6 +283,7 @@ def get_referal_act(referral_id):
     bank=request.form.get('bank')
     mfo=request.form.get('mfo')
     inn=request.form.get('inn')
+    ref_name = request.form.get('ref_name')
     name=referral.full_name
     appartment_area=real_deal.deal_metr
     phone=referral.phone_number
@@ -327,7 +328,7 @@ def get_referal_act(referral_id):
             inn=inn,
             phone=phone,
             e_mail=e_mail,
-            ref_name=get_current_user().full_name)
+            ref_name=ref_name)
 
         if doc_bytes and output_filename:
             # Send file directly from memory using BytesIO
