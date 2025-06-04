@@ -9,7 +9,7 @@ import requests
 import utils
 import os
 import pymysql
-from flask_login import login_required
+# from flask_login import login_required
 from pymysql import MySQLError
 from models import db, MacroContact, MacroDeal
 from datetime import datetime, timedelta

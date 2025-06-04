@@ -114,7 +114,7 @@ def add_referral():
     full_name = request.form.get('full_name', "").strip()
     phone_number = request.form.get('phone_number', '')
 
-    if not re.match(r'^[A-Za-z]+(?: [A-Za-z]+){2,}$', full_name) or '  ' in full_name:
+    if not re.match(r'^[A-Za-z`]+(?: [A-Za-z`]+){2,}$', full_name) or '  ' in full_name:
         flash('Не верно введено ФИО', 'error')
         return redirect(url_for('routes.main'))
     if not re.match(r'^\+998 \d{2} \d{3} \d{2} \d{2}$', phone_number) or re.search(r'(\d)\1{3,}', phone_number):
@@ -150,7 +150,7 @@ def add_referral():
                 utils.send_email(
                 os.getenv('MANAGER_EMAIL'),
                 'Создание встречи для реферала',
-                f'ФИО: {full_name} \n {phone_number} \n')
+                f'Реферер {user.full_name} добавил реферала\nПожалуйста создайте встречу для человека\n ФИО: {full_name} \n Номер телефона: {phone_number} \n')
             else:
                 flash('Ошибка при создании реферала', 'error')
         except Exception as e:
@@ -231,7 +231,7 @@ def update_withdrawal_stage(referral_id):
         utils.send_email(
             os.getenv('MANAGER_EMAIL'),
             'Запрос на проверку реферала',
-            f'Пожалуйста созвонитесь с клиентом {referral.full_name} по номеру {referral.phone_number} для проверки.\n'
+            f'Пожалуйста созвонитесь с рефералом от {user.full_name}: ФИО: {referral.full_name} Телефон: {referral.phone_number} для проверки его данных.\n'
         )
 
     if withdrawal_stage == 500:
