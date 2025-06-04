@@ -2,15 +2,19 @@
 FROM python:3.13-slim
 
 # Install locales package and generate ru_RU.UTF-8 locale
+# Install locales package and generate ru_RU.UTF-8 locale more thoroughly
 RUN apt-get update && apt-get install -y --no-install-recommends locales \
     && sed -i -e 's/# ru_RU.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen \
+    && locale-gen ru_RU.UTF-8 \
+    && update-locale LANG=ru_RU.UTF-8 LC_ALL=ru_RU.UTF-8 \
     && dpkg-reconfigure --frontend=noninteractive locales \
     && rm -rf /var/lib/apt/lists/*
 
-# Set environment variables for locale and Flask
+# Set environment variables for locale
 ENV LANG=ru_RU.UTF-8
 ENV LANGUAGE=ru_RU:ru
 ENV LC_ALL=ru_RU.UTF-8
+
 ENV FLASK_APP=app.py
 
 # Set the working directory in the container

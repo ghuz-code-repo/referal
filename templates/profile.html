@@ -197,20 +197,20 @@
                     <div class="modal-body">
                         <form action="{{ url_for('routes.get_referer_agreement') }}" method="POST">
                             <div class="modal_form_container">
-                                <input type="text" id="name" name="name" placeholder="name" required>
-                                <input type="text" id="passport_number" name="passport_number" placeholder="passport_number" required>
-                                <input type="text" id="passport_giver" name="passport_giver" placeholder="passport_giver" required>
-                                <input type="text" id="passport_date" name="passport_date" placeholder="passport_date" required>
-                                <input type="text" id="passport_address" name="passport_address" placeholder="passport_address" required>
-                                <input type="text" id="mail_adress" name="mail_adress" placeholder="mail_adress" required>
-                                <input type="text" id="pinfl" name="pinfl" placeholder="pinfl" required pattern="\d{14}" title="ПИНФЛ должен содержать ровно 14 цифр">
-                                <input type="text" id="card_number" name="card_number" placeholder="card_number" required>
-                                <input type="text" id="bank_name" name="bank_name" placeholder="bank_name" required>
-                                <input type="text" id="mfo" name="mfo" placeholder="mfo" required>
-                                <input type="tel" id="phone" name="phone" placeholder="phone" required value="+998 ">
-                                <input type="email" id="e_mail" name="e_mail" placeholder="e_mail" required>
-                                <input type="text" id="trans_schet" name="trans_schet" placeholder="р/c" required>
-
+                                <input type="text" id="name" name="name" placeholder="ФИО" required>
+                                <input type="text" id="passport_number" name="passport_number" placeholder="Номер паспорта" required>
+                                <input type="text" id="passport_giver" name="passport_giver" placeholder="Кем выдан" required>
+                                <input type="text" id="passport_date" name="passport_date" placeholder="Дата выдачи" required>
+                                <input type="text" id="passport_adress" name="passport_adress" placeholder="Адрес регистрации" required>
+                                <input type="text" id="mail_adress" name="mail_adress" placeholder="Почтовый адрес" required>
+                                <input type="text" id="pinfl" name="pinfl" placeholder="ПИНФЛ" required pattern="\d{14}" title="ПИНФЛ должен содержать ровно 14 цифр">
+                                <input type="text" id="card_number" name="card_number" placeholder="Номер карты" required>
+                                <input type="text" id="bank" name="bank" placeholder="Банк" required>
+                                <input type="text" id="mfo" name="mfo" placeholder="МФО" required>
+                                <input type="tel" id="phone" name="phone" placeholder="Телефон" required value="+998 ">
+                                <input type="email" id="e_mail" name="e_mail" placeholder="E-mail" required>
+                                <input type="text" id="trans_schet" name="trans_schet" placeholder="Р/С" required>
+                                <input type="text" id="inn" name="inn" placeholder="ИНН" required>
                                 <button type="submit" class="button">
                                     Скачать соглашение
                                 </button>
@@ -262,14 +262,20 @@
                                     <div class="modal-body">
                                         <form action="{{ url_for('routes.get_referal_act', referral_id=referral.id) }}" method="POST">
                                             <div class="modal_form_container">
-                                                <input type="text" id="passport_number" name="passport_number" required placeholder="passport_number">
-                                                <input type="text" id="passport_giver" name="passport_giver" required placeholder="passport_giver">
-                                                <input type="text" id="passport_date" name="passport_date" required placeholder="passport_date">
-                                                <input type="text" id="passport_address" name="passport_address" required placeholder="passport_address">
-                                                <input type="text" id="appartment_area" name="appartment_area" required placeholder="appartment_area">
-                                                <input type="text" id="mail_adress" name="mail_adress" required placeholder="mail_adress">
-                                                <input type="text" id="pinfl" name="pinfl" placeholder="pinfl" required pattern="\d{14}" title="ПИНФЛ должен содержать ровно 14 цифр">
-                                                <input type="email" id="e_mail" name="e_mail" placeholder="e_mail" required>
+                                                <input type="text" id="passport_number" name="passport_number" required placeholder="Номер паспорта реферала">
+                                                <input type="text" id="passport_giver" name="passport_giver" required placeholder="Кем выдан">
+                                                <input type="text" id="passport_date" name="passport_date" required placeholder="Дата выдачи">
+                                                <input type="text" id="passport_adress" name="passport_adress" required placeholder="Адрес регистрации">
+                                                <input type="text" id="appartment_area" name="appartment_area" required placeholder="Площадь квартиры">
+                                                <input type="text" id="mail_adress" name="mail_adress" required placeholder="Почтовый адрес">
+                                                <input type="text" id="pinfl" name="pinfl" placeholder="ПИНФЛ" required pattern="\d{14}" title="ПИНФЛ должен содержать ровно 14 цифр">
+                                                <input type="email" id="e_mail" name="e_mail" placeholder="E-mail" required>
+                                                <input type="text" id="card_number" name="card_number" placeholder="Номер карты" required>
+                                                <input type="text" id="bank" name="bank" placeholder="Банк" required>
+                                                <input type="text" id="mfo" name="mfo" placeholder="МФО" required>
+                                                <input type="text" id="trans_schet" name="trans_schet" placeholder="Р/С" required>
+                                                <input type="text" id="inn" name="inn" placeholder="ИНН" required>
+
                                                 <button type="submit">
                                                     Скачать акт
                                                 </button>

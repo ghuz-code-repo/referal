@@ -274,11 +274,15 @@ def get_referal_act(referral_id):
     passport_number = request.form.get('passport_number')
     passport_giver = request.form.get('passport_giver')
     passport_date = request.form.get('passport_date')
-    passport_address = request.form.get('passport_address')
+    passport_adress = request.form.get('passport_adress')
     mail_adress=request.form.get('mail_adress')
     pinfl=request.form.get('pinfl')
     e_mail=request.form.get('e_mail')
-
+    trans_schet = request.form.get('trans_schet')
+    card_number=request.form.get('card_number')
+    bank=request.form.get('bank')
+    mfo=request.form.get('mfo')
+    inn=request.form.get('inn')
     name=referral.full_name
     appartment_area=real_deal.deal_metr
     phone=referral.phone_number
@@ -303,7 +307,7 @@ def get_referal_act(referral_id):
             passport_number=passport_number,
             passport_giver=passport_giver,
             passport_date=passport_date,
-            passport_address=passport_address,
+            passport_adress=passport_adress,
             agreement_day=agreement_date.day,
             agreement_month=month_name_genitive(agreement_date).lower(),
             agreement_year=agreement_date.year,
@@ -316,6 +320,11 @@ def get_referal_act(referral_id):
             withdrawal_amount=withdrawal_amount,
             mail_adress=mail_adress,
             pinfl=pinfl,
+            trans_schet=trans_schet,
+            card_number=card_number,
+            bank=bank,
+            mfo=mfo,
+            inn=inn,
             phone=phone,
             e_mail=e_mail)
         
@@ -349,7 +358,7 @@ def get_referer_agreement():
     passport_number = request.form.get('passport_number')
     passport_giver = request.form.get('passport_giver')
     passport_date = request.form.get('passport_date')
-    passport_address = request.form.get('passport_address')
+    passport_adress = request.form.get('passport_adress')
     mail_adress=request.form.get('mail_adress')
     pinfl=request.form.get('pinfl')
     trans_schet = request.form.get('trans_schet')
@@ -370,7 +379,7 @@ def get_referer_agreement():
             passport_number=passport_number,
             passport_giver=passport_giver,
             passport_date=passport_date,
-            passport_address=passport_address,
+            passport_adress=passport_adress,
             mail_adress=mail_adress,
             pinfl=pinfl,
             trans_schet=trans_schet,

@@ -92,6 +92,26 @@ def process_request_headers():
     g.is_admin = request.headers.get('X-User-Admin', 'false').lower() == 'true'
     g.roles = request.headers.get('X-User-Roles', '').split(',') if request.headers.get('X-User-Roles') else []
 
+# Add this after the imports section
+import locale
+
+# Safely set the locale for date formatting
+def setup_locale():
+    try:
+        # Try to set Russian locale
+        if sys.platform == 'win32':
+            locale.setlocale(locale.LC_TIME, 'rus_rus')
+        else:
+            locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
+    except locale.Error:
+        try:
+            # Fallback to a more common locale format
+            locale.setlocale(locale.LC_TIME, 'ru')
+        except locale.Error:
+            # If all else fails, use default locale
+            locale.setlocale(locale.LC_TIME, '')
+            print("Warning: Could not set Russian locale. Using system default.")
+
 
 if __name__ == '__main__':
     with app.app_context():
@@ -111,7 +131,5 @@ if __name__ == '__main__':
         if scheduler.get_job('daily_update_job'):
             print(f"Scheduled daily update task. {scheduler.get_job('daily_update_job').next_run_time}")
 
-        locale.setlocale(
-            locale.LC_ALL,
-            'rus_rus' if sys.platform == 'win32' else 'ru_RU.UTF-8')
+    setup_locale() 
     app.run(host='0.0.0.0', port=80, debug=True)

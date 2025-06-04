@@ -109,45 +109,40 @@ def send_sms(phone_number, user_full_name):
     
 def month_name_genitive(date):
     """Возвращает название месяца в родительном падеже"""
-    print(date)
+    # Create a fixed mapping instead of relying on system locales
+    month_mapping = {
+        1: 'Января', 2: 'Февраля', 3: 'Марта',
+        4: 'Апреля', 5: 'Мая', 6: 'Июня',
+        7: 'Июля', 8: 'Августа', 9: 'Сентября',
+        10: 'Октября', 11: 'Ноября', 12: 'Декабря'
+    }
+    
     try:
-        if isinstance(date, int) and date > 0 and date < 13:
-            print("Integer")
-            month_mapping = {
-            1: 'Января',
-            2: 'Февраля',
-            3: 'Марта',
-            4: 'Апреля',
-            5: 'Мая',
-            6: 'Июня',
-            7: 'Июля',
-            8: 'Августа',
-            9: 'Сентября',
-            10: 'Октября',
-            11: 'Ноября',
-            12: 'Декабря'}
+        # Handle integer month number
+        if isinstance(date, int) and 1 <= date <= 12:
             return month_mapping.get(date)
+        # Handle datetime object
+        elif hasattr(date, 'month'):
+            return month_mapping.get(date.month)
+        # Handle string month name (convert to corresponding number)
         else:
-            print("Datetime")
-            month_mapping = {
-            'Январь': 'Января',
-            'Февраль': 'Февраля',
-            'Март': 'Марта',
-            'Апрель': 'Апреля',
-            'Май': 'Мая',
-            'Июнь': 'Июня',
-            'Июль': 'Июля',
-            'Август': 'Августа',
-            'Сентябрь': 'Сентября',
-            'Октябрь': 'Октября',
-            'Ноябрь': 'Ноября',
-            'Декабрь': 'Декабря'}   
-            nominative = date.month_name(locale="Russian")
-            return month_mapping.get(nominative, nominative)
-    except TypeError:
-        print("Invalid date format. Please provide a valid date.")
-        return None
-
+            # Simple mapping of Russian month names to numbers
+            month_to_num = {
+                'Январь': 1, 'Февраль': 2, 'Март': 3, 'Апрель': 4,
+                'Май': 5, 'Июнь': 6, 'Июль': 7, 'Август': 8,
+                'Сентябрь': 9, 'Октябрь': 10, 'Ноябрь': 11, 'Декабрь': 12
+            }
+            # Try to find the month number and then get the genitive form
+            for name, num in month_to_num.items():
+                if name in str(date):
+                    return month_mapping.get(num)
+            
+            # If nothing matched, return as is
+            return str(date)
+    except Exception as e:
+        print(f"Error in month_name_genitive: {e}")
+        # Fallback - return the original value
+        return str(date)
 def get_document(type=None, **kwargs):
     if type is None:
         raise ValueError("Document type must be specified")
