@@ -1,6 +1,7 @@
 # Use an official Python runtime as a parent image
 FROM python:3.13-slim
 
+ENV TZ=Asia/Tashkent
 # Install locales package and generate ru_RU.UTF-8 locale
 # Install locales package and generate ru_RU.UTF-8 locale more thoroughly
 RUN apt-get update && apt-get install -y --no-install-recommends locales \
