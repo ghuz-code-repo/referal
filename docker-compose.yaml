@@ -9,6 +9,8 @@ services:
       - "nginx.auth=true"
     volumes:
       - ./instance:/app/instance
+      - ./templates:/app/templates
+      - ./static:/app/static
       - ./documents:/app/documents
     env_file:
       - .env

@@ -38,15 +38,15 @@
         <!-- Шапка сайта -->
         <header class="header">
             <div class="header_name">
-                <a href="{{ url_for('routes.main') }}" class="nav__link"> Реферальная программа для сотрудников Golden House </a>
+                <a href="{{ url_for('main.main') }}" class="nav__link"> Реферальная программа для сотрудников Golden House </a>
             </div>
             <nav class="nav">
                 <ul class="nav__list">
                     <li class="nav__item">
-                        <a href="{{ url_for('routes.main') }}" class="nav__link"><i class="fas fa-home"></i> Главная</a>
+                        <a href="{{ url_for('main.main') }}" class="nav__link"><i class="fas fa-home"></i> Главная</a>
                     </li>
                     <li class="nav__item">
-                        <a href="{{ url_for('routes.profile') }}" class="nav__link"><i class="fas fa-user"></i> Профиль</a>
+                        <a href="{{ url_for('referal.profile') }}" class="nav__link"><i class="fas fa-user"></i> Профиль</a>
                     </li>
                     <li>
                         <a href="/" class="nav__link"><i class="fas fa-th-list"></i> Меню сервисов</a>
@@ -84,21 +84,23 @@
                         </thead>
                         <tbody class="table__body">
                             {% for request in withdrawal_requests %}
+                                {% for deal in request.deals %}
                             <tr class="table__row">
                                 <td class="table__data">{{ request.user_id
                                     }}</td>
-                                <td class="table__data">{{ request.full_name
+                                <td class="table__data">{{ request.referal_data.full_name
                                     }}</td>
-                                <td class="table__data">{{ request.phone_number
-                                    }}</td>
-                                <td class="table__data">{{
-                                    request.contract_number }}</td>
-                                <td class="table__data">{{ request.status_name
+                                <td class="table__data">{{ request.referal_data.phone_number
                                     }}</td>
                                 <td class="table__data">
-                                    <form
-                                        action="{{ url_for('routes.update_withdrawal_stage', referral_id=request.id) }}"
-                                        method="POST" class="form">
+                                        {{ deal.agreement_number }}
+                                    </td>
+                                <td class="table__data">{{ request.status_name
+                                    }}</td>
+                            <td class="table__data">
+                                <form
+                                    action="{{ url_for('admin.update_withdrawal_stage', referal_id=request.id) }}"
+                                    method="POST" class="form">
                                         <select name="withdrawal_stage" required
                                             class="form__select">
                                             {% for status in statuses %}
@@ -118,6 +120,7 @@
                                     </form>
                                 </td>
                             </tr>
+                                {% endfor %}
                             {% endfor %}
                         </tbody>
                     </table>

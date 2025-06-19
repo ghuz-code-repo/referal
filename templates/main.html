@@ -55,11 +55,22 @@
 
         // Ensure proper formatting on form submission
         phoneInput.form.addEventListener('submit', function() {
-            const input = phoneInput.value;
-            const digits = input.substring(5).replace(/\D/g, '');
+            const phones = phoneInput.value.split(',');
+            let allValid = true;
             
-            if (digits.length !== 9) {
-                alert('Пожалуйста, введите 9 цифр номера телефона после кода страны');
+            for (let phone of phones) {
+                phone = phone.trim();
+                if (!phone) continue;
+                
+                const digits = phone.substring(5).replace(/\D/g, '');
+                if (digits.length !== 9) {
+                    allValid = false;
+                    break;
+                }
+            }
+            
+            if (!allValid) {
+                alert('Пожалуйста, введите 9 цифр для каждого номера телефона после кода страны. Для множественных номеров разделяйте их запятыми.');
                 event.preventDefault();
                 return false;
             }
@@ -71,17 +82,17 @@
 <body>
     <header>
         <div class="header_name">
-            <a href="{{ url_for('routes.main') }}" class="nav__link"> Реферальная программа для сотрудников Golden House </a>
+            <a href="{{ url_for('main.main') }}" class="nav__link"> Реферальная программа для сотрудников Golden House </a>
         </div>
         <nav class="nav">
             <ul class="nav__list">
                 <li class="nav__item">
-                    <a href="{{ url_for('routes.profile') }}" class="nav__link"><i class="fas fa-user"></i> Профиль</a>
+                    <a href="{{ url_for('referal.profile') }}" class="nav__link"><i class="fas fa-user"></i> Профиль</a>
                 </li>
                 <li>
                     {% if current_user and current_user.role=='admin' %}
                     <li class="nav__item">
-                        <a href="{{ url_for('routes.admin_panel') }}" class="nav__link"><i class="fas fa-user"></i>Админ</a>
+                        <a href="{{ url_for('admin.admin_panel') }}" class="nav__link"><i class="fas fa-user"></i>Админ</a>
                     </li>
                     {% endif %}
                 </li>
@@ -101,7 +112,7 @@
     <main class ="main">
         <div class="container">
             <div id="form-container">
-                <form method="POST" action= "{{ url_for('routes.add_referral') }}">
+                <form method="POST" action= "{{ url_for('referal.add_referal') }}">
                     <h1 class="main__title">Введите данные реферала</h1>
                     <input type="text" name="full_name" placeholder="ФИО">
                     <p style="color: rgb(211, 40, 40);"> Фамилия, имя и отчество должны быть указаны на латинице в точном соответствии с паспортом/ID</p>
