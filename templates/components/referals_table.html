@@ -25,98 +25,226 @@
                 <tr>
                     <th style="width: 15%;">
                         <div class="header-cell">
-                            <span>ФИО</span>
-                            <a href="{{ url_for('referal.profile', sort='name', order='asc' if current_sort != 'name' or current_order == 'desc' else 'desc', **current_filters) }}" 
-                               class="sort-btn {{ 'active-asc' if current_sort == 'name' and current_order == 'asc' else 'active-desc' if current_sort == 'name' and current_order == 'desc' else '' }}">
-                                <i class="fas fa-sort"></i>
-                            </a>
+                            <div class="header-title">
+                                <span>ФИО</span>
+                                <div class="sort-controls">
+                                    {% for sort_field in sort_fields %}
+                                        {% if sort_field.field == 'name' %}
+                                    <button type="button" class="clear-sort-btn" data-field="name" title="Убрать из сортировки">
+                                        <i class="fas fa-times cancel_sort"></i>
+                                    </button>
+                                    <span class="sort-number">{{ loop.index }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <button type="button" class="sort-btn" data-field="name" title="Изменить сортировку">
+                                        {% if sort_fields|selectattr('field', 'equalto', 'name')|list %}
+                                            {% set name_field = sort_fields|selectattr('field', 'equalto', 'name')|first %}
+                                            <i class="fas fa-caret-{{ 'up' if name_field.order == 'asc' else 'down' }}"></i>
+                                        {% else %}
+                                            <i class="fas fa-sort"></i>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="header-controls">
+                                <input type="text" 
+                                       class="header-filter" 
+                                       placeholder="Поиск по ФИО"
+                                       value="{{ current_filters.name }}"
+                                       data-filter="name">
+                                {% if current_filters.name %}
+                                <button type="button" class="clear-filter-btn" data-filter="name" title="Очистить фильтр">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                {% endif %}
+                            </div>
                         </div>
-                        <input type="text" 
-                               class="header-filter" 
-                               placeholder="Поиск по ФИО"
-                               value="{{ current_filters.name }}"
-                               data-filter="name">
                     </th>
                     <th style="width: 12%;">
                         <div class="header-cell">
-                            <span>Телефон</span>
-                            <a href="{{ url_for('referal.profile', sort='phone', order='asc' if current_sort != 'phone' or current_order == 'desc' else 'desc', **current_filters) }}" 
-                               class="sort-btn {{ 'active-asc' if current_sort == 'phone' and current_order == 'asc' else 'active-desc' if current_sort == 'phone' and current_order == 'desc' else '' }}">
-                                <i class="fas fa-sort"></i>
-                            </a>
+                            <div class="header-title">
+                                <span>Телефон</span>
+                                <div class="sort-controls">
+                                    {% for sort_field in sort_fields %}
+                                        {% if sort_field.field == 'phone' %}
+                                    <button type="button" class="clear-sort-btn" data-field="phone" title="Убрать из сортировки">
+                                        <i class="fas fa-times cancel_sort"></i>
+                                    </button>
+                                    <span class="sort-number">{{ loop.index }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <button type="button" class="sort-btn" data-field="phone" title="Изменить сортировку">
+                                        {% if sort_fields|selectattr('field', 'equalto', 'phone')|list %}
+                                            {% set phone_field = sort_fields|selectattr('field', 'equalto', 'phone')|first %}
+                                            <i class="fas fa-caret-{{ 'up' if phone_field.order == 'asc' else 'down' }}"></i>
+                                        {% else %}
+                                            <i class="fas fa-sort"></i>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="header-controls">
+                                <input type="text" 
+                                       class="header-filter" 
+                                       placeholder="Поиск по телефону"
+                                       value="{{ current_filters.phone }}"
+                                       data-filter="phone">
+                                {% if current_filters.phone %}
+                                <button type="button" class="clear-filter-btn" data-filter="phone" title="Очистить фильтр">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                {% endif %}
+                            </div>
                         </div>
-                        <input type="text" 
-                               class="header-filter" 
-                               placeholder="Поиск по телефону"
-                               value="{{ current_filters.phone }}"
-                               data-filter="phone">
                     </th>
                     <th style="width: 12%;">
                         <div class="header-cell">
-                            <span>Договор</span>
-                            <a href="{{ url_for('referal.profile', sort='contract', order='asc' if current_sort != 'contract' or current_order == 'desc' else 'desc', **current_filters) }}" 
-                               class="sort-btn {{ 'active-asc' if current_sort == 'contract' and current_order == 'asc' else 'active-desc' if current_sort == 'contract' and current_order == 'desc' else '' }}">
-                                <i class="fas fa-sort"></i>
-                            </a>
+                            <div class="header-title">
+                                <span>Договор</span>
+                                <div class="sort-controls">
+                                    {% for sort_field in sort_fields %}
+                                        {% if sort_field.field == 'contract' %}
+                                    <button type="button" class="clear-sort-btn" data-field="contract" title="Убрать из сортировки">
+                                        <i class="fas fa-times cancel_sort"></i>
+                                    </button>
+                                    <span class="sort-number">{{ loop.index }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <button type="button" class="sort-btn" data-field="contract" title="Изменить сортировку">
+                                        {% if sort_fields|selectattr('field', 'equalto', 'contract')|list %}
+                                            {% set contract_field = sort_fields|selectattr('field', 'equalto', 'contract')|first %}
+                                            <i class="fas fa-caret-{{ 'up' if contract_field.order == 'asc' else 'down' }}"></i>
+                                        {% else %}
+                                            <i class="fas fa-sort"></i>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="header-controls">
+                                <input type="text" 
+                                       class="header-filter" 
+                                       placeholder="Номер договора"
+                                       value="{{ current_filters.contract }}"
+                                       data-filter="contract">
+                                {% if current_filters.contract %}
+                                <button type="button" class="clear-filter-btn" data-filter="contract" title="Очистить фильтр">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                {% endif %}
+                            </div>
                         </div>
-                        <input type="text" 
-                               class="header-filter" 
-                               placeholder="Номер договора"
-                               value="{{ current_filters.contract }}"
-                               data-filter="contract">
                     </th>
                     <th style="width: 8%;">
                         <div class="header-cell">
-                            <span>Macro ID</span>
-                        </div>
-                        <input type="text" 
-                               class="header-filter" 
-                               placeholder="Macro ID"
-                               value="{{ current_filters.contact_id }}"
-                               data-filter="contact_id">
-                    </th>
-                    <th style="width: 10%;">
-                        <div class="header-cell">
-                            <span>Статус</span>
-                            <a href="{{ url_for('referal.profile', sort='status', order='asc' if current_sort != 'status' or current_order == 'desc' else 'desc', **current_filters) }}" 
-                               class="sort-btn {{ 'active-asc' if current_sort == 'status' and current_order == 'asc' else 'active-desc' if current_sort == 'status' and current_order == 'desc' else '' }}">
-                                <i class="fas fa-sort"></i>
-                            </a>
-                        </div>
-                        <select class="header-filter header-select" data-filter="status">
-                            <option value="">Все</option>
-                            <option value="no_status" {{ 'selected' if current_filters.status == 'no_status' else '' }}>Не начата</option>
-                            {% for status in statuses %}
-                                {% if status.id != 0 %}
-                                <option value="{{ status.id }}" {{ 'selected' if current_filters.status == status.id|string else '' }}>
-                                    {{ status.name }}
-                                </option>
+                            <div class="header-title">
+                                <span>Macro ID</span>
+                            </div>
+                            <div class="header-controls">
+                                <input type="text" 
+                                       class="header-filter" 
+                                       placeholder="Macro ID"
+                                       value="{{ current_filters.contact_id }}"
+                                       data-filter="contact_id">
+                                {% if current_filters.contact_id %}
+                                <button type="button" class="clear-filter-btn" data-filter="contact_id" title="Очистить фильтр">
+                                    <i class="fas fa-times"></i>
+                                </button>
                                 {% endif %}
-                            {% endfor %}
-                        </select>
+                            </div>
+                        </div>
                     </th>
                     <th style="width: 10%;">
                         <div class="header-cell">
-                            <span>Сумма к выводу</span>
-                            <a href="{{ url_for('referal.profile', sort='amount', order='asc' if current_sort != 'amount' or current_order == 'desc' else 'desc', **current_filters) }}" 
-                               class="sort-btn {{ 'active-asc' if current_sort == 'amount' and current_order == 'asc' else 'active-desc' if current_sort == 'amount' and current_order == 'desc' else '' }}">
-                                <i class="fas fa-sort"></i>
-                            </a>
+                            <div class="header-title">
+                                <span>Статус</span>
+                                <div class="sort-controls">
+                                    {% for sort_field in sort_fields %}
+                                        {% if sort_field.field == 'status' %}
+                                    <button type="button" class="clear-sort-btn" data-field="status" title="Убрать из сортировки">
+                                        <i class="fas fa-times cancel_sort"></i>
+                                    </button>
+                                    <span class="sort-number">{{ loop.index }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <button type="button" class="sort-btn" data-field="status" title="Изменить сортировку">
+                                        {% if sort_fields|selectattr('field', 'equalto', 'status')|list %}
+                                            {% set status_field = sort_fields|selectattr('field', 'equalto', 'status')|first %}
+                                            <i class="fas fa-caret-{{ 'up' if status_field.order == 'asc' else 'down' }}"></i>
+                                        {% else %}
+                                            <i class="fas fa-sort"></i>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="header-controls">
+                                <select class="header-filter header-select" data-filter="status">
+                                    <option value="">Все</option>
+                                    <option value="no_status" {{ 'selected' if current_filters.status == 'no_status' else '' }}>Не начата</option>
+                                    {% for status in statuses %}
+                                        {% if status.id != 0 %}
+                                        <option value="{{ status.id }}" {{ 'selected' if current_filters.status == status.id|string else '' }}>
+                                            {{ status.name }}
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                                {% if current_filters.status %}
+                                <button type="button" class="clear-filter-btn" data-filter="status" title="Очистить фильтр">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </th>
+                    <th style="width: 10%;">
+                        <div class="header-cell">
+                            <div class="header-title">
+                                <span>Сумма к выводу</span>
+                                <div class="sort-controls">
+                                    {% for sort_field in sort_fields %}
+                                        {% if sort_field.field == 'amount' %}
+                                    <button type="button" class="clear-sort-btn" data-field="amount" title="Убрать из сортировки">
+                                        <i class="fas fa-times cancel_sort"></i>
+                                    </button>
+                                    <span class="sort-number">{{ loop.index }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <button type="button" class="sort-btn" data-field="amount" title="Изменить сортировку">
+                                        {% if sort_fields|selectattr('field', 'equalto', 'amount')|list %}
+                                            {% set amount_field = sort_fields|selectattr('field', 'equalto', 'amount')|first %}
+                                            <i class="fas fa-caret-{{ 'up' if amount_field.order == 'asc' else 'down' }}"></i>
+                                        {% else %}
+                                            <i class="fas fa-sort"></i>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </th>
                     <th style="width: 12%;">
                         <div class="header-cell">
-                            <span>Вывод средств</span>
+                            <div class="header-title">
+                                <span>Вывод средств</span>
+                            </div>
                         </div>
                     </th>
                     <th style="width: 11%;">
                         <div class="header-cell">
-                            <span>Документы</span>
+                            <div class="header-title">
+                                <span>Документы</span>
+                            </div>
                         </div>
                     </th>
                     <th style="width: 10%;">
                         <div class="header-cell">
-                            <span>Скачать акт</span>
+                            <div class="header-title">
+                                <span>Скачать акт</span>
+                            </div>
                         </div>
                     </th>
                 </tr>
@@ -152,6 +280,8 @@
         <p>Добавьте первого реферала, нажав кнопку "Добавить реферала"</p>
     </div>
     
+    <!-- Пагинация показывается даже при отсутствии рефералов -->
+    {% include 'components/pagination.html' %}
     <!-- Пагинация показывается даже при отсутствии рефералов -->
     {% include 'components/pagination.html' %}
     {% endif %}

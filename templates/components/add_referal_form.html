@@ -1,83 +1,64 @@
 <!-- Карточка реферала (точная копия структуры MacroCRM) -->
 <div id="DocumentFormModal_new" class="modal" style="display: none;">
-    <div class="modal-content">
-            <span class="close close_document_form" data-referal-id="new">&times;</span>
-            <div class="modal-header">
-                <h3>Добавление реферала</h3>
-            </div>
-            <div class="modal-body">
-                    <div class="data-card referal-card">
-                        <h3 style="padding-bottom: 10px;"><i class="fas fa-user-edit"></i> Данные реферала</h3>
-                        <h3 style="padding-bottom: 10px;"> Обязательные данные</h3>
-                        <form action="{{ url_for('referal.add_referal') }}" method="POST">
-                            <div class="card-content">
-                                <!-- Основная строка с именем -->
-                                <div class="name-row">
-                                    <span class="field-label">ФИО:</span>
-
-                                        <input type="text" 
-                                               name="full_name" 
-                                               class="editable-input"
-                                               placeholder="Введите ФИО реферала" 
-                                               required>
-                                </div>
-
-                                <!-- Вторая строка: телефон и ID -->
-                                <div class="info-row" style="grid-template-columns: 1fr;">
-                                    <div class="info-item full-phone" >
-                                        <span class="field-label">Телефон:</span>
-                                            <input type="tel" 
-                                                   name="phone_number" 
-                                                   class="editable-input"
-                                                   placeholder="+998 XX XXX XX XX" 
-                                                   required>
-                                    </div>
-                                </div>
-                                <!-- Блок паспортной информации -->
-                                <div class="passport-section">
-                                    <h3 style="padding-bottom: 10px;">Паспортная информация (необязательные поля)</h3>
-                                    <div class="passport-grid">
-                                        <div class="passport-item">
-                                            <span class="field-label">Серия и номер паспорта:</span>
-                                            <div class="passport-input-container">
-                                                <input type="text" 
-                                                       name="passport_number" 
-                                                       class="editable-input"
-                                                       placeholder="AA1234567">
-                                            </div>
-                                        </div>
-                                        <div class="passport-item full-width">
-                                            <span class="field-label">Кем выдан паспорт:</span>
-
-                                            <div class="passport-input-container">
-                                                <input type="text" 
-                                                       name="passport_giver" 
-                                                       class="editable-input"
-                                                       placeholder="Название органа">
-                                            </div>
-                                        </div>
-                                        <div class="passport-item">
-                                            <span class="field-label">Дата выдачи паспорта:</span>
-
-                                            <div class="passport-input-container">
-                                                <input type="date" 
-                                                       name="passport_date" 
-                                                       class="editable-input">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Кнопка сохранения внизу карточки реферала (аналогично кнопке переноса в MacroCRM) -->
-                                <div class="save-all-container">
-                                    <button type="submit" class="save-all-btn">
-                                        <i class="fas fa-save"></i> Сохранить данные реферала
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-            </div>
-        </div>
+  <div class="modal-content">
+    <span class="close close_document_form" data-referal-id="new">&times;</span>
+    <div class="modal-header">
+      <h3>Добавление реферала</h3>
     </div>
+    <div class="modal-body">
+      <div class="data-card referal-card">
+        <h3 style="padding-bottom: 10px;"><i class="fas fa-user-edit"></i> Данные реферала</h3>
+        <h3 style="padding-bottom: 10px;">Обязательные данные</h3>
+        <form action="{{ url_for('referal.add_referal') }}" method="POST">
+          <div class="card-content">
+            <!-- Основная строка с именем -->
+            <div class="name-row">
+              <span class="field-label">ФИО:</span>
+
+              <input type="text" name="full_name" class="editable-input" placeholder="Введите ФИО реферала" required />
+            </div>
+
+            <!-- Вторая строка: телефон и ID -->
+            <div class="info-row" style="grid-template-columns: 1fr;">
+              <div class="info-item full-phone">
+                <span class="field-label">Телефон:</span>
+                <input type="tel" name="phone_number" class="editable-input" placeholder="+998 XX XXX XX XX" required />
+              </div>
+            </div>
+            <!-- Блок паспортной информации -->
+            <div class="passport-section">
+              <h3 style="padding-bottom: 10px;">Паспортная информация (необязательные поля)</h3>
+              <div class="passport-grid">
+                <div class="passport-item">
+                  <span class="field-label">Серия и номер паспорта:</span>
+                  <div class="passport-input-container">
+                    <input type="text" name="passport_number" class="editable-input" placeholder="AA1234567" />
+                  </div>
+                </div>
+                <div class="passport-item full-width">
+                  <span class="field-label">Кем выдан паспорт:</span>
+
+                  <div class="passport-input-container">
+                    <input type="text" name="passport_giver" class="editable-input" placeholder="Название органа" />
+                  </div>
+                </div>
+                <div class="passport-item">
+                  <span class="field-label">Дата выдачи паспорта:</span>
+
+                  <div class="passport-input-container">
+                    <input type="date" name="passport_date" class="editable-input" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Кнопка сохранения внизу карточки реферала (аналогично кнопке переноса в MacroCRM) -->
+            <div class="save-all-container">
+              <button type="submit" class="save-all-btn"><i class="fas fa-save"></i> Сохранить данные реферала</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>

@@ -35,15 +35,30 @@ def profile():
     phone_filter = request.args.get('phone', '')
     contract_filter = request.args.get('contract', '')
     contact_id_filter = request.args.get('contact_id', '')
-    sort_by = request.args.get('sort', '')
-    sort_order = request.args.get('order', 'asc')
+    
+    # Получаем множественную сортировку как строку "field1:asc,field2:desc"
+    sort_param = request.args.get('sort', '')
+    
+    # Парсим сортировку
+    sort_fields = []
+    if sort_param:
+        for sort_item in sort_param.split(','):
+            if ':' in sort_item:
+                field, order = sort_item.split(':')
+                sort_fields.append({'field': field, 'order': order})
     
     # Базовый запрос с единократным присоединением ReferalData
     query = Referal.query.filter_by(user_id=user.id)
     
     # Определяем, нужно ли присоединять ReferalData
-    needs_referal_data_join = (name_filter or phone_filter or contract_filter or 
-                              sort_by in ['name', 'phone', 'contract'])
+    needs_referal_data_join = (name_filter or phone_filter or contract_filter)
+    
+    # Проверяем, есть ли сортировка по полям ReferalData
+    if sort_fields:
+        for sort_field in sort_fields:
+            if sort_field['field'] in ['name', 'phone', 'contract']:
+                needs_referal_data_join = True
+                break
     
     if needs_referal_data_join:
         query = query.join(ReferalData)
@@ -70,35 +85,32 @@ def profile():
     if contact_id_filter:
         query = query.filter(Referal.contact_id.ilike(f'%{contact_id_filter}%'))
     
-    # Применяем сортировку
-    if sort_by:
-        if sort_by == 'name':
-            if sort_order == 'desc':
-                query = query.order_by(ReferalData.full_name.desc())
+    # Применяем множественную сортировку
+    if sort_fields:
+        order_by_clauses = []
+        for sort_field in sort_fields:
+            field = sort_field['field']
+            order = sort_field['order']
+            
+            if field == 'name':
+                clause = ReferalData.full_name.desc() if order == 'desc' else ReferalData.full_name.asc()
+            elif field == 'phone':
+                clause = ReferalData.phone_number.desc() if order == 'desc' else ReferalData.phone_number.asc()
+            elif field == 'contract':
+                clause = ReferalData.contract_number.desc() if order == 'desc' else ReferalData.contract_number.asc()
+            elif field == 'status':
+                clause = Referal.status_id.desc() if order == 'desc' else Referal.status_id.asc()
+            elif field == 'amount':
+                clause = Referal.withdrawal_amount.desc() if order == 'desc' else Referal.withdrawal_amount.asc()
             else:
-                query = query.order_by(ReferalData.full_name.asc())
-        elif sort_by == 'phone':
-            if sort_order == 'desc':
-                query = query.order_by(ReferalData.phone_number.desc())
-            else:
-                query = query.order_by(ReferalData.phone_number.asc())
-        elif sort_by == 'contract':
-            if sort_order == 'desc':
-                query = query.order_by(ReferalData.contract_number.desc())
-            else:
-                query = query.order_by(ReferalData.contract_number.asc())
-        elif sort_by == 'status':
-            if sort_order == 'desc':
-                query = query.order_by(Referal.status_id.desc())
-            else:
-                query = query.order_by(Referal.status_id.asc())
-        elif sort_by == 'amount':
-            if sort_order == 'desc':
-                query = query.order_by(Referal.withdrawal_amount.desc())
-            else:
-                query = query.order_by(Referal.withdrawal_amount.asc())
+                continue
+            
+            order_by_clauses.append(clause)
+        
+        if order_by_clauses:
+            query = query.order_by(*order_by_clauses)
     else:
-        # Сортировка по умолчанию - по дате создания
+        # Сортировка по умолчанию
         query = query.order_by(Referal.id.desc())
     
     # Пагинация
@@ -137,8 +149,8 @@ def profile():
                               'contact_id': contact_id_filter,
                               'per_page': per_page
                           },
-                          current_sort=sort_by,
-                          current_order=sort_order)
+                          current_sort=sort_param,
+                          sort_fields=sort_fields if sort_fields else [])
 
 
 @referal_bp.route('/add', methods=['POST'])

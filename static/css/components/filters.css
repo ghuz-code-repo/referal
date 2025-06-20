@@ -17,6 +17,10 @@
     margin-bottom: 15px;
 }
 
+.cancel_sort {
+    font-size: 14px;
+}
+
 .filter-group {
     display: flex;
     flex-direction: column;
