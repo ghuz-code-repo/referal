@@ -156,7 +156,11 @@ def sync_referals_with_macro_contacts():
 
 
 def _fetch_and_process_contacts_task(mysql_config, app_context):
-    """Получает контакты из MySQL и вставляет их в локальную таблицу MacroContact."""
+    """
+    Fetches contacts from MySQL and upserts them into the local MacroContact table.
+    Handles multiple phone numbers separated by commas as separate contact records.
+    After completion, synchronizes existing referals with updated contacts.
+    """
     task_name = "Contacts Task"
     loaded_records = 0
     total_records_to_process = 0
@@ -217,9 +221,10 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                         "errors_list": ["No contacts found with valid modification date and non-empty phones"]
                     }
                 
-                # Fetch contacts data
+                # Fetch contacts data - убираем поле номер договора, оно не нужно
                 query_contacts = """
-                    SELECT id, contacts_buy_name, contacts_buy_phones
+                    SELECT id, contacts_buy_name, contacts_buy_phones, 
+                           COALESCE(contacts_buy_emails, '') as contacts_buy_emails
                     FROM estate_deals_contacts
                     WHERE date_modified >= %s
                     AND contacts_buy_phones IS NOT NULL 
@@ -263,10 +268,19 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                     # Expand contacts with multiple phone numbers
                     expanded_contacts = []
                     for mysql_row in rows_from_mysql:
-                        contact_id, full_name, phone_number_raw = mysql_row
+                        contact_id, full_name, phone_number_raw, email_raw = mysql_row
                         
                         if not phone_number_raw or phone_number_raw.strip() == '':
                             continue
+                        
+                        # Обработка email - берем только первый из списка
+                        processed_email = None
+                        if email_raw and email_raw.strip():
+                            # Разбиваем по запятой и берем первый email
+                            emails = [email.strip() for email in email_raw.split(',') if email.strip()]
+                            if emails:
+                                processed_email = emails[0]
+                                print(f"DEBUG: Processed email for contact {contact_id}: {processed_email}")
                         
                         # Handle multiple phone numbers separated by commas
                         if ',' in phone_number_raw:
@@ -278,7 +292,12 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                                         'contact_id': contact_id,
                                         'full_name': full_name,
                                         'formatted_phone': formatted_phone,
-                                        'raw_phone': phone
+                                        'raw_phone': phone,
+                                        'passport_number': None,
+                                        'passport_giver': None,
+                                        'passport_date': None,
+                                        'passport_address': None,
+                                        'email': processed_email
                                     })
                                 else:
                                     unformattable_phone_details_list.append({'id': contact_id, 'raw_phone': phone})
@@ -291,7 +310,12 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                                     'contact_id': contact_id,
                                     'full_name': full_name,
                                     'formatted_phone': formatted_phone,
-                                    'raw_phone': phone_number_raw
+                                    'raw_phone': phone_number_raw,
+                                    'passport_number': None,
+                                    'passport_giver': None,
+                                    'passport_date': None,
+                                    'passport_address': None,
+                                    'email': processed_email
                                 })
                             else:
                                 unformattable_phone_details_list.append({'id': contact_id, 'raw_phone': phone_number_raw})
@@ -322,16 +346,38 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                                 skipped_in_batch_conflict_in_batch += 1
                                 continue
                             
-                            # Create new contact record with phone as primary unique identifier
-                            # Since contacts_id is no longer unique, we can have multiple records with same contacts_id but different phones
-                            new_contact = MacroContact(
-                                contacts_id=contact_id_from_mysql,
-                                full_name=full_name_from_mysql,
-                                phone_number=formatted_phone_number
-                            )
-                            contacts_to_add.append(new_contact)
-                            global_processed_phones.add(formatted_phone_number)
-                            staged_for_commit_in_batch += 1
+                            # Check if contact already exists
+                            existing_contact = MacroContact.query.filter_by(phone_number=formatted_phone_number).first()
+                            
+                            if existing_contact:
+                                # Update existing contact with new data
+                                existing_contact.full_name = full_name_from_mysql
+                                existing_contact.contacts_id = contact_id_from_mysql
+                                existing_contact.email = contact_data.get('email')
+                                existing_contact.passport_address = contact_data.get('passport_address')
+                                existing_contact.passport_number = contact_data.get('passport_number')
+                                existing_contact.passport_giver = contact_data.get('passport_giver')
+                                existing_contact.passport_date = contact_data.get('passport_date')
+                                # Добавляем в processed phones после обновления
+                                global_processed_phones.add(formatted_phone_number)
+                                staged_for_commit_in_batch += 1
+                            else:
+                                # Create new contact record with all fields
+                                new_contact = MacroContact(
+                                    contacts_id=contact_id_from_mysql,
+                                    full_name=full_name_from_mysql,
+                                    phone_number=formatted_phone_number,
+                                    passport_number=contact_data.get('passport_number'),
+                                    passport_giver=contact_data.get('passport_giver'),
+                                    passport_date=contact_data.get('passport_date'),
+                                    passport_address=contact_data.get('passport_address'),
+                                    email=contact_data.get('email')
+                                )
+                                contacts_to_add.append(new_contact)
+                                # print(f"DEBUG: Creating new contact with email: {contact_data.get('email')}")
+                                # Добавляем в processed phones для новых контактов
+                                global_processed_phones.add(formatted_phone_number)
+                                staged_for_commit_in_batch += 1
                         
                         except Exception as e_single:
                             error_msg = f"{task_name}: Exception processing record: ID {contact_id_from_mysql}, Phone {formatted_phone_number} - {str(e_single)}"
@@ -362,12 +408,17 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                             individual_success = 0
                             for contact in contacts_to_add:
                                 try:
-                                    # Check if phone already exists
+                                    # Check if phone already exists again (safety check)
                                     existing = MacroContact.query.filter_by(phone_number=contact.phone_number).first()
                                     if existing:
-                                        print(f"{task_name}: Phone {contact.phone_number} already exists, updating contact_id from {existing.contacts_id} to {contact.contacts_id}")
+                                        print(f"{task_name}: Phone {contact.phone_number} already exists during individual insert, updating...")
                                         existing.contacts_id = contact.contacts_id
                                         existing.full_name = contact.full_name
+                                        existing.email = contact.email
+                                        existing.passport_address = contact.passport_address
+                                        existing.passport_number = contact.passport_number
+                                        existing.passport_giver = contact.passport_giver
+                                        existing.passport_date = contact.passport_date
                                     else:
                                         db.session.add(contact)
                                     db.session.commit()
@@ -378,9 +429,16 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                             
                             loaded_records += individual_success
                             print(f"{task_name}: Individual inserts: {individual_success} successful")
-                    else:
-                        print(f"{task_name}: No contacts to add in this batch")
-                
+                    
+                    # Commit updates to existing contacts
+                    try:
+                        db.session.commit()
+                        print(f"{task_name}: Successfully committed updates to existing contacts")
+                    except Exception as e_update:
+                        db.session.rollback()
+                        print(f"{task_name}: Error committing updates to existing contacts: {e_update}")
+                        errors.append(f"Update commit error: {str(e_update)}")
+
                     grand_total_skipped_in_batch_conflict += skipped_in_batch_conflict_in_batch
                     grand_total_skipped_staging_error += skipped_staging_error_in_batch
                 
@@ -543,3 +601,33 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
         if connection:
             connection.close()
             print(f"{task_name}: MySQL connection closed")
+
+
+def fetch_and_process_contacts(days_back=30):
+    """
+    Публичная функция для обновления контактов из MacroCRM
+    """
+    try:
+        mysql_config = {
+            'host': os.getenv('MYSQL_HOST'),
+            'port': int(os.getenv('MYSQL_PORT', 3306)),
+            'user': os.getenv('MYSQL_USER'),
+            'password': os.getenv('MYSQL_PASSWORD'),
+            'database': os.getenv('MYSQL_DATABASE'),
+            'charset': 'utf8mb4'
+        }
+        
+        # Запускаем задачу синхронизации
+        with current_app.app_context():
+            result = _fetch_and_process_contacts_task(mysql_config, current_app.app_context())
+            return {
+                'success': True,
+                'processed_count': result.get('loaded', 0) if result else 0
+            }
+    except Exception as e:
+        print(f"Error in fetch_and_process_contacts: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+            

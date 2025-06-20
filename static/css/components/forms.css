@@ -1,0 +1,159 @@
+form {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.form-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background-color: #fff;
+}
+
+.modal_form_container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+}
+
+.modal_form_container .form-group {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+input,
+select {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1em;
+    min-width: 75%;
+}
+
+label {
+    padding-top: 15px;
+    font-weight: bold;
+}
+
+.form {
+    /* styles already exist */
+}
+
+.form__select {
+    /* styles already exist */
+}
+
+.form__input {
+    /* styles already exist */
+}
+
+/* Компактные секции формы */
+.form-section {
+    margin-bottom: 20px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 15px;
+    border: 1px solid #e9ecef;
+}
+
+.form-section h3 {
+    color: #495057;
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #DAA520;
+}
+
+.form-section h3 i {
+    color: #DAA520;
+    font-size: 16px;
+}
+
+/* Компактная сетка формы */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 12px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-field-full {
+    grid-column: 1 / -1;
+}
+
+.form-field label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 4px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.form-field label::after {
+    content: "*";
+    color: #dc3545;
+    margin-left: 1px;
+}
+
+.form-field:not(:has(input[required])) label::after {
+    display: none;
+}
+
+/* Стили для выпадающего списка */
+select.readonly-input {
+    background-color: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-radius: var(--border-radius);
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--main-color);
+    font-family: inherit;
+    width: 100%;
+    /* appearance: none; */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 8px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    padding-right: 32px;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+select.readonly-input:focus {
+    outline: none;
+    border-color: var(--info-color);
+    box-shadow: 0 0 0 2px rgba(23, 162, 184, 0.25);
+}
+
+/* Убираем фокус стили после blur */
+select.readonly-input:not(:focus) {
+    border-color: #ced4da;
+    box-shadow: none;
+}
+
+select.readonly-input option {
+    padding: 8px 12px;
+    background-color: var(--white);
+    color: var(--main-color);
+    cursor: pointer;
+}
+
+select.readonly-input option:hover {
+    background-color: var(--light-gray);
+}

@@ -1,0 +1,262 @@
+<!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\components\modal_scripts.html -->
+<!-- Подключение JavaScript модулей -->
+<script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/validation/pinfl-validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/validation/email-validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/modal-handler.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/flash-messages.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/password-validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+<script>
+    // Обработчики для модальных окон
+    document.addEventListener('DOMContentLoaded', function() {
+        // Обработчики для соглашения
+        var AgreementDownloadModal = document.getElementById("AgreementDownloadModal");
+        var btn_agreement = document.getElementById("open_agreement");
+        var span_agreement = document.getElementById("close_agreement");
+        
+        if (btn_agreement) {
+            btn_agreement.onclick = function() {
+                AgreementDownloadModal.style.display = "block";
+            }
+        }
+        
+        if (span_agreement) {
+            span_agreement.onclick = function() {
+                AgreementDownloadModal.style.display = "none";
+            }
+        }
+
+        // Обработчики для акта
+        var ActDownloadModal = document.getElementById("ActDownloadModal");
+        var btn_act = document.getElementById("open_act");
+        var span_act = document.getElementById("close_act");
+        
+        if (btn_act) {
+            btn_act.onclick = function() {
+                ActDownloadModal.style.display = "block";
+            }
+        }
+        
+        if (span_act) {
+            span_act.onclick = function() {
+                ActDownloadModal.style.display = "none";
+            }
+        }
+
+        document.querySelectorAll('.use-macro-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const fieldId = this.getAttribute('data-field');
+                const macroValue = this.getAttribute('data-macro-value');
+                const targetInput = document.getElementById(fieldId);
+                
+                if (targetInput && macroValue) {
+                    const fieldName = targetInput.placeholder || targetInput.name || 'поле';
+                    
+                    if (confirm(`Заменить текущее значение поля "${fieldName}" на данные из MacroCRM?\n\nНовое значение: "${macroValue}"`)) {
+                        const oldValue = targetInput.value;
+                        targetInput.value = macroValue;
+                        
+                        // Визуальная обратная связь
+                        targetInput.classList.add('field-updated');
+                        setTimeout(() => {
+                            targetInput.classList.remove('field-updated');
+                        }, 1000);
+                        
+                        // Создаем и показываем уведомление
+                        const container = targetInput.parentElement;
+                        container.style.position = 'relative';
+                        
+                        const notification = document.createElement('div');
+                        notification.className = 'field-update-notification';
+                        notification.textContent = 'Обновлено из MacroCRM';
+                        
+                        container.appendChild(notification);
+                        
+                        setTimeout(() => {
+                            if (notification.parentElement) {
+                                notification.parentElement.removeChild(notification);
+                            }
+                        }, 2000);
+                        
+                        // Логирование изменения
+                        console.log(`Field updated: ${fieldName}`, {
+                            oldValue: oldValue,
+                            newValue: macroValue,
+                            field: fieldId
+                        });
+                        
+                        // Если это поле телефона, применяем форматирование
+                        if (targetInput.name === 'phone_number') {
+                            // Trigger phone formatting if it exists
+                            const inputEvent = new Event('input', { bubbles: true });
+                            targetInput.dispatchEvent(inputEvent);
+                        }
+                    }
+                }
+            });
+        });
+
+        // Добавляем подсказки при наведении на кнопки MacroCRM
+        document.querySelectorAll('.use-macro-btn').forEach(button => {
+            const macroValue = button.getAttribute('data-macro-value');
+            if (macroValue) {
+                // Создаем красивую подсказку
+                button.addEventListener('mouseenter', function() {
+                    if (!this.querySelector('.macro-tooltip')) {
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'macro-tooltip';
+                        tooltip.textContent = macroValue;
+                        tooltip.style.cssText = `
+                            position: absolute;
+                            bottom: 120%;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            background: #333;
+                            color: white;
+                            padding: 4px 8px;
+                            border-radius: 4px;
+                            font-size: 11px;
+                            white-space: nowrap;
+                            z-index: 1001;
+                            pointer-events: none;
+                        `;
+                        
+                        this.style.position = 'relative';
+                        this.appendChild(tooltip);
+                    }
+                });
+                
+                button.addEventListener('mouseleave', function() {
+                    const tooltip = this.querySelector('.macro-tooltip');
+                    if (tooltip) {
+                        tooltip.remove();
+                    }
+                });
+            }
+        });
+
+        // Обработчики для документов реферала
+        document.querySelectorAll('.open_document_form').forEach(button => {
+            button.addEventListener('click', function() {
+                const referalId = this.getAttribute('data-referal-id');
+                const modal = document.getElementById(`DocumentFormModal_${referalId}`);
+                if (modal) {
+                    modal.style.display = 'block';
+                }
+            });
+        });
+
+        document.querySelectorAll('.close_document_form').forEach(span => {
+            span.addEventListener('click', function() {
+                const referalId = this.getAttribute('data-referal-id');
+                const modal = document.getElementById(`DocumentFormModal_${referalId}`);
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+
+        // Обработчик для кнопки "Взять имя из MacroCRM"
+        document.querySelectorAll('.use-macro-name-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const referalId = this.getAttribute('data-referal-id');
+                const macroName = this.getAttribute('data-macro-name');
+                const referalNameInput = document.getElementById(`referal_name_${referalId}`);
+                
+                if (referalNameInput && macroName) {
+                    if (confirm(`Заменить текущее имя на "${macroName}"?`)) {
+                        referalNameInput.value = macroName;
+                        
+                        // Визуальная обратная связь
+                        referalNameInput.style.backgroundColor = '#e8f5e8';
+                        setTimeout(() => {
+                            referalNameInput.style.backgroundColor = '';
+                        }, 1000);
+                        
+                        // Уведомление
+                        const notification = document.createElement('div');
+                        notification.className = 'name-update-notification';
+                        notification.textContent = 'Имя обновлено из MacroCRM';
+                        notification.style.cssText = `
+                            position: absolute;
+                            top: -30px;
+                            left: 0;
+                            background: #28a745;
+                            color: white;
+                            padding: 5px 10px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            z-index: 1000;
+                            animation: fadeInOut 2s ease-in-out;
+                        `;
+                        
+                        const container = this.parentElement;
+                        container.style.position = 'relative';
+                        container.appendChild(notification);
+                        
+                        setTimeout(() => {
+                            if (notification.parentElement) {
+                                notification.parentElement.removeChild(notification);
+                            }
+                        }, 2000);
+                    }
+                }
+            });
+        });
+
+        // Закрытие модальных окон при клике вне их области
+        window.addEventListener('click', function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        });
+
+        // Форматирование телефона в модальном окне
+        document.querySelectorAll('input[name="phone_number"]').forEach(function(input) {
+            function formatPhone(input) {
+                let value = input.value;
+                
+                if (!value.startsWith('+998 ')) {
+                    value = '+998 ' + value.replace(/^\+998\s*/g, '');
+                }
+                
+                let digits = value.substring(5).replace(/\D/g, '');
+                
+                if (digits.length > 9) {
+                    digits = digits.substring(0, 9);
+                }
+                
+                let formatted = '';
+                if (digits.length > 0) {
+                    formatted += digits.substring(0, Math.min(2, digits.length));
+                }
+                if (digits.length > 2) {
+                    formatted += ' ' + digits.substring(2, Math.min(5, digits.length));
+                }
+                if (digits.length > 5) {
+                    formatted += ' ' + digits.substring(5, Math.min(7, digits.length));
+                }
+                if (digits.length > 7) {
+                    formatted += ' ' + digits.substring(7, 9);
+                }
+                
+                input.value = '+998 ' + formatted;
+            }
+
+            input.addEventListener('input', function() {
+                formatPhone(this);
+            });
+            
+            input.addEventListener('focus', function() {
+                if (this.value.length <= 5) {
+                    this.value = '+998 ';
+                    setTimeout(() => {
+                        this.selectionStart = this.selectionEnd = 5;
+                    }, 0);
+                }
+            });
+        });
+    });
+</script>

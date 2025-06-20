@@ -1,0 +1,145 @@
+@media (max-width: 768px) {
+    nav {
+        flex-direction: column;
+    }
+
+    nav ul {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    table {
+        display: block;
+        overflow-x: auto;
+    }
+
+    th,
+    td {
+        white-space: nowrap;
+    }
+
+    .container,
+    .form-container {
+        padding: 10px;
+    }
+
+    form {
+        width: 100%;
+    }
+
+    .modal-content {
+        min-width: 95vw;
+        max-width: 95vw;
+        margin: 5px;
+        max-height: 95vh;
+    }
+
+    .modal-header {
+        padding: 12px 15px;
+    }
+
+    .modal-body {
+        padding: 15px;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .macro-info-grid {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .form-section {
+        padding: 12px;
+        margin-bottom: 15px;
+    }
+
+    .input-with-button {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .use-macro-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 10px;
+        height: auto;
+    }
+
+    .use-macro-btn::after {
+        content: " Взять из MacroCRM";
+        margin-left: 6px;
+        font-size: 12px;
+    }
+
+    .form-actions {
+        margin-top: 15px;
+        padding-top: 12px;
+    }
+
+    .button-primary {
+        min-width: 100%;
+        padding: 12px;
+    }
+
+    .cards-container {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .info-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .passport-grid {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .passport-item {
+        grid-column: 1 / -1;
+    }
+
+    .input-with-button {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .use-macro-btn {
+        width: 100%;
+        min-width: auto;
+        height: 32px;
+        justify-content: center;
+    }
+
+    .use-macro-btn:not(.disabled)::after {
+        content: " Взять из MacroCRM";
+        margin-left: 6px;
+        font-size: 10px;
+    }
+
+    .use-macro-btn.disabled::after {
+        content: " Недоступно";
+        margin-left: 6px;
+        font-size: 10px;
+    }
+
+    .transfer-all-btn {
+        padding: 12px;
+        font-size: 11px;
+    }
+
+    .save-all-btn {
+        padding: 12px;
+        font-size: 11px;
+    }
+
+    .readonly-input.small {
+        max-width: none;
+        text-align: left;
+    }
+}

@@ -1,0 +1,34 @@
+<!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\modals\act_download_modal.html -->
+<!-- Модальное окно для скачивания акта -->
+<div id="ActDownloadModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close" id="close_act">&times;</span>
+        <div class="modal-header">
+            <h2>Форма скачивания акта реферала</h2>
+        </div>
+    <br>
+        <div class="modal-body">
+            <form action="{{ url_for('document.get_referal_act', referal_id=referal.id) }}" method="POST">
+                <div class="modal_form_container">
+                    <input type="text" id="passport_number" name="passport_number" required placeholder="Номер паспорта реферала">
+                    <input type="text" id="passport_giver" name="passport_giver" required placeholder="Кем выдан">
+                    <input type="text" id="passport_date" name="passport_date" required placeholder="Дата выдачи">
+                    <input type="text" id="passport_adress" name="passport_adress" required placeholder="Адрес регистрации">
+                    <input type="text" id="appartment_area" name="appartment_area" required placeholder="Площадь квартиры">
+                    <input type="text" id="mail_adress" name="mail_adress" required placeholder="Почтовый адрес">
+                    <input type="text" id="pinfl" name="pinfl" placeholder="ПИНФЛ" required pattern="\d{14}" title="ПИНФЛ должен содержать ровно 14 цифр">
+                    <input type="email" id="e_mail" name="e_mail" placeholder="E-mail" required>
+                    <input type="text" id="card_number" name="card_number" placeholder="Номер карты" required>
+                    <input type="text" id="bank" name="bank" placeholder="Банк" required>
+                    <input type="text" id="mfo" name="mfo" placeholder="МФО" required>
+                    <input type="text" id="trans_schet" name="trans_schet" placeholder="Р/С" required>
+                    <input type="text" id="inn" name="inn" placeholder="ИНН" required>
+
+                    <button type="submit">
+                        Скачать акт
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

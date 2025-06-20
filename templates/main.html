@@ -1,114 +1,25 @@
+<!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\main.html -->
 <!DOCTYPE html>
 <html>
 <head>
-    <!-- Подключение Font Awesome -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Реферальная программа</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- Подключение CSS файлов -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <title>Реферальная система</title>
-    <script>
-        function hideFlashMessage() {
-            var flashMessage = document.getElementById('flash-message');
-            if (flashMessage) {
-                setTimeout(function() {
-                    flashMessage.style.display = 'none';
-                }, 3000);
-            }
-        }
-        
-        // Make sure prefix exists when input changes
-        document.addEventListener('DOMContentLoaded', function() {
-        const phoneInput = document.getElementById('phone_input');
-        
-        // Make sure prefix exists when input changes
-        phoneInput.addEventListener('input', function() {
-            // Always maintain the prefix
-            if (!this.value.startsWith('+998 ')) {
-                this.value = '+998 ' + this.value.replace(/^\+998\s*/g, '');
-            }
-            
-            // Get only digits after the prefix
-            let digits = this.value.substring(5).replace(/\D/g, '');
-            
-            // Limit to 9 digits
-            if (digits.length > 9) {
-                digits = digits.substring(0, 9);
-            }
-            
-            // Format the number with spaces: XX XXX XX XX
-            let formatted = '';
-            if (digits.length > 0) {
-                formatted += digits.substring(0, Math.min(2, digits.length));
-            }
-            if (digits.length > 2) {
-                formatted += ' ' + digits.substring(2, Math.min(5, digits.length));
-            }
-            if (digits.length > 5) {
-                formatted += ' ' + digits.substring(5, Math.min(7, digits.length));
-            }
-            if (digits.length > 7) {
-                formatted += ' ' + digits.substring(7, 9);
-            }
-            
-            // Update the input value with the formatted number
-            this.value = '+998 ' + formatted;
-        });
-
-        // Ensure proper formatting on form submission
-        phoneInput.form.addEventListener('submit', function() {
-            const phones = phoneInput.value.split(',');
-            let allValid = true;
-            
-            for (let phone of phones) {
-                phone = phone.trim();
-                if (!phone) continue;
-                
-                const digits = phone.substring(5).replace(/\D/g, '');
-                if (digits.length !== 9) {
-                    allValid = false;
-                    break;
-                }
-            }
-            
-            if (!allValid) {
-                alert('Пожалуйста, введите 9 цифр для каждого номера телефона после кода страны. Для множественных номеров разделяйте их запятыми.');
-                event.preventDefault();
-                return false;
-            }
-        });
-    });
-        window.onload = hideFlashMessage;
-    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/responsive.css') }}">
 </head>
 <body>
-    <header>
-        <div class="header_name">
-            <a href="{{ url_for('main.main') }}" class="nav__link"> Реферальная программа для сотрудников Golden House </a>
-        </div>
-        <nav class="nav">
-            <ul class="nav__list">
-                <li class="nav__item">
-                    <a href="{{ url_for('referal.profile') }}" class="nav__link"><i class="fas fa-user"></i> Профиль</a>
-                </li>
-                <li>
-                    {% if current_user and current_user.role=='admin' %}
-                    <li class="nav__item">
-                        <a href="{{ url_for('admin.admin_panel') }}" class="nav__link"><i class="fas fa-user"></i>Админ</a>
-                    </li>
-                    {% endif %}
-                </li>
-                <li>
-                    <a href="/menu" class="nav__link"><i class="fas fa-th-list"></i> Меню сервисов</a>
-                </li>
-            </ul>
-        </nav>
-    </header>
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div id="flash-message" class="{{ 'flash-message' if category == 'success' else 'error-message' }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+    {% include 'components/header.html' %}
+    {% include 'components/flash_messages.html' %}
+    
     <main class ="main">
         <div class="container">
             <div id="form-container">
@@ -123,8 +34,139 @@
             </div>
         </div>
     </main> 
-    <footer class="footer">
-        <p class="footer__text">&copy; 2025 Реферальная система</p>
-    </footer> 
+    
+    {% include 'components/footer.html' %}
+    
+    <!-- Подключение JavaScript файлов -->
+    <script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/flash-messages.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Дополнительные скрипты для главной страницы -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Функция валидации PINFL (должен быть ровно 14 цифр)
+            function validatePinfl(input) {
+                const pinflPattern = /^\d{14}$/;
+                if (!pinflPattern.test(input.value)) {
+                    input.setCustomValidity('ПИНФЛ должен содержать ровно 14 цифр');
+                    return false;
+                } else {
+                    input.setCustomValidity('');
+                    return true;
+                }
+            }
+
+            // Функция валидации Email
+            function validateEmail(input) {
+                const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+                if (!emailPattern.test(input.value)) {
+                    input.setCustomValidity('Пожалуйста, введите корректный email');
+                    return false;
+                } else {
+                    input.setCustomValidity('');
+                    return true;
+                }
+            }
+
+            // Функция форматирования телефона с поддержкой множественных номеров
+            function formatPhone(input) {
+                let value = input.value;
+                
+                // Split by comma to handle multiple phones
+                let phones = value.split(',');
+                let formattedPhones = [];
+                
+                for (let i = 0; i < phones.length; i++) {
+                    let phone = phones[i].trim();
+                    
+                    // Skip empty entries
+                    if (!phone) continue;
+                    
+                    // Всегда поддерживаем префикс для каждого номера
+                    if (!phone.startsWith('+998 ')) {
+                        phone = '+998 ' + phone.replace(/^\+998\s*/g, '');
+                    }
+                    
+                    // Получаем только цифры после префикса
+                    let digits = phone.substring(5).replace(/\D/g, '');
+                    
+                    // Ограничиваем до 9 цифр
+                    if (digits.length > 9) {
+                        digits = digits.substring(0, 9);
+                    }
+                    
+                    // Форматируем номер с пробелами: XX XXX XX XX
+                    let formatted = '';
+                    if (digits.length > 0) {
+                        formatted += digits.substring(0, Math.min(2, digits.length));
+                    }
+                    if (digits.length > 2) {
+                        formatted += ' ' + digits.substring(2, Math.min(5, digits.length));
+                    }
+                    if (digits.length > 5) {
+                        formatted += ' ' + digits.substring(5, Math.min(7, digits.length));
+                    }
+                    if (digits.length > 7) {
+                        formatted += ' ' + digits.substring(7, 9);
+                    }
+                    
+                    // Добавляем отформатированный номер
+                    if (formatted.trim()) {
+                        formattedPhones.push('+998 ' + formatted);
+                    }
+                }
+                
+                // Обновляем значение поля ввода
+                input.value = formattedPhones.join(', ');
+            }
+
+            // Находим все поля телефонов и добавляем форматирование
+            const phoneInputs = document.querySelectorAll('input[name="phone_number"]');
+            phoneInputs.forEach(function(input) {
+                // Устанавливаем значение по умолчанию
+                if (!input.value) {
+                    input.value = '+998 ';
+                }
+                
+                input.addEventListener('input', function() {
+                    formatPhone(this);
+                });
+                
+                input.addEventListener('focus', function() {
+                    if (this.value.length <= 5) {
+                        this.value = '+998 ';
+                        setTimeout(() => {
+                            this.selectionStart = this.selectionEnd = 5;
+                        }, 0);
+                    }
+                });
+                
+                // Проверка перед отправкой формы с поддержкой множественных номеров
+                if (input.form) {
+                    input.form.addEventListener('submit', function(e) {
+                        const phones = input.value.split(',');
+                        let allValid = true;
+                        
+                        for (let phone of phones) {
+                            phone = phone.trim();
+                            if (!phone) continue;
+                            
+                            const digits = phone.substring(5).replace(/\D/g, '');
+                            if (digits.length !== 9) {
+                                allValid = false;
+                                break;
+                            }
+                        }
+                        
+                        if (!allValid) {
+                            alert('Пожалуйста, введите 9 цифр для каждого номера телефона после кода страны. Для множественных номеров разделяйте их запятыми.');
+                            e.preventDefault();
+                        }
+                    });
+                }
+            });
+        });
+    </script>
 </body>
 </html>

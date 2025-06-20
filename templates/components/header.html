@@ -1,0 +1,38 @@
+<!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\components\header.html -->
+<header class="header">
+    <div class="header_name">
+        <a href="{{ url_for('main.main') }}" class="nav__link"> Реферальная программа для сотрудников Golden House </a>
+    </div>
+    <nav class="nav">
+        <ul class="nav__list">
+            {% if request.path != '/profile' %}
+            <li class="nav__item">
+                <a href="{{ url_for('referal.profile') }}" class="nav__link"><i class="fas fa-home"></i>Мои рефералы</a>
+            </li>
+            {% endif %}
+            {% if request.path != '/main' %}
+            <li class="nav__item">
+                <a href="{{ url_for('main.main') }}" class="nav__link"><i class="fas fa-home"></i> Добавление реферала</a>
+            </li>
+            {% endif %}
+            {% if current_user and current_user.role=='admin' and request.path != '/admin' %}
+            <li class="nav__item">
+                <a href="{{ url_for('admin.admin_panel') }}" class="nav__link"><i class="fas fa-user"></i>Админ</a>
+            </li>
+            {% endif %}
+            {% if current_user and current_user.role=='manager' %}
+            <li class="nav__item">
+                <a href="{{ url_for('manager.manager_panel') }}" class="nav__link"><i class="fas fa-user"></i>Менеджер</a>
+            </li>
+            {% endif %}
+            {% if current_user and current_user.role=='user' %}
+            <li class="nav__item">
+                <a href="{{ url_for('referal.profile') }}" class="nav__link"><i class="fas fa-user"></i>Профиль</a>
+            </li>
+            {% endif %}
+            <li>
+                <a href="/menu" class="nav__link"><i class="fas fa-th-list"></i> Меню сервисов</a>
+            </li>
+        </ul>
+    </nav>
+</header>

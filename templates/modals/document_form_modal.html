@@ -1,0 +1,249 @@
+<!-- Модальное окно для заполнения документов реферала -->
+<div id="DocumentFormModal_{{ referal.id }}" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Заполнение документов реферала</h3>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form method="POST" action="{{ url_for('referal.update_referal_documents', referal_id=referal.id) }}">
+                
+                <!-- Контейнер для двух карточек -->
+                <div class="cards-container">
+                    
+                    <!-- Карточка MacroCRM -->
+                    <div class="macro-card" data-referal-id="{{ referal.id }}">
+                        <div class="card-header">
+                            <h3><i class="fas fa-database"></i> Данные MacroCRM</h3>
+                        </div>
+                        
+                        <!-- Строка с именем -->
+                        <div class="name-row">
+                            <span class="field-label">ФИО:</span>
+                            <div class="macro-field-with-transfer">
+                                <input type="text" class="readonly-input" 
+                                       data-field="macro_full_name" 
+                                       data-referal-id="{{ referal.id }}"
+                                       value="{{ referal.macro_contact.full_name if referal.macro_contact else 'Недоступно' }}" 
+                                       readonly>
+                                <button type="button" class="transfer-macro-btn" 
+                                        data-source-field="macro_full_name"
+                                        data-target-field="referal_full_name"
+                                        data-referal-id="{{ referal.id }}"
+                                        title="Перенести ФИО в карточку реферала">
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Строка с телефоном и ID -->
+                        <div class="info-row">
+                            <div class="info-item">
+                                <span class="field-label">Телефон:</span>
+                                {% if referal.macro_contacts %}
+                                    <div class="macro-field-with-transfer">
+                                        <select class="readonly-input" 
+                                                data-field="macro_phone" 
+                                                data-referal-id="{{ referal.id }}"
+                                                id="phone_select_{{ referal.id }}">
+                                            {% for macro_contact in referal.macro_contacts %}
+                                            <option value="{{ macro_contact.phone_number }}" {% if loop.first %}selected{% endif %}>{{ macro_contact.phone_number }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="button" class="transfer-macro-btn" 
+                                                data-source-field="macro_phone"
+                                                data-target-field="referal_phone"
+                                                data-referal-id="{{ referal.id }}"
+                                                title="Перенести выбранный телефон">
+                                            <i class="fas fa-arrow-right"></i>
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    <div class="macro-field-with-transfer">
+                                        <input type="text" class="readonly-input" 
+                                               data-field="macro_phone" 
+                                               data-referal-id="{{ referal.id }}"
+                                               value="Недоступно" 
+                                               readonly>
+                                        <button type="button" class="transfer-macro-btn disabled" 
+                                                data-source-field="macro_phone"
+                                                data-target-field="referal_phone"
+                                                data-referal-id="{{ referal.id }}"
+                                                title="Нет данных для переноса"
+                                                disabled>
+                                            <i class="fas fa-arrow-right"></i>
+                                        </button>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="info-item">
+                                <span class="field-label">ID:</span>
+                                <input type="text" class="readonly-input small" 
+                                       data-field="macro_contact_id" 
+                                       data-referal-id="{{ referal.id }}"
+                                       value="{{ referal.contact_id if referal.contact_id else 'N/A' }}" 
+                                       readonly>
+                            </div>
+                        </div>
+                        
+                        <div class="passport-item">
+                            <span class="field-label">Номер договора:</span>
+                            <div class="macro-field-with-transfer">
+                                <input type="text" class="readonly-input" 
+                                       data-field="macro_agreement_number" 
+                                       data-referal-id="{{ referal.id }}"
+                                       value="{% if referal.referal_data and referal.referal_data.contract_number %}{{ referal.referal_data.contract_number }}{% else %}Недоступно{% endif %}" 
+                                       readonly>
+                            </div>
+                        </div>
+                        <!-- Паспортные данные MacroCRM -->
+                        <div class="passport-item">
+                            <span class="field-label">Серия и номер паспорта:</span>
+                            <div class="macro-field-with-transfer">
+                                <input type="text" class="readonly-input" 
+                                       data-field="macro_passport_number" 
+                                       data-referal-id="{{ referal.id }}"
+                                       value="{% if referal.macro_contact and referal.macro_contact.passport_number %}{{ referal.macro_contact.passport_number }}{% else %}Недоступно{% endif %}" 
+                                       readonly>
+                                <button type="button" class="transfer-macro-btn" 
+                                        data-source-field="macro_passport_number"
+                                        data-target-field="referal_passport_number"
+                                        data-referal-id="{{ referal.id }}"
+                                        title="Перенести номер паспорта">
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="passport-item">
+                            <span class="field-label">Кем выдан паспорт:</span>
+                            <div class="macro-field-with-transfer">
+                                <input type="text" class="readonly-input" 
+                                       data-field="macro_passport_giver" 
+                                       data-referal-id="{{ referal.id }}"
+                                       value="{% if referal.macro_contact and referal.macro_contact.passport_giver %}{{ referal.macro_contact.passport_giver }}{% else %}Недоступно{% endif %}" 
+                                       readonly>
+                                <button type="button" class="transfer-macro-btn" 
+                                        data-source-field="macro_passport_giver"
+                                        data-target-field="referal_passport_giver"
+                                        data-referal-id="{{ referal.id }}"
+                                        title="Перенести орган выдачи паспорта">
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="passport-item">
+                            <span class="field-label">Дата выдачи паспорта:</span>
+                            <div class="macro-field-with-transfer">
+                                <input type="date" class="readonly-input" 
+                                       data-field="macro_passport_date" 
+                                       data-referal-id="{{ referal.id }}"
+                                       value="{% if referal.macro_contact and referal.macro_contact.passport_date %}{{ referal.macro_contact.passport_date.strftime('%Y-%m-%d') }}{% endif %}" 
+                                       readonly>
+                                <button type="button" class="transfer-macro-btn" 
+                                        data-source-field="macro_passport_date"
+                                        data-target-field="referal_passport_date"
+                                        data-referal-id="{{ referal.id }}"
+                                        title="Перенести дату выдачи паспорта">
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    
+    
+                        <!-- Контейнер для кнопки переноса всех данных (перемещен в низ) -->
+                        <div class="transfer-all-container">
+                            <button type="button" class="transfer-all-btn disabled" data-referal-id="{{ referal.id }}" disabled>
+                                <i class="fas fa-copy"></i>
+                                Перенести все данные в карточку реферала
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Карточка реферала -->
+                    <div class="referal-card" data-referal-id="{{ referal.id }}">
+                        <div class="card-header">
+                            <h3><i class="fas fa-user"></i> Данные реферала</h3>
+                        </div>
+                        
+                        <!-- Поля для ввода данных реферала -->
+                        <div class="name-row">
+                            <span class="field-label">ФИО:</span>
+                            <input type="text" class="editable-input" 
+                                   data-field="referal_full_name" 
+                                   data-referal-id="{{ referal.id }}"
+                                   name="full_name"
+                                   value="{{ referal.referal_data.full_name if referal.referal_data else '' }}"
+                                   placeholder="Введите ФИО" required>
+                        </div>
+                        
+                        <div class="info-row">
+                            <div class="info-item">
+                                <span class="field-label">Телефон:</span>
+                                <input type="text" class="editable-input" 
+                                       data-field="referal_phone" 
+                                       data-referal-id="{{ referal.id }}"
+                                       name="phone_number"
+                                       value="{{ referal.referal_data.phone_number if referal.referal_data else '' }}"
+                                       placeholder="+998 XX XXX XX XX" required>
+                            </div>
+                            <div class="info-item">
+                                <span class="field-label">Contacts ID:</span>
+                                <input type="text" class="readonly-input small" 
+                                       value="{{ referal.contact_id if referal.contact_id else 'N/A' }}" 
+                                       readonly>
+                            </div>
+                        </div>
+                        <div class="passport-item">
+                            <span class="field-label">Номер договора:</span>
+                            <input type="text" class="readonly-input" 
+                                   data-field="referal_agreement_number" 
+                                   data-referal-id="{{ referal.id }}"
+                                   name="contract_number"
+                                   value="{{ referal.referal_data.contract_number if referal.referal_data else '' }}"
+                                   placeholder="Номер договора">
+                        </div>
+                        <div class="passport-item">
+                            <span class="field-label">Серия и номер паспорта:</span>
+                            <input type="text" class="editable-input" 
+                                   data-field="referal_passport_number" 
+                                   data-referal-id="{{ referal.id }}"
+                                   name="passport_number"
+                                   value="{{ referal.referal_data.passport_number if referal.referal_data else '' }}"
+                                   placeholder="AA1234567">
+                        </div>
+                        
+                        <div class="passport-item">
+                            <span class="field-label">Кем выдан паспорт:</span>
+                            <input type="text" class="editable-input" 
+                                   data-field="referal_passport_giver" 
+                                   data-referal-id="{{ referal.id }}"
+                                   name="passport_giver"
+                                   value="{{ referal.referal_data.passport_giver if referal.referal_data else '' }}"
+                                   placeholder="Орган выдачи">
+                        </div>
+                        
+                        <div class="passport-item">
+                            <span class="field-label">Дата выдачи паспорта:</span>
+                            <input type="date" class="editable-input" 
+                                   data-field="referal_passport_date" 
+                                   data-referal-id="{{ referal.id }}"
+                                   name="passport_date"
+                                   value="{% if referal.referal_data and referal.referal_data.passport_date %}{{ referal.referal_data.passport_date.strftime('%Y-%m-%d') }}{% endif %}">
+                        </div>
+                        
+                        <!-- Контейнер для кнопки сохранения -->
+                        <div class="save-all-container">
+                            <button type="submit" class="save-all-btn">
+                                <i class="fas fa-save"></i>
+                                Сохранить данные реферала
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</div>

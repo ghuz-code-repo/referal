@@ -52,7 +52,7 @@ class Referal(db.Model):
     
     #Status
     status_id = db.Column(db.Integer, db.ForeignKey('status.id'), nullable=False, default=0)
-    status_name = db.Column(db.String(50), nullable=True, default='Not Started')
+    status_name = db.Column(db.String(50), nullable=True, default='Не начата')
     rejection_reason = db.Column(db.String(255), nullable=True)
     #Approvals
     initial_approval = db.Column(db.Boolean, default=False)
@@ -104,11 +104,23 @@ class MacroDeal(db.Model):
         return f'<MacroDeal {self.agreement_number}>'
 
 class MacroContact(db.Model):
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    __tablename__ = 'macro_contact'
+    
+    id = db.Column(db.Integer, primary_key=True)
     contacts_id = db.Column(db.Integer, nullable=False)
-    full_name = db.Column(db.String(100), nullable=False)
-    phone_number = db.Column(db.String(20), nullable=False, unique=True)
-
+    full_name = db.Column(db.String(255), nullable=False)
+    phone_number = db.Column(db.String(20), unique=True, nullable=False)
+    
+    # Поля для паспортных данных
+    passport_number = db.Column(db.String(50), nullable=True)
+    passport_giver = db.Column(db.String(255), nullable=True)
+    passport_date = db.Column(db.Date, nullable=True)
+    passport_address = db.Column(db.Text, nullable=True)#УБРАТЬ
+    email = db.Column(db.String(255), nullable=True)#УБРАТЬ
+    
+    # Добавляем поле номер договора
+    agreement_number = db.Column(db.String(100), nullable=True)
+    
     def __repr__(self):
         return f'<MacroContact {self.full_name}>'
 

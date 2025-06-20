@@ -1,0 +1,56 @@
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+th,
+td {
+    padding: 15px 10px 15px 15px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+}
+
+th {
+    background-color: var(--golden-color);
+    color: white;
+}
+
+tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+tr:hover {
+    background-color: #ddd;
+}
+
+.table-container {
+    /* styles already exist in admin section */
+}
+
+.table {
+    /* styles already exist */
+}
+
+.table__head {
+    /* styles already exist */
+}
+
+.table__body {
+    /* styles already exist */
+}
+
+.table__row {
+    /* styles already exist */
+}
+
+.table__header {
+    /* styles already exist */
+}
+
+.table__data {
+    /* styles already exist */
+}

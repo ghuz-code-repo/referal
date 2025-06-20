@@ -1,0 +1,161 @@
+/* Компактные поля ввода с кнопками */
+.input-with-button {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+}
+
+.input-with-button input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid #e9ecef;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: all 0.3s ease;
+    background: white;
+    min-height: 0;
+}
+
+.input-with-button input:focus {
+    outline: none;
+    border-color: #DAA520;
+    box-shadow: 0 0 0 2px rgba(218, 165, 32, 0.15);
+}
+
+.input-with-button input::placeholder {
+    color: #adb5bd;
+    font-style: italic;
+    font-size: 12px;
+}
+
+/* Стили для заблокированных input полей в карточке MacroCRM */
+.readonly-input {
+    padding: 6px 8px;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    font-size: 12px;
+    background: #f8f9fa !important;
+    color: #495057;
+    cursor: not-allowed;
+    user-select: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.readonly-input.small {
+    max-width: 80px;
+    text-align: center;
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.readonly-input.unavailable {
+    background: #f1f3f4 !important;
+    color: #6c757d;
+    font-style: italic;
+    border: 1px dashed #ced4da;
+    text-align: center;
+}
+
+.readonly-input:focus {
+    outline: none;
+    border-color: #e9ecef;
+    box-shadow: none;
+}
+
+/* Стили для редактируемых input полей в карточке реферала */
+.editable-input {
+    padding: 6px 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 12px;
+    background: white;
+    color: #495057;
+    width: 100%;
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+}
+
+.editable-input:focus {
+    outline: none;
+    border-color: #28a745;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.15);
+    background: #f8fff8;
+}
+
+.editable-input::placeholder {
+    color: #adb5bd;
+    font-style: italic;
+}
+
+/* Поля ввода с кнопками в карточке реферала */
+.referal-card .input-with-button {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.referal-card .input-with-button .editable-input {
+    flex: 1;
+}
+
+/* Паспортные поля с кнопками */
+.passport-item .input-with-button {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.passport-item .input-with-button input {
+    flex: 1;
+    padding: 6px 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.passport-item .input-with-button input:focus {
+    outline: none;
+    border-color: #28a745;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.15);
+}
+
+/* Паспортные поля MacroCRM */
+.macro-card .passport-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.macro-card .passport-item .field-label {
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    align-self: baseline;
+}
+
+/* Паспортные поля реферала */
+.referal-card .passport-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.referal-card .passport-item .field-label {
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    align-self: baseline;
+}
+
+.referal-card .passport-item .passport-input-container {
+    display: flex;
+    padding-bottom: 10px;
+    align-items: baseline
+}

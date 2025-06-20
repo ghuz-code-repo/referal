@@ -1,6 +1,6 @@
 """Маршруты для работы с рефералами"""
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from datetime import datetime
 import re
 from models import *
@@ -24,6 +24,18 @@ def profile():
     
     referal_service.update_deal_info(user)
     referals = Referal.query.filter_by(user_id=user.id).all()
+    
+    # Обогащаем каждый реферал данными MacroContact
+    for referal in referals:
+        if referal.contact_id:
+            # Получаем ВСЕ MacroContact записи с данным contacts_id
+            referal.macro_contacts = MacroContact.query.filter_by(contacts_id=referal.contact_id).all()
+            # Оставляем одну запись для совместимости (первую)
+            referal.macro_contact = referal.macro_contacts[0] if referal.macro_contacts else None
+        else:
+            referal.macro_contacts = []
+            referal.macro_contact = None
+    
     print(f"Found {len(referals)} referals for user {user.login}")
     
     return render_template('profile.html', 
@@ -35,79 +47,74 @@ def profile():
                           statuses=Status.query.all())
 
 
-@referal_bp.route('/add_referal', methods=['POST'])
+@referal_bp.route('/add', methods=['POST'])
 def add_referal():
+    """Добавление нового реферала через модальную форму"""
     user = get_current_user()
-    print(f"User before creating referal: {user}, has ID: {user.id if user else None}")
-    
     if not user:
-        flash('Пожалуйста, войдите в систему', 'error')
-        return redirect(url_for('main.main'))
+        flash('Необходимо войти в систему', 'error')
+        return redirect(url_for('auth.login'))
     
-    full_name = request.form.get('full_name', "").strip()
-    phone_number = request.form.get('phone_number', '')
-
-    if full_name and not re.match(r'^[A-Za-z`‘]+(?: [A-Za-z`‘]+){2,}$', full_name) or '  ' in full_name:
-        flash('Не верно введено ФИО', 'error')
-        return redirect(url_for('main.main'))
+    try:
+        # Получаем данные из формы
+        full_name = request.form.get('full_name', '').strip()
+        phone_number = request.form.get('phone_number', '').strip()
+        
+        # Валидация обязательных полей
+        if not full_name:
+            flash('Имя реферала обязательно для заполнения', 'error')
+            return redirect(url_for('referal.profile'))
+        
+        if not phone_number:
+            flash('Телефон реферала обязателен для заполнения', 'error')
+            return redirect(url_for('referal.profile'))
+        
+        # Форматируем номер телефона
+        formatted_phone = utils.format_phone_number(phone_number)
+        if not formatted_phone:
+            flash('Неверный формат номера телефона', 'error')
+            return redirect(url_for('referal.profile'))
+        
+        # Проверяем, не существует ли уже реферал с таким телефоном у данного пользователя
+        existing_referal = Referal.query.join(ReferalData).filter(
+            Referal.user_id == user.id,
+            ReferalData.phone_number == formatted_phone
+        ).first()
+        
+        if existing_referal:
+            flash(f'Реферал с номером {formatted_phone} уже существует', 'error')
+            return redirect(url_for('referal.profile'))
+        
+        # Создаем новый реферал
+        new_referal = Referal(user_id=user.id)
+        db.session.add(new_referal)
+        db.session.flush()  # Получаем ID реферала
+        
+        # Создаем данные реферала
+        referal_data = ReferalData(
+            referal_id=new_referal.id,
+            full_name=full_name,
+            phone_number=formatted_phone
+        )
+        db.session.add(referal_data)
+        
+        # Пытаемся найти соответствующий MacroContact
+        macro_contact = MacroContact.query.filter_by(phone_number=formatted_phone).first()
+        if macro_contact:
+            new_referal.contact_id = macro_contact.contacts_id
+            print(f"Found matching MacroContact for {formatted_phone}: {macro_contact.contacts_id}")
+        
+        db.session.commit()
+        
+        flash(f'Реферал {full_name} успешно добавлен', 'success')
+        print(f"Successfully added referal: {full_name} ({formatted_phone}) for user {user.login}")
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error adding referal: {e}")
+        flash('Произошла ошибка при добавлении реферала', 'error')
     
-    # Updated phone validation to handle multiple phones separated by commas
-    phone_numbers = [phone.strip() for phone in phone_number.split(',')]
-    valid_phones = []
-    
-    for phone in phone_numbers:
-        if re.match(r'^\+998 \d{2} \d{3} \d{2} \d{2}$', phone) and not re.search(r'(\d)\1{3,}', phone):
-            valid_phones.append(phone)
-        else:
-            flash(f'Неверный формат телефона: {phone}. Пример верного заполнения +998 99 999 99 99', 'error')
-            return redirect(url_for('main.main'))
-    
-    if not valid_phones:
-        flash('Не указан ни один корректный номер телефона', 'error')
-        return redirect(url_for('main.main'))
-
-    # Check for existing contacts
-    existing_contact = MacroContact.query.filter(
-        (MacroContact.full_name == full_name) | 
-        (MacroContact.phone_number.in_(valid_phones))
-    ).first()
-    if existing_contact:
-        flash('Данный человек не может являться рефералом', 'error')
-        return redirect(url_for('main.main'))
-
-    existing_referal_data = ReferalData.query.filter(
-        (ReferalData.full_name == full_name) | (ReferalData.phone_number == phone_number)
-    ).first()
-    if existing_referal_data:
-        flash('Данный человек не может являться рефералом', 'error')
-        return redirect(url_for('main.main'))
-    
-    else:
-        try:
-            new_referal = referal_service.create_new_referal(full_name, phone_number, user)
-            if new_referal:
-                print(f"New referal created with user_id: {new_referal.user_id}")
-                db.session.add(new_referal)
-                db.session.commit()
-                flash('Вы успешно добавили реферала', 'success')
-                utils.send_sms(phone_number, user.user_data.full_name)
-                try:
-                    notification_service.create_macro_task(
-                        full_name=full_name,
-                        phone_number=phone_number
-                    )
-                except Exception as e:
-                    flash(f'Ошибка при создании задачи: {e}', 'error')
-                utils.send_email(
-                    os.getenv('MANAGER_EMAIL'),
-                    'Создание встречи для реферала',
-                    f'Реферер {user.user_data.full_name} добавил реферала\nПожалуйста создайте встречу для человека\n ФИО: {full_name} \n Номер телефона: {phone_number} \n')
-            else:
-                flash('Ошибка при создании реферала', 'error')
-        except Exception as e:
-            flash(f'Ошибка при добавлении реферала: {e}', 'error')
-
-    return redirect(url_for('main.main'))
+    return redirect(url_for('referal.profile'))
 
 
 @referal_bp.route('/update_deal_info', methods=['POST'])
@@ -131,7 +138,7 @@ def request_withdrawal(referal_id):
     """Маршрут для запроса на вывод средств."""
     user = get_current_user()
     try:
-        withdrawal_service.request_withdrawal(referal_id, user=user)
+        withdrawal_service.request_withwithdrawal(referal_id, user=user)
     except Exception as e:
         flash(f'Ошибка при запросе на вывод средств: {e}', 'error')
     return redirect(url_for('referal.profile'))
@@ -231,7 +238,35 @@ def referal_profile(referal_id):
                           referal=referal)
 
 
-@referal_bp.route('/update_macro_data', methods=['GET'])
+@referal_bp.route('/update_macro_data')
 def update_macro_data():
-    data_sync_service.fetch_data_from_mysql()
-    return redirect(url_for('referal.profile'))
+    """Force update macro data including email fields"""
+    try:
+        # Используем правильную функцию
+        result = data_sync_service.fetch_and_process_contacts(days_back=180)
+        
+        if result and result.get('success'):
+            return jsonify({
+                'success': True,
+                'message': f"Данные обновлены. Обработано контактов: {result.get('processed_count', 0)}"
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': f"Ошибка обновления: {result.get('error', 'Unknown error') if result else 'No result returned'}"
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f"Ошибка: {str(e)}"
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f"Ошибка: {str(e)}"
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f"Ошибка: {str(e)}"
+        })

@@ -1,3 +1,4 @@
+<!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\profile.html -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -5,209 +6,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Профиль пользователя</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- Подключение CSS файлов -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
-    <script>
-        function hideFlashMessage() {
-            var flashMessage = document.getElementById('flash-message');
-            if (flashMessage) {
-                setTimeout(function() {
-                    flashMessage.style.display = 'none';
-                }, 3000);
-            }
-        }
-
-        window.onload = hideFlashMessage;
-
-        document.addEventListener('DOMContentLoaded', function() {
-        // Функция валидации PINFL (должен быть ровно 14 цифр)
-        function validatePinfl(input) {
-            const pinflPattern = /^\d{14}$/;
-            if (!pinflPattern.test(input.value)) {
-                input.setCustomValidity('ПИНФЛ должен содержать ровно 14 цифр');
-                return false;
-            } else {
-                input.setCustomValidity('');
-                return true;
-            }
-        }
-
-        // Функция валидации Email
-        function validateEmail(input) {
-            const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-            if (!emailPattern.test(input.value)) {
-                input.setCustomValidity('Пожалуйста, введите корректный email');
-                return false;
-            } else {
-                input.setCustomValidity('');
-                return true;
-            }
-        }
-
-        // Функция форматирования телефона с поддержкой множественных номеров
-        function formatPhone(input) {
-            let value = input.value;
-            
-            // Split by comma to handle multiple phones
-            let phones = value.split(',');
-            let formattedPhones = [];
-            
-            for (let i = 0; i < phones.length; i++) {
-                let phone = phones[i].trim();
-                
-                // Skip empty entries
-                if (!phone) continue;
-                
-                // Всегда поддерживаем префикс для каждого номера
-                if (!phone.startsWith('+998 ')) {
-                    phone = '+998 ' + phone.replace(/^\+998\s*/g, '');
-                }
-                
-                // Получаем только цифры после префикса
-                let digits = phone.substring(5).replace(/\D/g, '');
-                
-                // Ограничиваем до 9 цифр
-                if (digits.length > 9) {
-                    digits = digits.substring(0, 9);
-                }
-                
-                // Форматируем номер с пробелами: XX XXX XX XX
-                let formatted = '';
-                if (digits.length > 0) {
-                    formatted += digits.substring(0, Math.min(2, digits.length));
-                }
-                if (digits.length > 2) {
-                    formatted += ' ' + digits.substring(2, Math.min(5, digits.length));
-                }
-                if (digits.length > 5) {
-                    formatted += ' ' + digits.substring(5, Math.min(7, digits.length));
-                }
-                if (digits.length > 7) {
-                    formatted += ' ' + digits.substring(7, 9);
-                }
-                
-                // Добавляем отформатированный номер
-                if (formatted.trim()) {
-                    formattedPhones.push('+998 ' + formatted);
-                }
-            }
-            
-            // Обновляем значение поля ввода
-            input.value = formattedPhones.join(', ');
-        }
-
-        // Находим все поля PINFL и добавляем валидацию
-        const pinflInputs = document.querySelectorAll('input[name="pinfl"]');
-        pinflInputs.forEach(function(input) {
-            input.addEventListener('input', function() {
-                // Удаляем все не-цифры
-                this.value = this.value.replace(/\D/g, '');
-                validatePinfl(this);
-            });
-            
-            input.addEventListener('invalid', function(e) {
-                if (this.value === '') {
-                    this.setCustomValidity('Пожалуйста, введите ПИНФЛ');
-                } else {
-                    validatePinfl(this);
-                }
-            });
-        });
-
-        // Находим все поля Email и добавляем валидацию
-        const emailInputs = document.querySelectorAll('input[name="e_mail"]');
-        emailInputs.forEach(function(input) {
-            input.addEventListener('input', function() {
-                validateEmail(this);
-            });
-            
-            input.addEventListener('invalid', function(e) {
-                if (this.value === '') {
-                    this.setCustomValidity('Пожалуйста, введите email');
-                } else {
-                    validateEmail(this);
-                }
-            });
-        });
-
-        // Находим все поля телефонов и добавляем форматирование
-        const phoneInputs = document.querySelectorAll('input[name="phone"]');
-        phoneInputs.forEach(function(input) {
-            // Устанавливаем значение по умолчанию
-            if (!input.value) {
-                input.value = '+998 ';
-            }
-            
-            input.addEventListener('input', function() {
-                formatPhone(this);
-            });
-            
-            input.addEventListener('focus', function() {
-                if (this.value.length <= 5) {
-                    this.value = '+998 ';
-                    setTimeout(() => {
-                        this.selectionStart = this.selectionEnd = 5;
-                    }, 0);
-                }
-            });
-            
-            // Проверка перед отправкой формы с поддержкой множественных номеров
-            input.form.addEventListener('submit', function(e) {
-                const phones = input.value.split(',');
-                let allValid = true;
-                
-                for (let phone of phones) {
-                    phone = phone.trim();
-                    if (!phone) continue;
-                    
-                    const digits = phone.substring(5).replace(/\D/g, '');
-                    if (digits.length !== 9) {
-                        allValid = false;
-                        break;
-                    }
-                }
-                
-                if (!allValid) {
-                    alert('Пожалуйста, введите 9 цифр для каждого номера телефона после кода страны. Для множественных номеров разделяйте их запятыми.');
-                    e.preventDefault();
-                }
-            });
-        });
-    });
-    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/modals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/inputs.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/macro-crm.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/responsive.css') }}">
 </head>
 <body>
-    <!-- Шапка -->
-    <header class="header">
-        <div class="header_name">
-            <a href="{{ url_for('main.main') }}" class="nav__link"> Реферальная программа для сотрудников Golden House </a>
-        </div>
-        <nav class="nav">
-            <ul class="nav__list">
-                <li class="nav__item">
-                    <a href="{{ url_for('main.main') }}" class="nav__link"><i class="fas fa-home"></i> Главная</a>
-                </li>
-                    {% if current_user and current_user.role=='admin' %}
-                    <li class="nav__item">
-                        <a href="{{ url_for('admin.admin_panel') }}" class="nav__link"><i class="fas fa-user"></i>Админ</a>
-                    </li>
-                    {% endif %}
-                </li>
-                <li>
-                    <a href="/menu" class="nav__link"><i class="fas fa-th-list"></i> Меню сервисов</a>
-                </li>
-            </ul>
-        </nav>
-    </header>
-    <div class="flash-message-container">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div id="flash-message" class="{{ 'flash-message' if category == 'success' else 'error-message' }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-    </div>
+    {% include 'components/header.html' %}
+    {% include 'components/flash_messages.html' %}
+    
     <!-- Основной контент -->
     <main class="main">
         <div class="container">
@@ -216,40 +33,10 @@
                 <p>Бонусные баллы<a href="https://gh.uz" class="rikroll">:</a> {{current_balance}}</p>
             </div>
             <br>
+            
             <button id="open_agreement" class="button">Форма скачивания договора</button>
-            <div id="AgreementDownloadModal" class="modal" style="display: none;">
-                <div class="modal-content">
-                    <span class="close" id="close_agreement">&times;</span>
-                    <div class="modal-header">
-                        <h2>Форма скачивания соглашения</h2>
-                    </div>
-                <br>
-                    <div class="modal-body">
-                        <form action="{{ url_for('document.get_referer_agreement') }}" method="POST">
-                            <div class="modal_form_container">
-                                <input type="text" id="ref_name" name="ref_name" placeholder="Ваше ФИО" required>
-                                <input type="text" id="name" name="name" placeholder="ФИО реферала" required>
-                                <input type="text" id="passport_number" name="passport_number" placeholder="Номер паспорта" required>
-                                <input type="text" id="passport_giver" name="passport_giver" placeholder="Кем выдан" required>
-                                <input type="text" id="passport_date" name="passport_date" placeholder="Дата выдачи" required>
-                                <input type="text" id="passport_adress" name="passport_adress" placeholder="Адрес регистрации" required>
-                                <input type="text" id="mail_adress" name="mail_adress" placeholder="Почтовый адрес" required>
-                                <input type="text" id="pinfl" name="pinfl" placeholder="ПИНФЛ" required pattern="\d{14}" title="ПИНФЛ должен содержать ровно 14 цифр">
-                                <input type="text" id="card_number" name="card_number" placeholder="Номер карты" required>
-                                <input type="text" id="bank" name="bank" placeholder="Банк" required>
-                                <input type="text" id="mfo" name="mfo" placeholder="МФО" required>
-                                <input type="tel" id="phone" name="phone" placeholder="Телефон" required value="+998 ">
-                                <input type="email" id="e_mail" name="e_mail" placeholder="E-mail" required>
-                                <input type="text" id="trans_schet" name="trans_schet" placeholder="Р/С" required>
-                                <input type="text" id="inn" name="inn" placeholder="ИНН" required>
-                                <button type="submit" class="button">
-                                    Скачать соглашение
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
+            {% include 'modals/agreement_modal.html' %}
+            
             <h2 class="main__subtitle">Рефералы</h2>
 
             <!-- Таблица с рефералами -->
@@ -268,815 +55,225 @@
                 </thead>
                 <tbody>
                     {% for referal in referals %}
-                        {% if referal.deals[0] %}
-                            {% for deal in referal.deals %}
-                                <tr>
-                                    <td>{{ referal.referal_data.full_name }}</td>
-                                    <td>{{ referal.referal_data.phone_number }}</td>
-                                    <td>{{ deal.agreement_number}}</td>
-                                    <td>{{ referal.contact_id }}</td>
-                                    <td>{{ "Ожидание вывода" if referal.status_name=="Not Started" else referal.status_name }}</td>
-                                    <td>{{ referal.withdrawal_amount }}</td>
-                                    <td>
-                                        <form action="{{ url_for('referal.request_withdrawal', referal_id=referal.id) }}" method="POST">
-                                            <button type="submit" class="table_button" {{ 'disabled' if (referal.balance_pending_withdrawal or referal.withdrawal_amount==0) else '' }}>
-                                                Отправить на проверку
-                                            </button>
-                                        </form>
-                                    </td>
-                                    <td>
-                                        <button class="table_button open_document_form" {{ 'disabled' if referal.status_id != 0 else '' }} data-referal-id="{{ referal.id }}">
-                                            Заполнить данные
-                                        </button>
-                                                                            <!-- Модальное окно для заполнения документов реферала -->
-                                    <div id="DocumentFormModal_{{ referal.id }}" class="modal" style="display: none;">
-                                        <div class="modal-content">
-                                            <span class="close close_document_form" data-referal-id="{{ referal.id }}">&times;</span>
-                                            <div class="modal-header">
-                                                <h2>Заполнение документов реферала: {{ referal.referal_data.full_name if referal.referal_data and referal.referal_data.full_name else 'Новый реферал' }}</h2>
-                                            </div>
-                                            <br>
-                                            <div class="modal-body">
-                                                <form action="{{ url_for('referal.update_referal_documents', referal_id=referal.id) }}" method="POST">
-                                                    <div class="modal_form_container">
-                                                        
-                                                        <!-- Кнопка для получения всех данных клиента из MacroCRM -->
-                                                        {% if referal.contact_id %}
-                                                        <div class="macro-client-fetch-container">
-                                                            <button type="button" 
-                                                                    class="fetch-client-data-btn"
-                                                                    data-referal-id="{{ referal.id }}"
-                                                                    data-contact-id="{{ referal.contact_id }}">
-                                                                <i class="fas fa-download"></i> Получить данные клиента из MacroCRM
-                                                            </button>
-                                                            <div class="fetch-status" id="fetch-status-{{ referal.id }}"></div>
-                                                        </div>
-                                                        {% endif %}
-                                                        
-                                                        <div class="form-group">
-                                                            <h4>Основные данные</h4>
-                                                            
-                                                            <!-- Поле ФИО с кнопкой получения из макро -->
-                                                            {% if referal.contact_id %}
-                                                                {% set macro_contact = referal.get_macro_contact() %}
-                                                                {% if macro_contact and macro_contact.full_name %}
-                                                                <div class="field-with-macro">
-                                                                    <label for="referal_name_{{ referal.id }}">ФИО реферала:</label>
-                                                                    <div class="field-input-group">
-                                                                        <input type="text" 
-                                                                               id="referal_name_{{ referal.id }}"
-                                                                               name="full_name" 
-                                                                               value="{{ referal.referal_data.full_name if referal.referal_data and referal.referal_data.full_name else '' }}"
-                                                                               placeholder="ФИО реферала" 
-                                                                               required>
-                                                                        <button type="button" 
-                                                                                class="use-macro-field-btn"
-                                                                                data-target-field="referal_name_{{ referal.id }}"
-                                                                                data-macro-value="{{ macro_contact.full_name }}"
-                                                                                title="Взять из MacroCRM: {{ macro_contact.full_name }}">
-                                                                            <i class="fas fa-arrow-down"></i>
-                                                                        </button>
-                                                                    </div>
-                                                                    <small class="macro-hint">MacroCRM: {{ macro_contact.full_name }}</small>
-                                                                </div>
-                                                                {% else %}
-                                                                <input type="text" 
-                                                                       id="referal_name_{{ referal.id }}"
-                                                                       name="full_name" 
-                                                                       value="{{ referal.referal_data.full_name if referal.referal_data and referal.referal_data.full_name else '' }}"
-                                                                       placeholder="ФИО реферала" 
-                                                                       required>
-                                                                {% endif %}
-                                                            {% else %}
-                                                            <input type="text" 
-                                                                   id="referal_name_{{ referal.id }}"
-                                                                   name="full_name" 
-                                                                   value="{{ referal.referal_data.full_name if referal.referal_data and referal.referal_data.full_name else '' }}"
-                                                                   placeholder="ФИО реферала" 
-                                                                   required>
-                                                            {% endif %}
-                                                            
-                                                            <!-- Поле телефона -->
-                                                            <input type="tel" 
-                                                                   id="phone_number_{{ referal.id }}"
-                                                                   name="phone_number" 
-                                                                   value="{{ referal.referal_data.phone_number if referal.referal_data and referal.referal_data.phone_number else '+998 ' }}"
-                                                                   placeholder="Номер телефона" 
-                                                                   required>
-                                                        </div>
-                                                        
-                                                        <div class="form-group">
-                                                            <h4>Паспортные данные</h4>
-                                                            
-                                                            <!-- Поле номера паспорта с кнопкой получения из макро -->
-                                                            <div class="field-with-macro">
-                                                                <label for="passport_number_{{ referal.id }}">Номер паспорта:</label>
-                                                                <div class="field-input-group">
-                                                                    <input type="text" 
-                                                                           id="passport_number_{{ referal.id }}"
-                                                                           name="passport_number" 
-                                                                           value="{{ referal.referal_data.passport_number if referal.referal_data and referal.referal_data.passport_number else '' }}"
-                                                                           placeholder="Номер паспорта реферала">
-                                                                    <button type="button" 
-                                                                            class="fetch-macro-field-btn"
-                                                                            data-target-field="passport_number_{{ referal.id }}"
-                                                                            data-field-name="passport_number"
-                                                                            data-contact-id="{{ referal.contact_id if referal.contact_id else '' }}"
-                                                                            title="Получить из MacroCRM">
-                                                                        <i class="fas fa-download"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <!-- Поле кем выдан с кнопкой получения из макро -->
-                                                            <div class="field-with-macro">
-                                                                <label for="passport_giver_{{ referal.id }}">Кем выдан:</label>
-                                                                <div class="field-input-group">
-                                                                    <input type="text" 
-                                                                           id="passport_giver_{{ referal.id }}"
-                                                                           name="passport_giver" 
-                                                                           value="{{ referal.referal_data.passport_giver if referal.referal_data and referal.referal_data.passport_giver else '' }}"
-                                                                           placeholder="Кем выдан">
-                                                                    <button type="button" 
-                                                                            class="fetch-macro-field-btn"
-                                                                            data-target-field="passport_giver_{{ referal.id }}"
-                                                                            data-field-name="passport_giver"
-                                                                            data-contact-id="{{ referal.contact_id if referal.contact_id else '' }}"
-                                                                            title="Получить из MacroCRM">
-                                                                        <i class="fas fa-download"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <!-- Поле даты выдачи с кнопкой получения из макро -->
-                                                            <div class="field-with-macro">
-                                                                <label for="passport_date_{{ referal.id }}">Дата выдачи:</label>
-                                                                <div class="field-input-group">
-                                                                    <input type="date" 
-                                                                           id="passport_date_{{ referal.id }}"
-                                                                           name="passport_date" 
-                                                                           value="{{ referal.referal_data.passport_date.strftime('%Y-%m-%d') if referal.referal_data and referal.referal_data.passport_date else '' }}">
-                                                                    <button type="button" 
-                                                                            class="fetch-macro-field-btn"
-                                                                            data-target-field="passport_date_{{ referal.id }}"
-                                                                            data-field-name="passport_date"
-                                                                            data-contact-id="{{ referal.contact_id if referal.contact_id else '' }}"
-                                                                            title="Получить из MacroCRM">
-                                                                        <i class="fas fa-download"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <!-- Поле адреса регистрации с кнопкой получения из макро -->
-                                                            <div class="field-with-macro">
-                                                                <label for="passport_adress_{{ referal.id }}">Адрес регистрации:</label>
-                                                                <div class="field-input-group">
-                                                                    <input type="text" 
-                                                                           id="passport_adress_{{ referal.id }}"
-                                                                           name="passport_adress" 
-                                                                           value="{{ referal.referal_data.passport_adress if referal.referal_data and referal.referal_data.passport_adress else '' }}"
-                                                                           placeholder="Адрес регистрации">
-                                                                    <button type="button" 
-                                                                            class="fetch-macro-field-btn"
-                                                                            data-target-field="passport_adress_{{ referal.id }}"
-                                                                            data-field-name="passport_address"
-                                                                            data-contact-id="{{ referal.contact_id if referal.contact_id else '' }}"
-                                                                            title="Получить из MacroCRM">
-                                                                        <i class="fas fa-download"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        <div class="form-group">
-                                                            <h4>Контактные данные</h4>
-                                                            
-                                                            <!-- Поле почтового адреса с кнопкой получения из макро -->
-                                                            <div class="field-with-macro">
-                                                                <label for="mail_adress_{{ referal.id }}">Почтовый адрес:</label>
-                                                                <div class="field-input-group">
-                                                                    <input type="text" 
-                                                                           id="mail_adress_{{ referal.id }}"
-                                                                           name="mail_adress" 
-                                                                           value="{{ referal.referal_data.mail_adress if referal.referal_data and referal.referal_data.mail_adress else '' }}"
-                                                                           placeholder="Почтовый адрес проживания">
-                                                                    <button type="button" 
-                                                                            class="fetch-macro-field-btn"
-                                                                            data-target-field="mail_adress_{{ referal.id }}"
-                                                                            data-field-name="mail_address"
-                                                                            data-contact-id="{{ referal.contact_id if referal.contact_id else '' }}"
-                                                                            title="Получить из MacroCRM">
-                                                                        <i class="fas fa-download"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        <button type="submit" class="button">
-                                                            <i class="fas fa-save"></i> Сохранить данные реферала
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-
-
-                                    </td>
-                                    <td>
-                                        <button id="open_act" class="table_button" {{ 'disabled' if referal.status_id != 200 else '' }}> Скачать акт</button>
-                                        <div id="ActDownloadModal" class="modal" style="display: none;">
-                                            <div class="modal-content">
-                                                <span class="close" id="close_act">&times;</span>
-                                                <div class="modal-header">
-                                                    <h2>Форма скачивания акта реферала</h2>
-                                                </div>
-                                            <br>
-                                                <div class="modal-body">
-                                                    <form action="{{ url_for('document.get_referal_act', referal_id=referal.id) }}" method="POST">
-                                                                                        <div class="modal_form_container">
-                                                            <input type="text" id="passport_number" name="passport_number" required placeholder="Номер паспорта реферала">
-                                                            <input type="text" id="passport_giver" name="passport_giver" required placeholder="Кем выдан">
-                                                            <input type="text" id="passport_date" name="passport_date" required placeholder="Дата выдачи">
-                                                            <input type="text" id="passport_adress" name="passport_adress" required placeholder="Адрес регистрации">
-                                                            <input type="text" id="appartment_area" name="appartment_area" required placeholder="Площадь квартиры">
-                                                            <input type="text" id="mail_adress" name="mail_adress" required placeholder="Почтовый адрес">
-                                                            <input type="text" id="pinfl" name="pinfl" placeholder="ПИНФЛ" required pattern="\d{14}" title="ПИНФЛ должен содержать ровно 14 цифр">
-                                                            <input type="email" id="e_mail" name="e_mail" placeholder="E-mail" required>
-                                                            <input type="text" id="card_number" name="card_number" placeholder="Номер карты" required>
-                                                            <input type="text" id="bank" name="bank" placeholder="Банк" required>
-                                                            <input type="text" id="mfo" name="mfo" placeholder="МФО" required>
-                                                            <input type="text" id="trans_schet" name="trans_schet" placeholder="Р/С" required>
-                                                            <input type="text" id="inn" name="inn" placeholder="ИНН" required>
-                                                        
-                                                            <button type="submit">
-                                                                Скачать акт
-                                                            </button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td>{{ referal.referal_data.full_name }}</td>
-                                <td>{{ referal.referal_data.phone_number }}</td>
-                                <td>{{ "-" }}</td>
-                                <td>{{ "-" if referal.contact_id==None else referal.contact_id }}</td>
-                                <td>{{ "Ожидание сделки" if referal.status_name=="Not Started" else referal.status_name }}</td>
-                                <td>{{ referal.withdrawal_amount }}</td>
-                                <td>
-                                    <form action="{{ url_for('referal.request_withdrawal', referal_id=referal.id) }}" method="POST">
-                                        <button type="submit" class="table_button" {{ 'disabled' if (referal.balance_pending_withdrawal or referal.withdrawal_amount==0) else '' }}>
-                                            Отправить на проверку
-                                        </button>
-                                    </form>
-                                </td>
-                                <td>
-                                    <button class="table_button open_document_form" {{ 'disabled' if referal.status_id != 0 else '' }} data-referal-id="{{ referal.id }}">
-                                            Заполнить данные
-                                    </button>
-                                    <div id="DocumentFormModal_{{ referal.id }}" class="modal" style="display: none;">
-                                        <div class="modal-content">
-                                            <span class="close close_document_form" data-referal-id="{{ referal.id }}">&times;</span>
-                                            <div class="modal-header">
-                                                <h2>Заполнение документов реферала: {{ referal.referal_data.full_name if referal.referal_data and referal.referal_data.full_name else 'Новый реферал' }}</h2>
-                                            </div>
-                                            <br>
-                                            <div class="modal-body">
-                                                <form action="{{ url_for('referal.update_referal_documents', referal_id=referal.id) }}" method="POST">
-                                                    <div class="modal_form_container">
-                                                        
-                                                        <!-- Кнопка для получения всех данных клиента из MacroCRM -->
-                                                        {% if referal.contact_id %}
-                                                        <div class="macro-client-fetch-container">
-                                                            <button type="button" 
-                                                                    class="fetch-client-data-btn"
-                                                                    data-referal-id="{{ referal.id }}"
-                                                                    data-contact-id="{{ referal.contact_id }}">
-                                                                <i class="fas fa-download"></i> Получить данные клиента из MacroCRM
-                                                            </button>
-                                                            <div class="fetch-status" id="fetch-status-{{ referal.id }}"></div>
-                                                        </div>
-                                                        {% endif %}
-                                                        
-                                                        <div class="form-group">
-                                                            <h4>Основные данные</h4>
-                                                            
-                                                            <!-- Поле ФИО с кнопкой получения из макро -->
-                                                            {% if referal.contact_id %}
-                                                                {% set macro_contact = referal.get_macro_contact() %}
-                                                                {% if macro_contact and macro_contact.full_name %}
-                                                                <div class="field-with-macro">
-                                                                    <label for="referal_name_{{ referal.id }}">ФИО реферала:</label>
-                                                                    <div class="field-input-group">
-                                                                        <input type="text" 
-                                                                               id="referal_name_{{ referal.id }}"
-                                                                               name="full_name" 
-                                                                               value="{{ referal.referal_data.full_name if referal.referal_data and referal.referal_data.full_name else '' }}"
-                                                                               placeholder="ФИО реферала" 
-                                                                               required>
-                                                                        <button type="button" 
-                                                                                class="use-macro-field-btn"
-                                                                                data-target-field="referal_name_{{ referal.id }}"
-                                                                                data-macro-value="{{ macro_contact.full_name }}"
-                                                                                title="Взять из MacroCRM: {{ macro_contact.full_name }}">
-                                                                            <i class="fas fa-arrow-down"></i>
-                                                                        </button>
-                                                                    </div>
-                                                                    <small class="macro-hint">MacroCRM: {{ macro_contact.full_name }}</small>
-                                                                </div>
-                                                                {% else %}
-                                                                <input type="text" 
-                                                                       id="referal_name_{{ referal.id }}"
-                                                                       name="full_name" 
-                                                                       value="{{ referal.referal_data.full_name if referal.referal_data and referal.referal_data.full_name else '' }}"
-                                                                       placeholder="ФИО реферала" 
-                                                                       required>
-                                                                {% endif %}
-                                                            {% else %}
-                                                            <input type="text" 
-                                                                   id="referal_name_{{ referal.id }}"
-                                                                   name="full_name" 
-                                                                   value="{{ referal.referal_data.full_name if referal.referal_data and referal.referal_data.full_name else '' }}"
-                                                                   placeholder="ФИО реферала" 
-                                                                   required>
-                                                            {% endif %}
-                                                            
-                                                            <!-- Поле телефона -->
-                                                            <input type="tel" 
-                                                                   id="phone_number_{{ referal.id }}"
-                                                                   name="phone_number" 
-                                                                   value="{{ referal.referal_data.phone_number if referal.referal_data and referal.referal_data.phone_number else '+998 ' }}"
-                                                                   placeholder="Номер телефона" 
-                                                                   required>
-                                                        </div>
-                                                        
-                                                        <div class="form-group">
-                                                            <h4>Паспортные данные</h4>
-                                                            
-                                                            <!-- Поле номера паспорта с кнопкой получения из макро -->
-                                                            <div class="field-with-macro">
-                                                                <label for="passport_number_{{ referal.id }}">Номер паспорта:</label>
-                                                                <div class="field-input-group">
-                                                                    <input type="text" 
-                                                                           id="passport_number_{{ referal.id }}"
-                                                                           name="passport_number" 
-                                                                           value="{{ referal.referal_data.passport_number if referal.referal_data and referal.referal_data.passport_number else '' }}"
-                                                                           placeholder="Номер паспорта реферала">
-                                                                    <button type="button" 
-                                                                            class="fetch-macro-field-btn"
-                                                                            data-target-field="passport_number_{{ referal.id }}"
-                                                                            data-field-name="passport_number"
-                                                                            data-contact-id="{{ referal.contact_id if referal.contact_id else '' }}"
-                                                                            title="Получить из MacroCRM">
-                                                                        <i class="fas fa-download"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <!-- Поле кем выдан с кнопкой получения из макро -->
-                                                            <div class="field-with-macro">
-                                                                <label for="passport_giver_{{ referal.id }}">Кем выдан:</label>
-                                                                <div class="field-input-group">
-                                                                    <input type="text" 
-                                                                           id="passport_giver_{{ referal.id }}"
-                                                                           name="passport_giver" 
-                                                                           value="{{ referal.referal_data.passport_giver if referal.referal_data and referal.referal_data.passport_giver else '' }}"
-                                                                           placeholder="Кем выдан">
-                                                                    <button type="button" 
-                                                                            class="fetch-macro-field-btn"
-                                                                            data-target-field="passport_giver_{{ referal.id }}"
-                                                                            data-field-name="passport_giver"
-                                                                            data-contact-id="{{ referal.contact_id if referal.contact_id else '' }}"
-                                                                            title="Получить из MacroCRM">
-                                                                        <i class="fas fa-download"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <!-- Поле даты выдачи с кнопкой получения из макро -->
-                                                            <div class="field-with-macro">
-                                                                <label for="passport_date_{{ referal.id }}">Дата выдачи:</label>
-                                                                <div class="field-input-group">
-                                                                    <input type="date" 
-                                                                           id="passport_date_{{ referal.id }}"
-                                                                           name="passport_date" 
-                                                                           value="{{ referal.referal_data.passport_date.strftime('%Y-%m-%d') if referal.referal_data and referal.referal_data.passport_date else '' }}">
-                                                                    <button type="button" 
-                                                                            class="fetch-macro-field-btn"
-                                                                            data-target-field="passport_date_{{ referal.id }}"
-                                                                            data-field-name="passport_date"
-                                                                            data-contact-id="{{ referal.contact_id if referal.contact_id else '' }}"
-                                                                            title="Получить из MacroCRM">
-                                                                        <i class="fas fa-download"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <!-- Поле адреса регистрации с кнопкой получения из макро -->
-                                                            <div class="field-with-macro">
-                                                                <label for="passport_adress_{{ referal.id }}">Адрес регистрации:</label>
-                                                                <div class="field-input-group">
-                                                                    <input type="text" 
-                                                                           id="passport_adress_{{ referal.id }}"
-                                                                           name="passport_adress" 
-                                                                           value="{{ referal.referal_data.passport_adress if referal.referal_data and referal.referal_data.passport_adress else '' }}"
-                                                                           placeholder="Адрес регистрации">
-                                                                    <button type="button" 
-                                                                            class="fetch-macro-field-btn"
-                                                                            data-target-field="passport_adress_{{ referal.id }}"
-                                                                            data-field-name="passport_address"
-                                                                            data-contact-id="{{ referal.contact_id if referal.contact_id else '' }}"
-                                                                            title="Получить из MacroCRM">
-                                                                        <i class="fas fa-download"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        <div class="form-group">
-                                                            <h4>Контактные данные</h4>
-                                                            
-                                                            <!-- Поле почтового адреса с кнопкой получения из макро -->
-                                                            <div class="field-with-macro">
-                                                                <label for="mail_adress_{{ referal.id }}">Почтовый адрес:</label>
-                                                                <div class="field-input-group">
-                                                                    <input type="text" 
-                                                                           id="mail_adress_{{ referal.id }}"
-                                                                           name="mail_adress" 
-                                                                           value="{{ referal.referal_data.mail_adress if referal.referal_data and referal.referal_data.mail_adress else '' }}"
-                                                                           placeholder="Почтовый адрес проживания">
-                                                                    <button type="button" 
-                                                                            class="fetch-macro-field-btn"
-                                                                            data-target-field="mail_adress_{{ referal.id }}"
-                                                                            data-field-name="mail_address"
-                                                                            data-contact-id="{{ referal.contact_id if referal.contact_id else '' }}"
-                                                                            title="Получить из MacroCRM">
-                                                                        <i class="fas fa-download"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        <button type="submit" class="button">
-                                                            <i class="fas fa-save"></i> Сохранить данные реферала
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                </td>
-                                <td>
-                                    <button id="open_act" class="table_button" {{ 'disabled' if referal.status_id != 200 else '' }}> Скачать акт</button>
-                                    <div id="ActDownloadModal" class="modal" style="display: none;">
-                                        <div class="modal-content">
-                                            <span class="close" id="close_act">&times;</span>
-                                            <div class="modal-header">
-                                                <h2>Форма скачивания акта реферала</h2>
-                                            </div>
-                                        <br>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endif %}
+                        {% include 'components/referal_table_row.html' %}
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </main>
-    <footer class="footer">
-        <p class="footer__text">&copy; 2025 Реферальная система</p>
-    </footer> 
+    
+    {% include 'components/footer.html' %}
+    
+    <!-- Подключение JavaScript файлов в правильном порядке -->
+    <script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/validation/pinfl-validation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/validation/email-validation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/validation/passport-validation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/flash-messages.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/modal-handler.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/macro-transfer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Временный отладочный скрипт для проверки -->
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Profile page loaded');
+            
+            // Проверим наличие кнопки и модального окна с правильными ID
+            const btn = document.getElementById('open_agreement');
+            const modal = document.getElementById('AgreementDownloadModal');
+            
+            console.log('Agreement button found:', !!btn);
+            console.log('Agreement modal found:', !!modal);
+            
+            if (btn && modal) {
+                console.log('Both elements found, modal should work');
+            } else {
+                console.log('Missing elements:', { button: !!btn, modal: !!modal });
+            }
+        });
+    </script>
+    
+    <!-- Дополнительные скрипты для валидации форм в модальных окнах -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Функция валидации PINFL (должен быть ровно 14 цифр)
+            function validatePinfl(input) {
+                const pinflPattern = /^\d{14}$/;
+                if (!pinflPattern.test(input.value)) {
+                    input.setCustomValidity('ПИНФЛ должен содержать ровно 14 цифр');
+                    return false;
+                } else {
+                    input.setCustomValidity('');
+                    return true;
+                }
+            }
 
+            // Функция валидации Email
+            function validateEmail(input) {
+                const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+                if (!emailPattern.test(input.value)) {
+                    input.setCustomValidity('Пожалуйста, введите корректный email');
+                    return false;
+                } else {
+                    input.setCustomValidity('');
+                    return true;
+                }
+            }
 
-        // Получаем модальное окно
-        var AgreementDownloadModal = document.getElementById("AgreementDownloadModal");
-        var ActDownloadModal = document.getElementById("ActDownloadModal");
-        // Получаем кнопку, которая открывает модальное окно
-        var btn_agreement = document.getElementById("open_agreement");
-        var btn_act = document.getElementById("open_act");
-        // Получаем элемент <span>, который закрывает модальное окно
-        var span_agreement = document.getElementById("close_agreement");
-        var span_act = document.getElementById("close_act");
-        
-        // Когда пользователь нажимает на кнопку, открываем модальное окно
-        btn_agreement.onclick = function() {
-            AgreementDownloadModal.style.display = "block";
-        }
-
-        // Когда пользователь нажимает на <span> (x), закрываем модальное окно
-        span_agreement.onclick = function() {
-            AgreementDownloadModal.style.display = "none";
-        }
-
-        btn_act.onclick = function() {
-            ActDownloadModal.style.display = "block";
-        }
-
-        span_act.onclick = function() {
-            ActDownloadModal.style.display = "none";
-        }
-
- // Обработчики для новых модальных окон заполнения документов
-            document.addEventListener('DOMContentLoaded', function() {
-                // Открытие модального окна заполнения документов
-                document.querySelectorAll('.open_document_form').forEach(button => {
-                    button.addEventListener('click', function() {
-                        const referalId = this.getAttribute('data-referal-id');
-                        const modal = document.getElementById(`DocumentFormModal_${referalId}`);
-                        if (modal) {
-                            modal.style.display = 'block';
-                        }
-                    });
-                });
-
-
-                document.querySelectorAll('.use-macro-field-btn').forEach(button => {
-                    button.addEventListener('click', function() {
-                        const targetField = this.getAttribute('data-target-field');
-                        const macroValue = this.getAttribute('data-macro-value');
-                        const inputField = document.getElementById(targetField);
-                        
-                        if (inputField && macroValue) {
-                            if (confirm(`Заменить текущее значение на "${macroValue}"?`)) {
-                                inputField.value = macroValue;
-                                showFieldUpdateNotification(inputField, 'Обновлено из MacroCRM');
-                            }
-                        }
-                    });
-                });
-
-                // Обработчик для кнопок получения данных из MacroCRM (отдельные поля)
-                document.querySelectorAll('.fetch-macro-field-btn').forEach(button => {
-                    button.addEventListener('click', function() {
-                        const targetField = this.getAttribute('data-target-field');
-                        const fieldName = this.getAttribute('data-field-name');
-                        const contactId = this.getAttribute('data-contact-id');
-                        const inputField = document.getElementById(targetField);
-                        
-                        if (!contactId) {
-                            alert('Нет связанного контакта в MacroCRM');
-                            return;
-                        }
-                        
-                        fetchMacroField(contactId, fieldName, inputField);
-                    });
-                });
-
-                // Обработчик для кнопки получения всех данных клиента
-                document.querySelectorAll('.fetch-client-data-btn').forEach(button => {
-                    button.addEventListener('click', function() {
-                        const referralId = this.getAttribute('data-referral-id');
-                        const contactId = this.getAttribute('data-contact-id');
-                        
-                        if (!contactId) {
-                            alert('Нет связанного контакта в MacroCRM');
-                            return;
-                        }
-                        
-                        fetchAllClientData(referralId, contactId);
-                    });
-                });
-                // Закрытие модального окна заполнения документов
-                document.querySelectorAll('.close_document_form').forEach(span => {
-                    span.addEventListener('click', function() {
-                        const referalId = this.getAttribute('data-referal-id');
-                        const modal = document.getElementById(`DocumentFormModal_${referalId}`);
-                        if (modal) {
-                            modal.style.display = 'none';
-                        }
-                    });
-                });
-
-                // Закрытие модальных окон при клике вне их области
-                window.addEventListener('click', function(event) {
-                    if (event.target.classList.contains('modal')) {
-                        event.target.style.display = 'none';
-                    }
-                });
-
-                // Форматирование телефона в модальном окне
-                document.querySelectorAll('input[name="phone_number"]').forEach(function(input) {
-                    function formatPhone(input) {
-                        let value = input.value;
-                        
-                        // Всегда поддерживаем префикс
-                        if (!value.startsWith('+998 ')) {
-                            value = '+998 ' + value.replace(/^\+998\s*/g, '');
-                        }
-                        
-                        // Получаем только цифры после префикса
-                        let digits = value.substring(5).replace(/\D/g, '');
-                        
-                        // Ограничиваем до 9 цифр
-                        if (digits.length > 9) {
-                            digits = digits.substring(0, 9);
-                        }
-                        
-                        // Форматируем номер с пробелами: XX XXX XX XX
-                        let formatted = '';
-                        if (digits.length > 0) {
-                            formatted += digits.substring(0, Math.min(2, digits.length));
-                        }
-                        if (digits.length > 2) {
-                            formatted += ' ' + digits.substring(2, Math.min(5, digits.length));
-                        }
-                        if (digits.length > 5) {
-                            formatted += ' ' + digits.substring(5, Math.min(7, digits.length));
-                        }
-                        if (digits.length > 7) {
-                            formatted += ' ' + digits.substring(7, 9);
-                        }
-                        
-                        // Обновляем значение поля ввода
-                        input.value = '+998 ' + formatted;
-                    }
-
-                    input.addEventListener('input', function() {
-                        formatPhone(this);
-                    });
+            // Функция форматирования телефона с поддержкой множественных номеров
+            function formatPhone(input) {
+                let value = input.value;
+                
+                // Split by comma to handle multiple phones
+                let phones = value.split(',');
+                let formattedPhones = [];
+                
+                for (let i = 0; i < phones.length; i++) {
+                    let phone = phones[i].trim();
                     
-                    input.addEventListener('focus', function() {
-                        if (this.value.length <= 5) {
-                            this.value = '+998 ';
-                            setTimeout(() => {
-                                this.selectionStart = this.selectionEnd = 5;
-                            }, 0);
-                        }
-                    });
+                    // Skip empty entries
+                    if (!phone) continue;
+                    
+                    // Всегда поддерживаем префикс для каждого номера
+                    if (!phone.startsWith('+998 ')) {
+                        phone = '+998 ' + phone.replace(/^\+998\s*/g, '');
+                    }
+                    
+                    // Получаем только цифры после префикса
+                    let digits = phone.substring(5).replace(/\D/g, '');
+                    
+                    // Ограничиваем до 9 цифр
+                    if (digits.length > 9) {
+                        digits = digits.substring(0, 9);
+                    }
+                    
+                    // Форматируем номер с пробелами: XX XXX XX XX
+                    let formatted = '';
+                    if (digits.length > 0) {
+                        formatted += digits.substring(0, Math.min(2, digits.length));
+                    }
+                    if (digits.length > 2) {
+                        formatted += ' ' + digits.substring(2, Math.min(5, digits.length));
+                    }
+                    if (digits.length > 5) {
+                        formatted += ' ' + digits.substring(5, Math.min(7, digits.length));
+                    }
+                    if (digits.length > 7) {
+                        formatted += ' ' + digits.substring(7, 9);
+                    }
+                    
+                    // Добавляем отформатированный номер
+                    if (formatted.trim()) {
+                        formattedPhones.push('+998 ' + formatted);
+                    }
+                }
+                
+                // Обновляем значение поля ввода
+                input.value = formattedPhones.join(', ');
+            }
+
+            // Находим все поля PINFL и добавляем валидацию
+            const pinflInputs = document.querySelectorAll('input[name="pinfl"]');
+            pinflInputs.forEach(function(input) {
+                input.addEventListener('input', function() {
+                    // Удаляем все не-цифры
+                    this.value = this.value.replace(/\D/g, '');
+                    validatePinfl(this);
+                });
+                
+                input.addEventListener('invalid', function(e) {
+                    if (this.value === '') {
+                        this.setCustomValidity('Пожалуйста, введите ПИНФЛ');
+                    } else {
+                        validatePinfl(this);
+                    }
                 });
             });
 
-            function fetchMacroField(contactId, fieldName, inputField) {
-                const button = document.querySelector(`[data-target-field="${inputField.id}"]`);
-                const originalText = button.innerHTML;
-                
-                // Показываем индикатор загрузки
-                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                button.disabled = true;
-                
-                fetch(`/fetch_macro_field/${contactId}/${fieldName}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.value) {
-                        if (confirm(`Заменить текущее значение на "${data.value}"?`)) {
-                            inputField.value = data.value;
-                            showFieldUpdateNotification(inputField, 'Получено из MacroCRM');
-                        }
-                    } else {
-                        alert(data.error || 'Данные не найдены в MacroCRM');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Ошибка при получении данных из MacroCRM');
-                })
-                .finally(() => {
-                    button.innerHTML = originalText;
-                    button.disabled = false;
+            // Находим все поля Email и добавляем валидацию
+            const emailInputs = document.querySelectorAll('input[name="e_mail"]');
+            emailInputs.forEach(function(input) {
+                input.addEventListener('input', function() {
+                    validateEmail(this);
                 });
-            }
-
-            // Функция для получения всех данных клиента из MacroCRM
-            function fetchAllClientData(referralId, contactId) {
-                const button = document.querySelector(`[data-referral-id="${referralId}"].fetch-client-data-btn`);
-                const statusDiv = document.getElementById(`fetch-status-${referralId}`);
-                const originalText = button.innerHTML;
                 
-                // Показываем индикатор загрузки
-                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Получаем данные...';
-                button.disabled = true;
-                statusDiv.innerHTML = '<div class="loading-status">Подключение к MacroCRM...</div>';
-                
-                fetch(`/fetch_client_data/${contactId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
+                input.addEventListener('invalid', function(e) {
+                    if (this.value === '') {
+                        this.setCustomValidity('Пожалуйста, введите email');
+                    } else {
+                        validateEmail(this);
                     }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        updateFieldsWithClientData(referralId, data.client_data);
-                        statusDiv.innerHTML = '<div class="success-status">✓ Данные успешно получены из MacroCRM</div>';
+                });
+            });
+
+            // Находим все поля телефонов и добавляем форматирование
+            const phoneInputs = document.querySelectorAll('input[name="phone"]');
+            phoneInputs.forEach(function(input) {
+                // Устанавливаем значение по умолчанию
+                if (!input.value) {
+                    input.value = '+998 ';
+                }
+                
+                input.addEventListener('input', function() {
+                    formatPhone(this);
+                });
+                
+                input.addEventListener('focus', function() {
+                    if (this.value.length <= 5) {
+                        this.value = '+998 ';
+                        setTimeout(() => {
+                            this.selectionStart = this.selectionEnd = 5;
+                        }, 0);
+                    }
+                });
+                
+                // Проверка перед отправкой формы с поддержкой множественных номеров
+                if (input.form) {
+                    input.form.addEventListener('submit', function(e) {
+                        const phones = input.value.split(',');
+                        let allValid = true;
                         
-                        setTimeout(() => {
-                            statusDiv.innerHTML = '';
-                        }, 3000);
-                    } else {
-                        statusDiv.innerHTML = `<div class="error-status">✗ ${data.error}</div>`;
-                        setTimeout(() => {
-                            statusDiv.innerHTML = '';
-                        }, 5000);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    statusDiv.innerHTML = '<div class="error-status">✗ Ошибка при получении данных из MacroCRM</div>';
-                    setTimeout(() => {
-                        statusDiv.innerHTML = '';
-                    }, 5000);
-                })
-                .finally(() => {
-                    button.innerHTML = originalText;
-                    button.disabled = false;
-                });
-            }
-
-            // Функция для обновления полей с полученными данными
-            function updateFieldsWithClientData(referralId, clientData) {
-                const fieldsToUpdate = [
-                    { field: 'passport_number', element: `passport_number_${referralId}` },
-                    { field: 'passport_giver', element: `passport_giver_${referralId}` },
-                    { field: 'passport_date', element: `passport_date_${referralId}` },
-                    { field: 'passport_address', element: `passport_adress_${referralId}` },
-                    { field: 'mail_address', element: `mail_adress_${referralId}` }
-                ];
-
-                let updatedCount = 0;
-                fieldsToUpdate.forEach(({field, element}) => {
-                    if (clientData[field]) {
-                        const inputField = document.getElementById(element);
-                        if (inputField) {
-                            // Проверяем, не пустое ли текущее поле
-                            if (!inputField.value.trim() || confirm(`Поле "${inputField.placeholder}" уже заполнено. Заменить на данные из MacroCRM?`)) {
-                                inputField.value = clientData[field];
-                                showFieldUpdateNotification(inputField, 'Обновлено из MacroCRM');
-                                updatedCount++;
+                        for (let phone of phones) {
+                            phone = phone.trim();
+                            if (!phone) continue;
+                            
+                            const digits = phone.substring(5).replace(/\D/g, '');
+                            if (digits.length !== 9) {
+                                allValid = false;
+                                break;
                             }
                         }
-                    }
-                });
-
-                if (updatedCount > 0) {
-                    // Показываем общее уведомление
-                    const notification = document.createElement('div');
-                    notification.className = 'global-notification success';
-                    notification.innerHTML = `<i class="fas fa-check-circle"></i> Обновлено полей: ${updatedCount}`;
-                    document.body.appendChild(notification);
-                    
-                    setTimeout(() => {
-                        if (notification.parentElement) {
-                            notification.parentElement.removeChild(notification);
+                        
+                        if (!allValid) {
+                            alert('Пожалуйста, введите 9 цифр для каждого номера телефона после кода страны. Для множественных номеров разделяйте их запятыми.');
+                            e.preventDefault();
                         }
-                    }, 3000);
+                    });
                 }
+            });
+        });
+    </script>
+    
+    <!-- Дополнительный отладочный скрипт -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Profile page loaded');
+            
+            // Проверим наличие кнопки и модального окна
+            const btn = document.getElementById('open_agreement');
+            const modal = document.getElementById('agreement_modal');
+            
+            console.log('Agreement button found:', !!btn);
+            console.log('Agreement modal found:', !!modal);
+            
+            if (btn) {
+                console.log('Button element:', btn);
+                btn.addEventListener('click', function(e) {
+                    console.log('Direct click listener triggered');
+                });
             }
-
-            // Функция для показа уведомления об обновлении поля
-            function showFieldUpdateNotification(inputField, message) {
-                // Добавляем визуальную обратную связь
-                inputField.style.backgroundColor = '#e8f5e8';
-                inputField.style.borderColor = '#28a745';
-                
-                setTimeout(() => {
-                    inputField.style.backgroundColor = '';
-                    inputField.style.borderColor = '';
-                }, 2000);
-                
-                // Создаем уведомление
-                const notification = document.createElement('div');
-                notification.className = 'field-notification';
-                notification.textContent = message;
-                notification.style.cssText = `
-                    position: absolute;
-                    top: -25px;
-                    right: 0;
-                    background: #28a745;
-                    color: white;
-                    padding: 4px 8px;
-                    border-radius: 3px;
-                    font-size: 11px;
-                    z-index: 1000;
-                    animation: fadeInOut 2s ease-in-out;
-                `;
-                
-                const container = inputField.parentElement;
-                if (container.style.position !== 'relative') {
-                    container.style.position = 'relative';
-                }
-                container.appendChild(notification);
-                
-                setTimeout(() => {
-                    if (notification.parentElement) {
-                        notification.parentElement.removeChild(notification);
-                    }
-                }, 2000);
-            }
-
+        });
     </script>
 </body>
 </html>

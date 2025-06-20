@@ -10,7 +10,7 @@ import pymysql
 from models import MacroContact, MacroDeal, db, User, Referal, Status
 
 # Импортируем все Blueprint'ы из папки routes
-from routes import auth_bp, referal_bp, admin_bp, document_bp, main_bp, user_bp
+from routes import auth_bp, referal_bp, admin_bp, document_bp, main_bp, user_bp  # Исправлено: referal_bp
 
 import pandas as pd
 from werkzeug.security import generate_password_hash
@@ -69,7 +69,7 @@ scheduler.start()
 # Register all blueprints WITHOUT URL prefixes
 app.register_blueprint(main_bp)
 app.register_blueprint(auth_bp)
-app.register_blueprint(referal_bp)
+app.register_blueprint(referal_bp)  # Исправлено: referal_bp
 app.register_blueprint(admin_bp)
 app.register_blueprint(document_bp)
 app.register_blueprint(user_bp)
@@ -121,11 +121,12 @@ if __name__ == '__main__':
         db.create_all()
         
         if not Status.query.filter_by(id=0).first():
-            db.session.add(Status(id=0, name='Not Started',  is_start = True, is_final=False))
+            db.session.add(Status(id=0, name='Не начата',  is_start = True, is_final=False))
             db.session.add(Status(id=1, name='Проверка отделом аналитики', is_final=False))
             db.session.add(Status(id=10, name='Проверка колл центром', is_final=False))
             db.session.add(Status(id=20, name='Проверка Коммерческим Директором', is_final=False))
-            db.session.add(Status(id=200, name='Акцептовано к оплате', is_final=True))
+            db.session.add(Status(id=200, name='Акцептовано к оплате', is_final=False))
+            db.session.add(Status(id=300, name='Оплачено', is_final=True))
             db.session.add(Status(id=500, name='Отказано', is_final=True))
             db.session.commit()
         
