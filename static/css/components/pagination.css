@@ -1,0 +1,119 @@
+.pagination-section {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.pagination-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pagination-info {
+    font-size: 14px;
+    color: var(--text-secondary, #6c757d);
+}
+
+.pagination-nav {
+    align-self: center;
+}
+
+.pagination {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 2px;
+}
+
+.page-item {
+    display: flex;
+}
+
+.page-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color, #dee2e6);
+    background: var(--bg-white, white);
+    color: #333;
+    text-decoration: none;
+    font-size: 14px;
+    transition: all 0.3s;
+    min-width: 40px;
+    height: 38px;
+    border-radius: 4px;
+}
+
+.page-link:hover:not(.current) {
+    background: var(--bg-light, #f8f9fa);
+    border-color: var(--border-hover, #adb5bd);
+}
+
+.page-number {
+    font-weight: 500;
+}
+
+.page-item.active .page-link {
+    background: var(--golden-color);
+    color: var(--text-white, white);
+    border-color: var(--golden-color);
+    font-weight: 600;
+}
+
+.page-item.active .page-link.current {
+    cursor: default;
+}
+
+.page-item.disabled .page-link {
+    color: var(--text-muted, #6c757d);
+    background: var(--bg-disabled, #f8f9fa);
+    border-color: var(--border-disabled, #dee2e6);
+    cursor: not-allowed;
+}
+
+
+.per-page-control {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-primary, #333);
+}
+
+.per-page-select {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--bg-white, white);
+    color: var(--text-primary, #333);
+}
+
+.per-page-select:focus {
+    outline: none;
+    border-color: var(--golden-color);
+    box-shadow: 0 0 0 2px var(--primary-shadow, rgba(0,123,255,0.25));
+}
+
+@media (max-width: 768px) {
+    .pagination-controls {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .pagination {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .page-link {
+        min-width: 35px;
+        height: 35px;
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+}

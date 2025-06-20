@@ -20,49 +20,36 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/macro-crm.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/filters.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/pagination.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/table-filters.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/footer.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/referals.css') }}">
 </head>
 <body>
-    {% include 'components/header.html' %}
-    {% include 'components/flash_messages.html' %}
-    
-    <!-- Основной контент -->
-    <main class="main">
-        <div class="container">
-            <h1 class="main__title">Профиль</h1>
-            <div class="profile__balance">
-                <p>Бонусные баллы<a href="https://gh.uz" class="rikroll">:</a> {{current_balance}}</p>
-            </div>
-            <br>
-            
-            <button id="open_agreement" class="button">Форма скачивания договора</button>
-            {% include 'modals/agreement_modal.html' %}
-            
-            <h2 class="main__subtitle">Рефералы</h2>
+    <div class="page-wrapper">
+        {% include 'components/header.html' %}
+        {% include 'components/flash_messages.html' %}
+        
+        <!-- Основной контент -->
+        <main class="main">
+            <div class="container">
+                {# <!-- 
+                <h1 class="main__title">Профиль</h1>
+                 <div class="profile__balance">
+                    <p>Бонусные баллы<a href="https://gh.uz" class="rikroll">:</a> {{current_balance}}</p>
+                </div>
+                <br>
+                
+                <button id="open_agreement" class="button">Форма скачивания договора</button>
+                {% include 'modals/agreement_modal.html' %} --> #}
+                 {% include 'components/referals_table.html' %}
 
-            <!-- Таблица с рефералами -->
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>ФИО</th>
-                        <th>Номер телефона</th>
-                        <th>Номер договора</th>
-                        <th>ID контакта</th>
-                        <th>Этап проверки</th>
-                        <th>Выплата</th>
-                        <th colspan="2">Действия</th>
-                        <th>Акт</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for referal in referals %}
-                        {% include 'components/referal_table_row.html' %}
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </main>
-    
-    {% include 'components/footer.html' %}
+            </div>
+        </main>
+        
+        {% include 'components/footer.html' %}
+    </div>
     
     <!-- Подключение JavaScript файлов в правильном порядке -->
     <script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
@@ -72,6 +59,7 @@
     <script src="{{ url_for('static', filename='js/components/flash-messages.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/modal-handler.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/macro-transfer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/table-filters.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     
     <!-- Временный отладочный скрипт для проверки -->

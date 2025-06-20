@@ -4,13 +4,13 @@ import locale
 from pathlib import Path
 import re
 import sys
-from flask import Flask, request, g
+from flask import Flask, request, g, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 import pymysql
 from models import MacroContact, MacroDeal, db, User, Referal, Status
 
 # Импортируем все Blueprint'ы из папки routes
-from routes import auth_bp, referal_bp, admin_bp, document_bp, main_bp, user_bp  # Исправлено: referal_bp
+from routes import auth_bp, referal_bp, admin_bp, document_bp, user_bp  # Убрали main_bp
 
 import pandas as pd
 from werkzeug.security import generate_password_hash
@@ -67,9 +67,8 @@ def daily_update_task():
 scheduler.start()
 
 # Register all blueprints WITHOUT URL prefixes
-app.register_blueprint(main_bp)
 app.register_blueprint(auth_bp)
-app.register_blueprint(referal_bp)  # Исправлено: referal_bp
+app.register_blueprint(referal_bp)  # Убрали url_prefix='/referal'
 app.register_blueprint(admin_bp)
 app.register_blueprint(document_bp)
 app.register_blueprint(user_bp)
@@ -78,6 +77,12 @@ app.register_blueprint(user_bp)
 # This will strip the /referal prefix when running behind proxy
 if os.getenv('BEHIND_PROXY', 'false').lower() == 'true':
     app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix='/referal')
+
+
+@app.route('/')
+def home():
+    """Корневой маршрут - редирект на профиль рефералов."""
+    return redirect(url_for('referal.profile'))
 
 
 @app.before_request
@@ -136,4 +141,5 @@ if __name__ == '__main__':
             print(f"Scheduled daily update task. {scheduler.get_job('daily_update_job').next_run_time}")
 
     setup_locale() 
+    app.run(host='0.0.0.0', port=80, debug=True)
     app.run(host='0.0.0.0', port=80, debug=True)

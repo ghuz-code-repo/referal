@@ -12,25 +12,107 @@ import os
 referal_bp = Blueprint('referal', __name__)
 
 
-@referal_bp.route('/profile', methods=['GET'])
+@referal_bp.route('/', methods=['GET'])
 def profile():
     print("Profile route accessed")
     user = get_current_user()
     print(f"User after get_current_user: {user}")
     
     if not user:
-        print("No user found, redirecting to main")
-        return redirect(url_for('main.main'))
+        print("No user found, redirecting to referal profile")
+        return redirect(url_for('referal.profile'))
     
     referal_service.update_deal_info(user)
-    referals = Referal.query.filter_by(user_id=user.id).all()
+    
+    # Получаем общее количество рефералов пользователя (без фильтров)
+    total_user_referals = Referal.query.filter_by(user_id=user.id).count()
+    
+    # Получаем параметры фильтрации, пагинации и сортировки
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 5, type=int)
+    status_filter = request.args.get('status', '')
+    name_filter = request.args.get('name', '')
+    phone_filter = request.args.get('phone', '')
+    contract_filter = request.args.get('contract', '')
+    contact_id_filter = request.args.get('contact_id', '')
+    sort_by = request.args.get('sort', '')
+    sort_order = request.args.get('order', 'asc')
+    
+    # Базовый запрос с единократным присоединением ReferalData
+    query = Referal.query.filter_by(user_id=user.id)
+    
+    # Определяем, нужно ли присоединять ReferalData
+    needs_referal_data_join = (name_filter or phone_filter or contract_filter or 
+                              sort_by in ['name', 'phone', 'contract'])
+    
+    if needs_referal_data_join:
+        query = query.join(ReferalData)
+    
+    # Применяем фильтры
+    if status_filter:
+        if status_filter == 'no_status':
+            query = query.filter(Referal.status_id == 0)
+        else:
+            query = query.filter(Referal.status_id == int(status_filter))
+    else:
+        # Когда выбрано "Все статусы", исключаем "Оплачено" (300) и "Отказано" (500)
+        query = query.filter(Referal.status_id.notin_([300, 500]))
+    
+    if name_filter:
+        query = query.filter(ReferalData.full_name.ilike(f'%{name_filter}%'))
+    
+    if phone_filter:
+        query = query.filter(ReferalData.phone_number.ilike(f'%{phone_filter}%'))
+    
+    if contract_filter:
+        query = query.filter(ReferalData.contract_number.ilike(f'%{contract_filter}%'))
+    
+    if contact_id_filter:
+        query = query.filter(Referal.contact_id.ilike(f'%{contact_id_filter}%'))
+    
+    # Применяем сортировку
+    if sort_by:
+        if sort_by == 'name':
+            if sort_order == 'desc':
+                query = query.order_by(ReferalData.full_name.desc())
+            else:
+                query = query.order_by(ReferalData.full_name.asc())
+        elif sort_by == 'phone':
+            if sort_order == 'desc':
+                query = query.order_by(ReferalData.phone_number.desc())
+            else:
+                query = query.order_by(ReferalData.phone_number.asc())
+        elif sort_by == 'contract':
+            if sort_order == 'desc':
+                query = query.order_by(ReferalData.contract_number.desc())
+            else:
+                query = query.order_by(ReferalData.contract_number.asc())
+        elif sort_by == 'status':
+            if sort_order == 'desc':
+                query = query.order_by(Referal.status_id.desc())
+            else:
+                query = query.order_by(Referal.status_id.asc())
+        elif sort_by == 'amount':
+            if sort_order == 'desc':
+                query = query.order_by(Referal.withdrawal_amount.desc())
+            else:
+                query = query.order_by(Referal.withdrawal_amount.asc())
+    else:
+        # Сортировка по умолчанию - по дате создания
+        query = query.order_by(Referal.id.desc())
+    
+    # Пагинация
+    pagination = query.paginate(
+        page=page, 
+        per_page=per_page, 
+        error_out=False
+    )
+    referals = pagination.items
     
     # Обогащаем каждый реферал данными MacroContact
     for referal in referals:
         if referal.contact_id:
-            # Получаем ВСЕ MacroContact записи с данным contacts_id
             referal.macro_contacts = MacroContact.query.filter_by(contacts_id=referal.contact_id).all()
-            # Оставляем одну запись для совместимости (первую)
             referal.macro_contact = referal.macro_contacts[0] if referal.macro_contacts else None
         else:
             referal.macro_contacts = []
@@ -44,7 +126,19 @@ def profile():
                           pending_withdrawal=user.pending_withdrawal,
                           total_withdrawal=user.total_withdrawal,
                           referals=referals,
-                          statuses=Status.query.all())
+                          pagination=pagination,
+                          statuses=Status.query.all(),
+                          total_user_referals=total_user_referals,
+                          current_filters={
+                              'status': status_filter,
+                              'name': name_filter,
+                              'phone': phone_filter,
+                              'contract': contract_filter,
+                              'contact_id': contact_id_filter,
+                              'per_page': per_page
+                          },
+                          current_sort=sort_by,
+                          current_order=sort_order)
 
 
 @referal_bp.route('/add', methods=['POST'])
@@ -75,19 +169,34 @@ def add_referal():
             flash('Неверный формат номера телефона', 'error')
             return redirect(url_for('referal.profile'))
         
-        # Проверяем, не существует ли уже реферал с таким телефоном у данного пользователя
+        # Проверяем, не существует ли уже реферал с таким телефоном 
         existing_referal = Referal.query.join(ReferalData).filter(
-            Referal.user_id == user.id,
             ReferalData.phone_number == formatted_phone
         ).first()
-        
         if existing_referal:
-            flash(f'Реферал с номером {formatted_phone} уже существует', 'error')
+            flash(f'Реферал с номером {formatted_phone} уже добавлен', 'error')
             return redirect(url_for('referal.profile'))
         
+                # Проверяем, не существует ли уже реферал с таким телефоном 
+        existing_referal = Referal.query.join(ReferalData).filter(
+            ReferalData.full_name == full_name
+        ).first()
+        if existing_referal:
+            flash(f'Реферал с именем {full_name} уже добавлен', 'error')
+            return redirect(url_for('referal.profile'))
+        
+        # Пытаемся найти соответствующий MacroContact
+        macro_contact = MacroContact.query.filter_by(phone_number=formatted_phone).first()
+        if macro_contact:
+            new_referal.contact_id = macro_contact.contacts_id
+            print(f"Found matching MacroContact for {formatted_phone}: {macro_contact.contacts_id}")
+            flash('Данный человек не может являться рефералом', 'error')
+            return redirect(url_for('referal.profile'))
+
         # Создаем новый реферал
         new_referal = Referal(user_id=user.id)
         db.session.add(new_referal)
+        db.session.commit()
         db.session.flush()  # Получаем ID реферала
         
         # Создаем данные реферала
@@ -96,16 +205,23 @@ def add_referal():
             full_name=full_name,
             phone_number=formatted_phone
         )
+
+        passport_number = request.form.get('passport_number', '').strip()
+        passport_date = request.form.get('passport_date', '').strip()
+        passport_giver = request.form.get('passport_giver', '').strip()
+
+        
+        if passport_number and passport_number != '':
+            referal_data.passport_number = passport_number
+        if passport_date and passport_date != '':
+            referal_data.passport_date = datetime.strptime(passport_date, '%Y-%m-%d')
+        if passport_giver and passport_giver != '':
+            referal_data.passport_giver = passport_giver
+
+        
         db.session.add(referal_data)
-        
-        # Пытаемся найти соответствующий MacroContact
-        macro_contact = MacroContact.query.filter_by(phone_number=formatted_phone).first()
-        if macro_contact:
-            new_referal.contact_id = macro_contact.contacts_id
-            print(f"Found matching MacroContact for {formatted_phone}: {macro_contact.contacts_id}")
-        
         db.session.commit()
-        
+        db.session.flush()
         flash(f'Реферал {full_name} успешно добавлен', 'success')
         print(f"Successfully added referal: {full_name} ({formatted_phone}) for user {user.login}")
         
@@ -123,7 +239,7 @@ def update_deal_info_route():
     user = get_current_user()
     if not user:
         flash('User not found', 'error')
-        return redirect(url_for('main.main'))
+        return redirect(url_for('referal.profile'))
         
     try:
         referal_service.update_deal_info(user)
@@ -150,7 +266,7 @@ def update_referal_documents(referal_id):
     user = get_current_user()
     if not user:
         flash('Пожалуйста, войдите в систему', 'error')
-        return redirect(url_for('main.main'))
+        return redirect(url_for('referal.profile'))
     
     referal = Referal.query.filter_by(id=referal_id, user_id=user.id).first()
     if not referal:
@@ -226,7 +342,7 @@ def referal_profile(referal_id):
     user = get_current_user()
     if not user:
         flash('Пожалуйста, войдите в систему', 'error')
-        return redirect(url_for('main.main'))
+        return redirect(url_for('referal.profile'))
     
     referal = Referal.query.filter_by(id=referal_id, user_id=user.id).first()
     if not referal:
@@ -270,3 +386,4 @@ def update_macro_data():
             'success': False,
             'message': f"Ошибка: {str(e)}"
         })
+

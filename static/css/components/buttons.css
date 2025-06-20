@@ -4,7 +4,6 @@ button {
     padding: 10px 20px;
     border: none;
     cursor: pointer;
-    font-size: 1em;
     border-radius: var(--border-radius);
     transition: background-color var(--transition-normal);
 }
@@ -21,10 +20,6 @@ button:disabled {
 button:hover:disabled {
     background-color: #ccc;
     cursor: not-allowed;
-}
-
-.button {
-    /* existing styles */
 }
 
 .button-primary {

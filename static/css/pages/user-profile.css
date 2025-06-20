@@ -1,0 +1,135 @@
+/* Фиксированный layout для профиля пользователя */
+html, body {
+    height: 100vh;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+.page-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.main {
+    flex: 1;
+    overflow: hidden;
+    padding: 20px;
+}
+
+.container {
+    height: 90%;
+    display: flex;
+    flex-direction: column;
+}
+
+.main__title {
+    margin: 0 0 20px 0;
+    flex-shrink: 0;
+}
+
+.profile-section {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 20px;
+    min-height: 0;
+}
+
+.profile-info, .profile-form {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.info-card, .form-card {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.info-card h3, .form-card h3 {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 1;
+    margin: 0 0 20px 0;
+    padding-bottom: 10px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.info-label {
+    font-weight: bold;
+}
+
+.info-value {
+    text-align: right;
+}
+
+.form-section {
+    margin-bottom: 30px;
+}
+
+.form-section h4 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    font-weight: 600;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+    box-sizing: border-box;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary-color, #007bff);
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.form-actions {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    padding: 20px 0 0 0;
+    border-top: 1px solid #e0e0e0;
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .profile-section {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+    
+    .profile-info {
+        max-height: 200px;
+    }
+}

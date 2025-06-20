@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль пользователя</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- Подключение CSS файлов -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/modals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/inputs.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/footer.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/user-profile.css') }}">
+</head>
+<body>
+    <div class="page-wrapper">
+        {% include 'components/header.html' %}
+        {% include 'components/flash_messages.html' %}
+        
+        <main class="main">
+            <div class="container">
+                <h1 class="main__title">Профиль пользователя</h1>
+                
+                <div class="profile-section">
+                    <div class="profile-info">
+                        <div class="info-card card">
+                            <h3><i class="fas fa-user"></i> Основная информация</h3>
+                            <div class="info-row">
+                                <span class="info-label">Логин:</span>
+                                <span class="info-value">{{ current_user.login }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Роль:</span>
+                                <span class="info-value">{{ current_user.role or 'Не указана' }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Текущий баланс:</span>
+                                <span class="info-value">{{ current_user.current_balance or 0 }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">К выводу:</span>
+                                <span class="info-value">{{ current_user.pending_withdrawal or 0 }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Всего выведено:</span>
+                                <span class="info-value">{{ current_user.total_withdrawal or 0 }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="profile-form">
+                        <div class="form-card card">
+                            <h3><i class="fas fa-edit"></i> Редактирование данных</h3>
+                            
+                            <form method="POST" action="{{ url_for('user.update_user_info') }}" class="user-form">
+                                <!-- Личные данные -->
+                                <div class="form-section">
+                                    <h4>Личные данные</h4>
+                                    
+                                    <div class="form-group">
+                                        <label for="name">ФИО:</label>
+                                        <input type="text" 
+                                               id="name" 
+                                               name="name" 
+                                               class="form-input input"
+                                               value="{{ current_user.user_data.full_name if current_user.user_data else '' }}"
+                                               placeholder="Введите полное имя">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="phone">Телефон:</label>
+                                        <input type="tel" 
+                                               id="phone" 
+                                               name="phone" 
+                                               class="form-input"
+                                               value="{{ current_user.user_data.phone if current_user.user_data else '' }}"
+                                               placeholder="+998 XX XXX XX XX">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="e_mail">Email:</label>
+                                        <input type="email" 
+                                               id="e_mail" 
+                                               name="e_mail" 
+                                               class="form-input"
+                                               value="{{ current_user.user_data.e_mail if current_user.user_data else '' }}"
+                                               placeholder="example@email.com">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="pinfl">ПИНФЛ:</label>
+                                        <input type="text" 
+                                               id="pinfl" 
+                                               name="pinfl" 
+                                               class="form-input"
+                                               value="{{ current_user.user_data.pinfl if current_user.user_data else '' }}"
+                                               placeholder="14 цифр"
+                                               maxlength="14">
+                                    </div>
+                                </div>
+
+                                <!-- Паспортные данные -->
+                                <div class="form-section">
+                                    <h4>Паспортные данные</h4>
+                                    
+                                    <div class="form-group">
+                                        <label for="passport_number">Серия и номер паспорта:</label>
+                                        <input type="text" 
+                                               id="passport_number" 
+                                               name="passport_number" 
+                                               class="form-input"
+                                               value="{{ current_user.user_data.passport_number if current_user.user_data else '' }}"
+                                               placeholder="AA1234567">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="passport_date">Дата выдачи:</label>
+                                        <input type="date" 
+                                               id="passport_date" 
+                                               name="passport_date" 
+                                               class="form-input"
+                                               value="{{ current_user.user_data.passport_date.strftime('%Y-%m-%d') if current_user.user_data and current_user.user_data.passport_date else '' }}">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="passport_giver">Кем выдан:</label>
+                                        <input type="text" 
+                                               id="passport_giver" 
+                                               name="passport_giver" 
+                                               class="form-input"
+                                               value="{{ current_user.user_data.passport_giver if current_user.user_data else '' }}"
+                                               placeholder="Орган выдачи">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="passport_adress">Адрес регистрации:</label>
+                                        <textarea id="passport_adress" 
+                                                  name="passport_adress" 
+                                                  class="form-input"
+                                                  rows="3"
+                                                  placeholder="Полный адрес регистрации">{{ current_user.user_data.passport_adress if current_user.user_data else '' }}</textarea>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="mail_adress">Почтовый адрес:</label>
+                                        <textarea id="mail_adress" 
+                                                  name="mail_adress" 
+                                                  class="form-input"
+                                                  rows="3"
+                                                  placeholder="Адрес для почтовой корреспонденции">{{ current_user.user_data.mail_adress if current_user.user_data else '' }}</textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Банковские данные -->
+                                <div class="form-section">
+                                    <h4>Банковские данные</h4>
+                                    
+                                    <div class="form-group">
+                                        <label for="card_number">Номер карты:</label>
+                                        <input type="text" 
+                                               id="card_number" 
+                                               name="card_number" 
+                                               class="form-input"
+                                               value="{{ current_user.user_data.card_number if current_user.user_data else '' }}"
+                                               placeholder="8600 XXXX XXXX XXXX">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="bank_name">Название банка:</label>
+                                        <input type="text" 
+                                               id="bank_name" 
+                                               name="bank_name" 
+                                               class="form-input"
+                                               value="{{ current_user.user_data.bank_name if current_user.user_data else '' }}"
+                                               placeholder="Название банка">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="trans_schet">Транзитный счет:</label>
+                                        <input type="text" 
+                                               id="trans_schet" 
+                                               name="trans_schet" 
+                                               class="form-input"
+                                               value="{{ current_user.user_data.trans_schet if current_user.user_data else '' }}"
+                                               placeholder="Номер транзитного счета">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="mfo">МФО:</label>
+                                        <input type="text" 
+                                               id="mfo" 
+                                               name="mfo" 
+                                               class="form-input"
+                                               value="{{ current_user.user_data.mfo if current_user.user_data else '' }}"
+                                               placeholder="МФО банка">
+                                    </div>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="submit" class="btn button button--primary">
+                                        <i class="fas fa-save"></i> Сохранить изменения
+                                    </button>
+                                    <a href="{{ url_for('referal.profile') }}" class="btn button button--secondary">
+                                        <i class="fas fa-arrow-left"></i> Назад к рефералам
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        {% include 'components/footer.html' %}
+    </div>
+    
+    <!-- Подключение JavaScript файлов -->
+    <script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/validation/pinfl-validation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/validation/email-validation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/flash-messages.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Скрипты валидации для профиля пользователя -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // ...existing code...
+        });
+    </script>
+</body>
+</html>
