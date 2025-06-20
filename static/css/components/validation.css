@@ -47,6 +47,46 @@ input.partial-success {
     transition: all var(--transition-normal);
 }
 
+/* Стили для валидации полей */
+.form-input.error {
+    border-color: var(--danger-color, #dc3545);
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.25);
+}
+
+.form-input.success {
+    border-color: var(--success-color, #28a745);
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.25);
+}
+
+/* Ошибки валидации для формы добавления реферала */
+.validation-error {
+    color: var(--danger-color, #dc3545);
+    font-size: 12px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.validation-error::before {
+    content: "⚠";
+    font-size: 14px;
+}
+
+.validation-success {
+    color: var(--success-color, #28a745);
+    font-size: 12px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.validation-success::before {
+    content: "✓";
+    font-size: 14px;
+}
+
 /* Анимация для ошибок */
 .field-error {
     animation: slideDown 0.3s ease-out;
@@ -67,27 +107,13 @@ input.partial-success {
     }
 }
 
-/* Ошибки валидации для формы добавления реферала */
-.validation-error {
-    color: var(--danger-color);
-    font-size: 12px;
-    margin-top: 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.validation-error::before {
-    content: "⚠";
-    font-size: 10px;
-}
-
+/* Анимация для ошибок */
 .form-input.error {
-    border-color: var(--danger-color);
-    background-color: rgba(220, 53, 69, 0.05);
+    animation: shake 0.3s ease-in-out;
 }
 
-.form-input.success {
-    border-color: var(--success-color);
-    background-color: rgba(40, 167, 69, 0.05);
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
 }

@@ -38,7 +38,7 @@ def update_user_info():
         userinfo = UserData(user_id=user.id)
         db.session.add(userinfo)
     
-    # Обновляем данные из формы
+    # Обновляем данные из формы (пустые строки сохраняем как None)
     userinfo.full_name = request.form.get('name', '').strip() or None
     userinfo.passport_number = request.form.get('passport_number', '').strip() or None
     userinfo.passport_giver = request.form.get('passport_giver', '').strip() or None

@@ -298,3 +298,163 @@ function validateAllPassportFields() {
     
     return allValid;
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const passportInput = document.getElementById('passport_number');
+    const nameInput = document.getElementById('name');
+    const passportGiverInput = document.getElementById('passport_giver');
+    
+    // Валидация номера паспорта
+    if (passportInput) {
+        passportInput.addEventListener('input', function() {
+            let value = this.value.toUpperCase();
+            
+            // Убираем все кроме букв и цифр
+            value = value.replace(/[^A-Z0-9]/g, '');
+            
+            // Форматируем паспорт (2 буквы + 7 цифр)
+            if (value.length > 2) {
+                value = value.slice(0, 2) + value.slice(2).replace(/[^0-9]/g, '');
+            }
+            if (value.length > 9) {
+                value = value.slice(0, 9);
+            }
+            
+            this.value = value;
+            validatePassport(this);
+        });
+        
+        passportInput.addEventListener('blur', function() {
+            validatePassport(this);
+        });
+    }
+    
+    // Валидация ФИО
+    if (nameInput) {
+        nameInput.addEventListener('input', function() {
+            let value = this.value;
+            
+            // Убираем цифры и специальные символы, оставляем только буквы, пробелы и дефисы
+            value = value.replace(/[^а-яёА-ЯЁa-zA-Z\s\-]/g, '');
+            
+            // Убираем множественные пробелы
+            value = value.replace(/\s+/g, ' ');
+            
+            this.value = value;
+            validateName(this);
+        });
+        
+        nameInput.addEventListener('blur', function() {
+            validateName(this);
+        });
+    }
+    
+    // Валидация органа выдачи паспорта
+    if (passportGiverInput) {
+        passportGiverInput.addEventListener('input', function() {
+            validatePassportGiver(this);
+        });
+        
+        passportGiverInput.addEventListener('blur', function() {
+            validatePassportGiver(this);
+        });
+    }
+    
+    function validatePassport(input) {
+        const value = input.value.trim();
+        const passportRegex = /^[A-Z]{2}[0-9]{7}$/;
+        
+        clearValidationError(input);
+        
+        if (value === '') {
+            return true; // Поле не обязательное
+        }
+        
+        if (!passportRegex.test(value)) {
+            showValidationError(input, 'Паспорт должен содержать 2 буквы и 7 цифр (например: AA1234567)');
+            return false;
+        }
+        
+        showValidationSuccess(input);
+        return true;
+    }
+    
+    function validateName(input) {
+        const value = input.value.trim();
+        
+        clearValidationError(input);
+        
+        if (value === '') {
+            return true; // Поле не обязательное
+        }
+        
+        if (value.length < 2) {
+            showValidationError(input, 'ФИО должно содержать минимум 2 символа');
+            return false;
+        }
+        
+        if (value.length > 100) {
+            showValidationError(input, 'ФИО не должно превышать 100 символов');
+            return false;
+        }
+        
+        // Проверяем, что есть хотя бы одна буква
+        if (!/[а-яёА-ЯЁa-zA-Z]/.test(value)) {
+            showValidationError(input, 'ФИО должно содержать буквы');
+            return false;
+        }
+        
+        showValidationSuccess(input);
+        return true;
+    }
+    
+    function validatePassportGiver(input) {
+        const value = input.value.trim();
+        
+        clearValidationError(input);
+        
+        if (value === '') {
+            return true; // Поле не обязательное
+        }
+        
+        if (value.length < 10) {
+            showValidationError(input, 'Орган выдачи должен содержать минимум 10 символов');
+            return false;
+        }
+        
+        if (value.length > 200) {
+            showValidationError(input, 'Орган выдачи не должен превышать 200 символов');
+            return false;
+        }
+        
+        showValidationSuccess(input);
+        return true;
+    }
+    
+    function showValidationError(input, message) {
+        input.classList.add('error');
+        input.classList.remove('success');
+        
+        let errorElement = input.parentNode.querySelector('.validation-error');
+        if (!errorElement) {
+            errorElement = document.createElement('div');
+            errorElement.className = 'validation-error';
+            input.parentNode.appendChild(errorElement);
+        }
+        errorElement.textContent = message;
+    }
+    
+    function showValidationSuccess(input) {
+        input.classList.add('success');
+        input.classList.remove('error');
+        clearValidationError(input);
+    }
+    
+    function clearValidationError(input) {
+        input.classList.remove('error', 'success');
+        const errorElement = input.parentNode.querySelector('.validation-error');
+        if (errorElement) {
+            errorElement.remove();
+        }
+    }
+});

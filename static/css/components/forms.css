@@ -41,21 +41,8 @@ label {
     font-weight: bold;
 }
 
-.form {
-    /* styles already exist */
-}
-
-.form__select {
-    /* styles already exist */
-}
-
-.form__input {
-    /* styles already exist */
-}
-
 /* Компактные секции формы */
 .form-section {
-    margin-bottom: 20px;
     background: #f8f9fa;
     border-radius: 6px;
     padding: 15px;

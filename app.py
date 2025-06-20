@@ -48,6 +48,14 @@ app.config.update(
 # Инициализация базы данных
 db.init_app(app)
 
+# Добавляем кастомный фильтр для очистки None значений
+@app.template_filter('clean_none')
+def clean_none_filter(value):
+    """Фильтр для очистки None значений и строки 'None'"""
+    if value is None or value == 'None' or str(value) == 'None':
+        return ''
+    return value
+
 scheduler = APScheduler()
 scheduler.init_app(app)
 
