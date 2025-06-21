@@ -134,7 +134,7 @@ if __name__ == '__main__':
         db.create_all()
         
         if not Status.query.filter_by(id=0).first():
-            db.session.add(Status(id=0, name='Не начата',  is_start = True, is_final=False))
+            db.session.add(Status(id=0, name='Ждёт проверки',  is_start = True, is_final=False))
             db.session.add(Status(id=1, name='Проверка отделом аналитики', is_final=False))
             db.session.add(Status(id=10, name='Проверка колл центром', is_final=False))
             db.session.add(Status(id=20, name='Проверка Коммерческим Директором', is_final=False))

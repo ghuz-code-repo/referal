@@ -1,3 +1,183 @@
+/* Фиксированный layout для страницы админа */
+html, body {
+    height: 100vh;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+.page-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.main {
+    flex: 1;
+    overflow: hidden;
+    padding: 20px;
+}
+
+.container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.section-header {
+    flex-shrink: 0;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.section-title h3 {
+    margin: 0 0 5px 0;
+}
+
+.section-subtitle {
+    margin: 0;
+    font-size: 14px;
+}
+
+.table-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.admin-table thead {
+    flex-shrink: 0;
+    display: block;
+    width: 100%;
+}
+
+.admin-table tbody {
+    flex: 1;
+    display: block;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.admin-table thead tr,
+.admin-table tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.admin-table th {
+    padding: 15px 10px;
+    font-weight: 600;
+    text-align: left;
+}
+
+.admin-table td {
+    padding: 12px 10px;
+    vertical-align: middle;
+}
+
+.admin-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.empty-state h4 {
+    margin: 0 0 10px 0;
+}
+
+.empty-state p {
+    margin: 0;
+}
+
+/* Стили для действий в таблице */
+.admin-actions {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    flex-direction: column;
+}
+
+.status-update-form {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.status-select {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+    min-width: 120px;
+}
+
+.update-status-btn {
+    background: var(--success-color, #28a745);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.update-status-btn:hover {
+    background: var(--success-hover, #218838);
+}
+
+.view-referal-btn {
+    background: var(--primary-color, #007bff);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.view-referal-btn:hover {
+    background: var(--primary-hover, #0056b3);
+    color: white;
+}
+
 .admin-panel {
     display: flex;
     flex-direction: column;
@@ -21,4 +201,8 @@
     color: blue;
     margin-top: 10px;
     font-size: 0.9em;
+}
+
+.empty-state-row{
+    height: 99%;
 }

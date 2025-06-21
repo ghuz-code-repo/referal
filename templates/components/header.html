@@ -5,7 +5,7 @@
     </div>
     <nav class="nav">
         <ul class="nav__list">
-            {% if request.path != '/' %}
+            {% if request.path != '/' and current_user and current_user.role == 'referer' %}
             <li class="nav__item">
                 <a href="{{ url_for('referal.profile') }}" class="nav__link"><i class="fas fa-users"></i>Мои рефералы</a>
             </li>
@@ -15,14 +15,9 @@
                 <a href="{{ url_for('user.user_profile') }}" class="nav__link"><i class="fas fa-user"></i>Мой профиль</a>
             </li>
             {% endif %}
-            {% if current_user and current_user.role=='admin' and request.path != '/admin' %}
+            {% if current_user and (current_user.role=='admin' or current_user.role=='manager') and request.path != '/admin' %}
             <li class="nav__item">
-                <a href="{{ url_for('admin.admin_panel') }}" class="nav__link"><i class="fas fa-cog"></i>Админ</a>
-            </li>
-            {% endif %}
-            {% if current_user and current_user.role=='manager' %}
-            <li class="nav__item">
-                <a href="{{ url_for('manager.manager_panel') }}" class="nav__link"><i class="fas fa-tasks"></i>Менеджер</a>
+                <a href="{{ url_for('admin.admin_panel') }}" class="nav__link">Управление рефералами</a>
             </li>
             {% endif %}
             <li>

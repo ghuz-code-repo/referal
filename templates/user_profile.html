@@ -60,174 +60,173 @@
 
                     <div class="profile-form">
                         <div class="form-card card">
-                            <h3><i class="fas fa-edit"></i> Редактирование данных</h3>
+
                             
                             <form method="POST" action="{{ url_for('user.update_user_info') }}" class="user-form">
-                            <!-- Личные данные -->
-                            <div class="form-section">
-                                <h4 class="section-toggle" data-target="personal-data">
-                                    <span>Личные данные</span>
-                                    <i class="fas fa-chevron-down toggle-icon"></i>
-                                </h4>
-                                <div class="section-content" id="personal-data" style="display: none;">
-                                    <div class="form-group">
-                                        <label for="name">ФИО:</label>
-                                        <input type="text" 
-                                               id="name" 
-                                               name="name" 
-                                               class="form-input input"
-                                               value="{{ (current_user.user_data.full_name if current_user.user_data else '')|clean_none }}"
-                                               placeholder="Введите полное имя">
-                                    </div>
-
-                                    <div class="passport-grid">
-                                        <div class="form-group">
-                                            <label for="phone">Телефон:</label>
-                                            <input type="tel" 
-                                                   id="phone" 
-                                                   name="phone" 
-                                                   class="form-input input"
-                                                   value="{{ (current_user.user_data.phone if current_user.user_data else '')|clean_none }}"
-                                                   placeholder="+998 XX XXX XX XX">
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label for="e_mail">Email:</label>
-                                            <input type="email" 
-                                                   id="e_mail" 
-                                                   name="e_mail" 
-                                                   class="form-input input"
-                                                   value="{{ (current_user.user_data.e_mail if current_user.user_data else '')|clean_none }}"
-                                                   placeholder="example@email.com">
-                                        </div>
-                                    </div>
-
-
+                                <div class="form-header">
+                                    <h3><i class="fas fa-edit"></i> Редактирование данных</h3>
+                                    <button type="submit" class="btn button button--primary">
+                                        <i class="fas fa-save"></i> Сохранить
+                                    </button>
                                 </div>
-                            </div>
+                                <div class="form-sections-container">
+                                    <!-- Личные данные -->
+                                    <div class="form-section">
+                                        <h4 class="section-toggle" data-target="personal-data">
+                                            <span>Личные данные</span>
+                                            <i class="fas fa-chevron-down toggle-icon"></i>
+                                        </h4>
+                                        <div class="section-content" id="personal-data" style="display: none;">
+                                            <div class="form-group">
+                                                <label for="name">ФИО:</label>
+                                                <input type="text" 
+                                                       id="name" 
+                                                       name="name" 
+                                                       class="form-input input"
+                                                       value="{{ (current_user.user_data.full_name if current_user.user_data else '')|clean_none }}"
+                                                       placeholder="Введите полное имя">
+                                            </div>
 
-                            <!-- Паспортные данные -->
-                            <div class="form-section">
-                                <h4 class="section-toggle" data-target="passport-data">
-                                    <span>Паспортные данные</span>
-                                    <i class="fas fa-chevron-down toggle-icon"></i>
-                                </h4>
-                                <div class="section-content" id="passport-data" style="display: none;">
-                                    <div class="form-group">
-                                        <label for="pinfl">ПИНФЛ:</label>
-                                        <input type="text" 
-                                               id="pinfl" 
-                                               name="pinfl" 
-                                               class="form-input input"
-                                               value="{{ (current_user.user_data.pinfl if current_user.user_data else '')|clean_none }}"
-                                               placeholder="1 234567 890 123 4"
-                                               maxlength="18">
-                                    </div>
-                                    <div class="passport-grid">
-                                        <div class="form-group">
-                                            <label for="passport_number">Серия и номер:</label>
-                                            <input type="text" 
-                                                   id="passport_number" 
-                                                   name="passport_number" 
-                                                   class="form-input input"
-                                                   value="{{ (current_user.user_data.passport_number if current_user.user_data else '')|clean_none }}"
-                                                   placeholder="AA1234567">
+                                            <div class="passport-grid">
+                                                <div class="form-group">
+                                                    <label for="phone">Телефон:</label>
+                                                    <input type="tel" 
+                                                           id="phone" 
+                                                           name="phone" 
+                                                           class="form-input input"
+                                                           value="{{ (current_user.user_data.phone if current_user.user_data else '')|clean_none }}"
+                                                           placeholder="+998 XX XXX XX XX">
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label for="e_mail">Email:</label>
+                                                    <input type="email" 
+                                                           id="e_mail" 
+                                                           name="e_mail" 
+                                                           class="form-input input"
+                                                           value="{{ (current_user.user_data.e_mail if current_user.user_data else '')|clean_none }}"
+                                                           placeholder="example@email.com">
+                                                </div>
+                                            </div>
+
+
                                         </div>
+                                    </div>
 
-                                        <div class="form-group">
-                                            <label for="passport_date">Дата выдачи:</label>
-                                            <input type="date" 
-                                                   id="passport_date" 
-                                                   name="passport_date" 
-                                                   class="form-input input"
-                                                   value="{{ current_user.user_data.passport_date.strftime('%Y-%m-%d') if current_user.user_data and current_user.user_data.passport_date else '' }}">
+                                    <!-- Паспортные данные -->
+                                    <div class="form-section">
+                                        <h4 class="section-toggle" data-target="passport-data">
+                                            <span>Паспортные данные</span>
+                                            <i class="fas fa-chevron-down toggle-icon"></i>
+                                        </h4>
+                                        <div class="section-content" id="passport-data" style="display: none;">
+                                            <div class="form-group">
+                                                <label for="pinfl">ПИНФЛ:</label>
+                                                <input type="text" 
+                                                       id="pinfl" 
+                                                       name="pinfl" 
+                                                       class="form-input input"
+                                                       value="{{ (current_user.user_data.pinfl if current_user.user_data else '')|clean_none }}"
+                                                       placeholder="1 234567 890 123 4"
+                                                       maxlength="18">
+                                            </div>
+                                            <div class="passport-grid">
+                                                <div class="form-group">
+                                                    <label for="passport_number">Серия и номер:</label>
+                                                    <input type="text" 
+                                                           id="passport_number" 
+                                                           name="passport_number" 
+                                                           class="form-input input"
+                                                           value="{{ (current_user.user_data.passport_number if current_user.user_data else '')|clean_none }}"
+                                                           placeholder="AA1234567">
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label for="passport_date">Дата выдачи:</label>
+                                                    <input type="date" 
+                                                           id="passport_date" 
+                                                           name="passport_date" 
+                                                           class="form-input input"
+                                                           value="{{ current_user.user_data.passport_date.strftime('%Y-%m-%d') if current_user.user_data and current_user.user_data.passport_date else '' }}">
+                                                </div>
+                                            </div>
+
+                                            <div class="form-group">
+                                                <label for="passport_giver">Кем выдан:</label>
+                                                <input type="text" 
+                                                       id="passport_giver" 
+                                                       name="passport_giver" 
+                                                       class="form-input input"
+                                                       value="{{ (current_user.user_data.passport_giver if current_user.user_data else '')|clean_none }}"
+                                                       placeholder="Орган выдачи">
+                                            </div>
+
+                                            <div class="passport-grid">
+                                                <div class="form-group full-width">
+                                                    <label for="passport_adress">Адрес регистрации:</label>
+                                                    <input type="text" 
+                                                           id="passport_adress" 
+                                                           name="passport_adress" 
+                                                           class="form-input input"
+                                                           value="{{ (current_user.user_data.passport_adress if current_user.user_data else '')|clean_none }}"
+                                                           placeholder="Адрес регистрации">
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div class="form-group">
-                                        <label for="passport_giver">Кем выдан:</label>
-                                        <input type="text" 
-                                               id="passport_giver" 
-                                               name="passport_giver" 
-                                               class="form-input input"
-                                               value="{{ (current_user.user_data.passport_giver if current_user.user_data else '')|clean_none }}"
-                                               placeholder="Орган выдачи">
-                                    </div>
+                                    <!-- Банковские данные -->
+                                    <div class="form-section">
+                                        <h4 class="section-toggle" data-target="bank-data">
+                                            <span>Банковские данные</span>
+                                            <i class="fas fa-chevron-down toggle-icon"></i>
+                                        </h4>
+                                        <div class="section-content" id="bank-data" style="display: none;">
+                                            <div class="bank-grid">
+                                                <div class="form-group">
+                                                    <label for="card_number">Номер карты:</label>
+                                                    <input type="text" 
+                                                           id="card_number" 
+                                                           name="card_number" 
+                                                           class="form-input input"
+                                                           value="{{ (current_user.user_data.card_number if current_user.user_data else '')|clean_none }}"
+                                                           placeholder="8600 XXXX XXXX XXXX">
+                                                </div>
 
-                                    <div class="passport-grid">
-                                        <div class="form-group full-width">
-                                            <label for="passport_adress">Адрес регистрации:</label>
-                                            <input type="text" 
-                                                   id="passport_adress" 
-                                                   name="passport_adress" 
-                                                   class="form-input input"
-                                                   value="{{ (current_user.user_data.passport_adress if current_user.user_data else '')|clean_none }}"
-                                                   placeholder="Адрес регистрации">
+                                                <div class="form-group">
+                                                    <label for="bank_name">Банк:</label>
+                                                    <input type="text" 
+                                                           id="bank_name" 
+                                                           name="bank_name" 
+                                                           class="form-input input"
+                                                           value="{{ (current_user.user_data.bank_name if current_user.user_data else '')|clean_none }}"
+                                                           placeholder="Название банка">
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label for="trans_schet">Транзитный счет:</label>
+                                                    <input type="text" 
+                                                           id="trans_schet" 
+                                                           name="trans_schet" 
+                                                           class="form-input input"
+                                                           value="{{ (current_user.user_data.trans_schet if current_user.user_data else '')|clean_none }}"
+                                                           placeholder="12345678901234567890">
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label for="mfo">МФО:</label>
+                                                    <input type="text" 
+                                                           id="mfo" 
+                                                           name="mfo" 
+                                                           class="form-input input"
+                                                           value="{{ (current_user.user_data.mfo if current_user.user_data else '')|clean_none }}"
+                                                           placeholder="01234">
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <!-- Банковские данные -->
-                            <div class="form-section">
-                                <h4 class="section-toggle" data-target="bank-data">
-                                    <span>Банковские данные</span>
-                                    <i class="fas fa-chevron-down toggle-icon"></i>
-                                </h4>
-                                <div class="section-content" id="bank-data" style="display: none;">
-                                    <div class="bank-grid">
-                                        <div class="form-group">
-                                            <label for="card_number">Номер карты:</label>
-                                            <input type="text" 
-                                                   id="card_number" 
-                                                   name="card_number" 
-                                                   class="form-input input"
-                                                   value="{{ (current_user.user_data.card_number if current_user.user_data else '')|clean_none }}"
-                                                   placeholder="8600 XXXX XXXX XXXX">
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label for="bank_name">Банк:</label>
-                                            <input type="text" 
-                                                   id="bank_name" 
-                                                   name="bank_name" 
-                                                   class="form-input input"
-                                                   value="{{ (current_user.user_data.bank_name if current_user.user_data else '')|clean_none }}"
-                                                   placeholder="Название банка">
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label for="trans_schet">Транзитный счет:</label>
-                                            <input type="text" 
-                                                   id="trans_schet" 
-                                                   name="trans_schet" 
-                                                   class="form-input input"
-                                                   value="{{ (current_user.user_data.trans_schet if current_user.user_data else '')|clean_none }}"
-                                                   placeholder="12345678901234567890">
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label for="mfo">МФО:</label>
-                                            <input type="text" 
-                                                   id="mfo" 
-                                                   name="mfo" 
-                                                   class="form-input input"
-                                                   value="{{ (current_user.user_data.mfo if current_user.user_data else '')|clean_none }}"
-                                                   placeholder="01234">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-actions">
-                                <button type="submit" class="btn button button--primary">
-                                    <i class="fas fa-save"></i> Сохранить
-                                </button>
-                                {#<a href="{{ url_for('referal.profile') }}" class="btn button button--secondary">
-                                    <i class="fas fa-arrow-left"></i> Назад
-                                </a>#}
-                            </div>
-                        </form>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -246,6 +245,7 @@
     <script src="{{ url_for('static', filename='js/validation/bank-validation.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/flash-messages.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/accordion.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/form-change-detector.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

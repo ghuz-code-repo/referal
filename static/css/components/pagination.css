@@ -96,7 +96,7 @@
 .per-page-select:focus {
     outline: none;
     border-color: var(--golden-color);
-    box-shadow: 0 0 0 2px var(--primary-shadow, rgba(0,123,255,0.25));
+    /* box-shadow: 0 0 0 2px var(--golden-color, rgba(0,123,255,0.25)); */
 }
 
 @media (max-width: 768px) {

@@ -22,6 +22,10 @@ def profile():
         print("No user found, redirecting to referal profile")
         return redirect(url_for('referal.profile'))
     
+    if user.role == 'admin' or user.role == 'manager':
+        """Перенаправление на административную панель для администраторов."""
+        return redirect(url_for('admin.admin_panel'))
+    
     referal_service.update_deal_info(user)
     
     # Получаем общее количество рефералов пользователя (без фильтров)

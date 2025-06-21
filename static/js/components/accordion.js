@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Инициализация аккордеона
     const toggles = document.querySelectorAll('.section-toggle');
     
     toggles.forEach(toggle => {
@@ -9,50 +8,53 @@ document.addEventListener('DOMContentLoaded', function() {
             const isActive = this.classList.contains('active');
             
             if (isActive) {
-                // Закрываем текущую секцию
                 closeSection(this, content);
             } else {
-                // Сначала закрываем все остальные секции
-                closeAllSections();
-                
-                // Затем открываем выбранную секцию с небольшой задержкой
-                setTimeout(() => {
-                    openSection(this, content);
-                }, 100);
+                switchToSection(this, content);
             }
         });
     });
     
-    function openSection(toggle, content) {
-        toggle.classList.add('active');
-        content.style.display = 'block';
+    function switchToSection(newToggle, newContent) {
+        const currentActiveToggle = document.querySelector('.section-toggle.active');
+        const currentActiveContent = currentActiveToggle ? 
+            document.getElementById(currentActiveToggle.dataset.target) : null;
         
-        // Принудительно запускаем reflow для анимации
-        content.offsetHeight;
+        // Если есть активная секция, плавно скрываем её
+        if (currentActiveContent && currentActiveToggle !== newToggle) {
+            currentActiveToggle.classList.remove('active');
+            currentActiveContent.classList.remove('show');
+        }
         
-        content.classList.add('show');
+        // Показываем новую секцию
+        newToggle.classList.add('active');
+        newContent.style.display = 'block';
+        
+        // Принудительно запускаем reflow
+        requestAnimationFrame(() => {
+            newContent.offsetHeight;
+            newContent.classList.add('show');
+        });
+        
+        // Скрываем старую секцию после завершения анимации
+        if (currentActiveContent) {
+            setTimeout(() => {
+                if (!currentActiveContent.classList.contains('show')) {
+                    currentActiveContent.style.display = 'none';
+                }
+            }, 650);
+        }
     }
     
     function closeSection(toggle, content) {
         toggle.classList.remove('active');
         content.classList.remove('show');
         
-        // Ждем завершения анимации перед скрытием
         setTimeout(() => {
             if (!content.classList.contains('show')) {
                 content.style.display = 'none';
             }
-        }, 400); // Время должно совпадать с transition в CSS
-    }
-    
-    function closeAllSections() {
-        toggles.forEach(toggle => {
-            const targetId = toggle.dataset.target;
-            const content = document.getElementById(targetId);
-            if (toggle.classList.contains('active')) {
-                closeSection(toggle, content);
-            }
-        });
+        }, 650);
     }
     
     // Функция для открытия секции с ошибками валидации
@@ -65,18 +67,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     const sectionId = section.id;
                     const toggle = document.querySelector(`[data-target="${sectionId}"]`);
                     if (toggle && !toggle.classList.contains('active')) {
-                        // Закрываем все секции и открываем нужную
-                        closeAllSections();
-                        setTimeout(() => {
-                            openSection(toggle, section);
-                        }, 200);
+                        toggle.click();
                     }
                 }
             }
         });
     }
     
-    // Открываем секции с ошибками после отправки формы
     const form = document.querySelector('.user-form');
     if (form) {
         form.addEventListener('submit', function() {

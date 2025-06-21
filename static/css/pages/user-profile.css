@@ -45,8 +45,9 @@ html, body {
 
 .info-card, .form-card {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: hidden;
     min-height: 0;
+    position: relative;
 }
 
 .info-card h3, .form-card h3 {
@@ -65,6 +66,14 @@ html, body {
     border-bottom: 1px solid #f0f0f0;
 }
 
+.form-header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
 .info-label {
     font-weight: bold;
 }
@@ -74,7 +83,7 @@ html, body {
 }
 
 
-.form-section h4 {
+ .form-section h4 {
     margin: 0 0 4px 0;
     font-size: 14px;
     font-weight: 600;
@@ -82,8 +91,12 @@ html, body {
     border-bottom: 1px solid #e0e0e0;
 }
 
+.form-sections-container .form-section {
+    margin-bottom: 15px;
+}
+
 .form-group {
-    margin-bottom: 12px;
+    margin-bottom: 10px; /* Уменьшаем отступы между полями */
 }
 
 .form-group label {
@@ -111,7 +124,7 @@ html, body {
 .passport-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px; /* Уменьшаем gap */
 }
 
 .passport-grid .full-width {
@@ -122,15 +135,20 @@ html, body {
     position: sticky;
     bottom: 0;
     background: white;
+    padding: 15px 0 0 0;
+    border-top: 1px solid #e0e0e0;
     display: flex;
     gap: 10px;
+    flex-shrink: 0;
+    z-index: 10;
 
 }
+
 /* Компактная сетка для банковских данных */
 .bank-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px; /* Уменьшаем gap */
 }
 
 .bank-grid .full-width {
@@ -144,7 +162,7 @@ html, body {
     justify-content: space-between;
     cursor: pointer;
     user-select: none;
-    transition: all 0.3s;
+    transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     padding: 8px 0;
     border-bottom: 1px solid #e0e0e0;
     margin: 0 0 0 0;
@@ -159,7 +177,7 @@ html, body {
 }
 
 .toggle-icon {
-    transition: transform 0.3s;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     font-size: 12px;
 }
 
@@ -171,15 +189,42 @@ html, body {
     overflow: hidden;
     max-height: 0;
     opacity: 0;
-    transition: max-height 0.4s ease-out, opacity 0.3s ease-out, padding 0.3s ease-out;
+    transform: translateY(10px);
+    transition: 
+        max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     padding-top: 0;
+    will-change: max-height, opacity, transform;
 }
 
 .section-content.show {
-    max-height: 1000px; /* Достаточно большое значение для любого контента */
+    max-height: 500px; /* Уменьшаем max-height чтобы поместилось без прокрутки */
     opacity: 1;
-    padding-top: 10px;
-    transition: max-height 0.4s ease-in, opacity 0.3s ease-in, padding 0.3s ease-in;
+    transform: translateY(0);
+    padding-top: 15px;
+}
+
+/* Состояние при скрытии */
+.section-content.hiding {
+    transition: 
+        max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+        padding 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Состояние при появлении */
+.section-content.showing {
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: 
+        max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s,
+        opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+        padding 0.25s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
 }
 
 /* Адаптивность */

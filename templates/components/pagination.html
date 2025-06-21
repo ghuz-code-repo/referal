@@ -1,98 +1,138 @@
-<div class="pagination-section">
-        <div class="per-page-control">
-            <label for="per_page_select">Показать:</label>
-            <select id="per_page_select" class="per-page-select">
-                <option value="5" {{ 'selected' if current_filters.per_page == 5 else '' }}>5</option>
-                <option value="10" {{ 'selected' if current_filters.per_page == 10 else '' }}>10</option>
-                <option value="25" {{ 'selected' if current_filters.per_page == 25 else '' }}>25</option>
-                <option value="50" {{ 'selected' if current_filters.per_page == 50 else '' }}>50</option>
-            </select>
-        </div>
-        
-    <nav class="pagination-nav">
-        <ul class="pagination">
-            <!-- Первая страница -->
-            {% if pagination and pagination.has_prev %}
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for('referal.profile', page=1, **current_filters) }}" title="Первая страница">
-                    <i class="fas fa-angle-double-left"></i>
-                </a>
-            </li>
-            <!-- Предыдущая страница -->
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for('referal.profile', page=pagination.prev_num, **current_filters) }}" title="Предыдущая страница">
-                    <i class="fas fa-angle-left"></i>
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled">
-                <span class="page-link" title="Первая страница"><i class="fas fa-angle-double-left"></i></span>
-            </li>
-            <li class="page-item disabled">
-                <span class="page-link" title="Предыдущая страница"><i class="fas fa-angle-left"></i></span>
-            </li>
-            {% endif %}
-            
-            <!-- Номера страниц -->
-            {% if pagination and pagination.pages > 0 %}
-                {% for page_num in pagination.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
-                    {% if page_num %}
-                        {% if page_num != pagination.page %}
-                        <li class="page-item">
-                            <a class="page-link page-number" href="{{ url_for('referal.profile', page=page_num, **current_filters) }}">
-                                {{ page_num }}
-                            </a>
-                        </li>
-                        {% else %}
-                        <li class="page-item active">
-                            <span class="page-link page-number current">{{ page_num }}</span>
-                        </li>
-                        {% endif %}
-                    {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">…</span>
-                    </li>
-                    {% endif %}
-                {% endfor %}
-            {% else %}
-            <!-- Показываем хотя бы страницу 1, даже если нет результатов -->
-            <li class="page-item active">
-                <span class="page-link page-number current">1</span>
-            </li>
-            {% endif %}
-            
-            <!-- Следующая страница -->
-            {% if pagination and pagination.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for('referal.profile', page=pagination.next_num, **current_filters) }}" title="Следующая страница">
-                    <i class="fas fa-angle-right"></i>
-                </a>
-            </li>
-            <!-- Последняя страница -->
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for('referal.profile', page=pagination.pages, **current_filters) }}" title="Последняя страница">
-                    <i class="fas fa-angle-double-right"></i>
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled">
-                <span class="page-link" title="Следующая страница"><i class="fas fa-angle-right"></i></span>
-            </li>
-            <li class="page-item disabled">
-                <span class="page-link" title="Последняя страница"><i class="fas fa-angle-double-right"></i></span>
-            </li>
-            {% endif %}
-        </ul>
-    </nav>
-
-        <div class="pagination-info">
-            {% if pagination and pagination.total > 0 %}
-            Показано {{ pagination.per_page * (pagination.page - 1) + 1 }} - 
-            {{ pagination.per_page * (pagination.page - 1) + pagination.items|length }} 
-            из {{ pagination.total }} записей
-            {% else %}
-            Записи не найдены
-            {% endif %}
-        </div>
-
+<!-- Компонент пагинации -->
+{% if pagination %}
+<div class="pagination-controls">
+    <div class="per-page-control">
+        <span>Показать:</span>
+        <select id="per_page_select" class="per-page-select">
+            <option value="5" {{ 'selected' if pagination.per_page == 5 else '' }}>5</option>
+            <option value="10" {{ 'selected' if pagination.per_page == 10 else '' }}>10</option>
+            <option value="20" {{ 'selected' if pagination.per_page == 20 else '' }}>20</option>
+            <option value="50" {{ 'selected' if pagination.per_page == 50 else '' }}>50</option>
+        </select>
+    </div>
+    
+    <div class="pagination-info">
+        {% if pagination and pagination.total > 0 %}
+            <span class="pagination-text">
+                Показано {{ pagination.per_page * (pagination.page - 1) + 1 }}-{{ 
+                    pagination.per_page * pagination.page if pagination.per_page * pagination.page <= pagination.total 
+                    else pagination.total 
+                }} из {{ pagination.total }} записей
+            </span>
+        {% endif %}
+    </div>
 </div>
+
+<nav aria-label="Page navigation" class="pagination-nav">
+    <ul class="pagination">
+        {% set base_url = base_pagination_url if base_pagination_url else url_for('referal.profile') %}
+        {% set current_params = request.args.to_dict() %}
+        
+        <!-- Первая страница -->
+        {% if pagination.page > 1 %}
+        <li class="page-item">
+            {% set first_params = current_params.copy() %}
+            {% set _ = first_params.update({'page': 1}) %}
+            <a class="page-link" href="{{ base_url }}?{{ first_params | urlencode }}" title="Первая страница">
+                <i class="fas fa-angle-double-left"></i>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link" title="Первая страница">
+                <i class="fas fa-angle-double-left"></i>
+            </span>
+        </li>
+        {% endif %}
+        
+        <!-- Предыдущая страница -->
+        {% if pagination.has_prev %}
+        <li class="page-item">
+            {% set prev_params = current_params.copy() %}
+            {% set _ = prev_params.update({'page': pagination.prev_num}) %}
+            <a class="page-link" href="{{ base_url }}?{{ prev_params | urlencode }}" title="Предыдущая страница">
+                <i class="fas fa-angle-left"></i>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link" title="Предыдущая страница">
+                <i class="fas fa-angle-left"></i>
+            </span>
+        </li>
+        {% endif %}
+        
+        <!-- Умная логика отображения номеров страниц -->
+        {% set current_page = pagination.page %}
+        {% set total_pages = pagination.pages %}
+        
+        <!-- Определяем диапазон страниц для отображения -->
+        {% if total_pages <= 5 %}
+            <!-- Если страниц <= 5, показываем все -->
+            {% set start_page = 1 %}
+            {% set end_page = total_pages %}
+        {% elif current_page <= 3 %}
+            <!-- Если текущая страница в начале (1, 2, 3) -->
+            {% set start_page = 1 %}
+            {% set end_page = 5 %}
+        {% elif current_page >= total_pages - 2 %}
+            <!-- Если текущая страница в конце -->
+            {% set start_page = total_pages - 4 %}
+            {% set end_page = total_pages %}
+        {% else %}
+            <!-- Если текущая страница в середине -->
+            {% set start_page = current_page - 2 %}
+            {% set end_page = current_page + 2 %}
+        {% endif %}
+        
+        <!-- Отображаем страницы в рассчитанном диапазоне -->
+        {% for page_num in range(start_page, end_page + 1) %}
+            {% if page_num != current_page %}
+            <li class="page-item">
+                {% set page_params = current_params.copy() %}
+                {% set _ = page_params.update({'page': page_num}) %}
+                <a class="page-link" href="{{ base_url }}?{{ page_params | urlencode }}">{{ page_num }}</a>
+            </li>
+            {% else %}
+            <li class="page-item active">
+                <span class="page-link">{{ page_num }}</span>
+            </li>
+            {% endif %}
+        {% endfor %}
+        
+        <!-- Следующая страница -->
+        {% if pagination.has_next %}
+        <li class="page-item">
+            {% set next_params = current_params.copy() %}
+            {% set _ = next_params.update({'page': pagination.next_num}) %}
+            <a class="page-link" href="{{ base_url }}?{{ next_params | urlencode }}" title="Следующая страница">
+                <i class="fas fa-angle-right"></i>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link" title="Следующая страница">
+                <i class="fas fa-angle-right"></i>
+            </span>
+        </li>
+        {% endif %}
+        
+        <!-- Последняя страница -->
+        {% if pagination.page < pagination.pages %}
+        <li class="page-item">
+            {% set last_params = current_params.copy() %}
+            {% set _ = last_params.update({'page': pagination.pages}) %}
+            <a class="page-link" href="{{ base_url }}?{{ last_params | urlencode }}" title="Последняя страница">
+                <i class="fas fa-angle-double-right"></i>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link" title="Последняя страница">
+                <i class="fas fa-angle-double-right"></i>
+            </span>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}

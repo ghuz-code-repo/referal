@@ -39,7 +39,7 @@
                         <!-- Строка с телефоном и ID -->
                         <div class="info-row">
                             <div class="info-item">
-                                <span class="field-label">Телефон:</span>
+                                <span class="field-label label-span">Телефон:</span>
                                 {% if referal.macro_contacts %}
                                     <div class="macro-field-with-transfer">
                                         <select class="readonly-input" 
@@ -77,7 +77,7 @@
                                 {% endif %}
                             </div>
                             <div class="info-item">
-                                <span class="field-label">ID:</span>
+                                <span class="field-label label-span">ID:</span>
                                 <input type="text" class="readonly-input small" 
                                        data-field="macro_contact_id" 
                                        data-referal-id="{{ referal.id }}"
@@ -180,16 +180,16 @@
                         
                         <div class="info-row">
                             <div class="info-item">
-                                <span class="field-label">Телефон:</span>
+                                <span class="field-label label-span">Телефон:</span>
                                 <input type="text" class="editable-input" 
                                        data-field="referal_phone" 
                                        data-referal-id="{{ referal.id }}"
                                        name="phone_number"
-                                       value="{{ referal.referal_data.phone_number if referal.referal_data else '' }}"
+                                       value="{{ referal.referal_data.phone_number if referal.referal_data.phone_number else '' }}"
                                        placeholder="+998 XX XXX XX XX" required>
                             </div>
                             <div class="info-item">
-                                <span class="field-label">Contacts ID:</span>
+                                <span class="field-label label-span">ID:</span>
                                 <input type="text" class="readonly-input small" 
                                        value="{{ referal.contact_id if referal.contact_id else 'N/A' }}" 
                                        readonly>
@@ -201,7 +201,7 @@
                                    data-field="referal_agreement_number" 
                                    data-referal-id="{{ referal.id }}"
                                    name="contract_number"
-                                   value="{{ referal.referal_data.contract_number if referal.referal_data else '' }}"
+                                   value="{{ referal.referal_data.contract_number if referal.referal_data.contract_number else '' }}"
                                    placeholder="Номер договора">
                         </div>
                         <div class="passport-item">
@@ -210,7 +210,7 @@
                                    data-field="referal_passport_number" 
                                    data-referal-id="{{ referal.id }}"
                                    name="passport_number"
-                                   value="{{ referal.referal_data.passport_number if referal.referal_data else '' }}"
+                                   value="{{ referal.referal_data.passport_number if referal.referal_data.passport_number else '' }}"
                                    placeholder="AA1234567">
                         </div>
                         
@@ -220,7 +220,7 @@
                                    data-field="referal_passport_giver" 
                                    data-referal-id="{{ referal.id }}"
                                    name="passport_giver"
-                                   value="{{ referal.referal_data.passport_giver if referal.referal_data else '' }}"
+                                   value="{{ referal.referal_data.passport_giver if referal.referal_data.passport_giver else '' }}"
                                    placeholder="Орган выдачи">
                         </div>
                         
@@ -245,5 +245,4 @@
             </form>
         </div>
     </div>
-</div>
 </div>

@@ -19,8 +19,8 @@ def get_current_user():
     roles = str.split(role_str, ',') if role_str else []
     role = ''
 
-    if 'referal' in roles:
-        role = 'referal'
+    if 'referal' in roles or 'referal-user' in roles or 'referer' in roles :
+        role = 'referer'
     if 'referal-manager' in roles:
         role = 'manager' 
     if 'admin' in roles or 'referal-admin' in roles:
@@ -29,8 +29,8 @@ def get_current_user():
         if user.role != 'admin' and is_admin:
             user.role = 'admin'
             db.session.commit()
-    print(f"User found: {user}, is_admin: {is_admin}")
-    
+        print(f"User found: {user.login}, role: {user.role} is_admin: {is_admin}")
+
     # Создание нового пользователя если не найден
     if not user and username:
         full_name = decode_header_full_name(request)
@@ -66,6 +66,7 @@ def get_current_user():
     if user and (user.role != role):
         user.role = role
     try:
+        print(f"User {user.login} updated with full_name: {user.user_data.full_name}, role: {user.role}")
         db.session.commit()
     except Exception as e:
         db.session.rollback()
