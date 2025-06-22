@@ -1,8 +1,12 @@
 <!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\components\header.html -->
 <header class="header">
     <div class="header_name">
-        <img src="{{ url_for('static', filename='img/logo-dark.svg')}}" alt="Logo" class="logo">
-        {#<h1>LOGO</h1>#}
+        <img src="{{ url_for('static', filename='img/logo-light.svg')}}" 
+             alt="Golden House Logo" 
+             class="logo" 
+             id="dynamic-logo"
+             data-light-logo="{{ url_for('static', filename='img/logo-dark.svg') }}"
+             data-dark-logo="{{ url_for('static', filename='img/logo-light.svg') }}">
     </div>
     
     <!-- Кнопка гамбургер для мобильной версии -->
@@ -24,14 +28,15 @@
                 <a href="{{ url_for('user.user_profile') }}" class="nav__link"><i class="fas fa-user"></i>Мой профиль</a>
             </li>
             {% endif %}
-            {% if current_user and (current_user.role=='admin' or current_user.role=='manager') and request.path != '/admin' %}
+            {% if current_user and (current_user.role=='admin' or current_user.role=='manager' or current_user.role=='call-center') and request.path != '/admin' %}
             <li class="nav__item">
                 <a href="{{ url_for('admin.admin_panel') }}" class="nav__link">Управление рефералами</a>
             </li>
             {% endif %}
-            <li>
+            <li class="nav__item">
                 <a href="/menu" class="nav__link"><i class="fas fa-th-list"></i> Меню сервисов</a>
             </li>
+            <!-- Переключатель темы будет добавлен автоматически через JavaScript -->
         </ul>
     </nav>
 </header>

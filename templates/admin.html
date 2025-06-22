@@ -7,9 +7,34 @@
     <title>Управление рефералами</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
+    <!-- Сначала загружаем базовые стили с переменными -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    
+    <!-- Inline критический JavaScript для предотвращения FOUC -->
+    <script>
+        (function() {
+            function getCookie(name) {
+                const nameEQ = name + "=";
+                const ca = document.cookie.split(';');
+                for(let i = 0; i < ca.length; i++) {
+                    let c = ca[i];
+                    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+                }
+                return null;
+            }
+            
+            const cookieTheme = getCookie('gh_theme');
+            const savedTheme = cookieTheme || localStorage.getItem('gh_theme_preference') || 'light';
+            
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark-theme');
+            }
+        })();
+    </script>
+    
     <!-- Подключение CSS файлов -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
@@ -253,9 +278,8 @@
                                                     </button>
                                                 </div>
                                             </div>
-                                            <div class="header-controls">
-                                                
-                                                <select class="header-filter header-select" data-filter="status" style="{{'display: none;' if current_user.role == 'call-center' }}">
+                                            <div class="header-controls" style="{{ 'display: none;' if current_user.role == 'call-center'}}">
+                                                <select class="header-filter header-select" data-filter="status" >
                                                     {% if current_user.role == 'manager' %}
                                                         <!-- Менеджеры видят только статусы для просмотра -->
                                                         <option value="all_manager" {{ 'selected' if current_filters.status == 'all_manager' else '' }}>Все доступные</option>
@@ -266,9 +290,6 @@
                                                             </option>
                                                             {% endif %}
                                                         {% endfor %}
-                                                   {% elif current_user.role == 'call-center' %}
-                                                        <!-- Call-center не имеет фильтрации по статусу -->
-                                                        <option value="10" selected disabled>Проверка колл центром</option>
                                                     {% elif current_user.role == 'admin' %}
                                                         <!-- Админы видят все статусы с опцией "Все" -->
                                                         <option value="-1">Все</option>
@@ -378,7 +399,7 @@
                                                         {% elif current_user.role == 'call-center' %}
                                                             <!-- Call-center видят только статусы 10 и 20 -->
                                                             {% for status in statuses %}
-                                                                {% if status.id in [10, 20] %}
+                                                                {% if status.id in [20] %}
                                                                 <option value="{{ status.id }}" 
                                                                         {{ 'selected' if status.id == referal.status_id else '' }}>
                                                                     {{ status.name }}
@@ -439,6 +460,9 @@
         
         {% include 'components/footer.html' %}
     </div>
+    
+    <!-- Подключение JavaScript файлов -->
+    <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/table-filters.js') }}"></script>
     <script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/flash-messages.js') }}"></script>    <!-- Подключение JavaScript файлов -->        <script src="{{ url_for('static', filename='js/validation/pinfl-validation.js') }}"></script>
@@ -452,10 +476,9 @@
     <script src="{{ url_for('static', filename='js/validation/passport-validation.js') }}"></script>
     <script src="{{ url_for('static', filename='js/validation/email-validation.js') }}"></script>
 
-    {% include 'components/modal_scripts.html' %}    <!-- Включаем компонент с модальными окнами -->        
+    {% include 'components/modal_scripts.html' %}
 
     <!-- Автоматическая установка фильтра по умолчанию -->
-<!-- Автоматическая установка фильтра по умолчанию -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         const statusFilter = document.querySelector('.header-filter[data-filter="status"]');

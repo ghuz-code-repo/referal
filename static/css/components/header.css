@@ -3,16 +3,18 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem 2rem;
-    background-color: #fff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background-color: var(--header-background) !important;
+    box-shadow: var(--header-shadow) !important;
     position: relative;
+    border-bottom: 1px solid var(--border-color);
+    transition: all var(--transition-normal);
 }
 
 
 .header_name .nav__link {
     font-size: 1.2rem;
     font-weight: bold;
-    color: #333;
+    color: var(--text-primary) !important;
     text-decoration: none;
 }
 
@@ -34,24 +36,53 @@
 
 .header_name {
     padding-left: 10px;
+    display: flex;
+    align-items: center;
 }
 .nav__link {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    color: #333;
+    color: var(--text-primary) !important;
     text-decoration: none;
     border-radius: 4px;
-    transition: background-color 0.2s;
+    transition: all var(--transition-normal);
 }
 
 .nav__link:hover {
-    background-color: #f8f9fa;
+    background-color: var(--light-gray) !important;
+    color: var(--text-primary) !important;
 }
 
 .logo {
-    scale: 1.5;
+    height: 50px !important;  /* Увеличиваем высоту */
+    width: auto !important;   /* Автоматическая ширина */
+    max-width: 200px !important; /* Максимальная ширина */
+    min-height: 40px !important;  /* Минимальная высота */
+    object-fit: contain !important;
+    transition: all var(--transition-normal);
+    filter: none;
+    scale: 1 !important; /* Убираем scale, используем height */
+}
+
+/* Дополнительные стили для корректного отображения логотипа */
+.header_name img {
+    height: 50px !important;
+    width: auto !important;
+    max-width: 200px !important;
+    object-fit: contain !important;
+    display: block;
+}
+
+/* Улучшение контрастности в тёмной теме */
+.dark-theme .logo {
+    filter: brightness(1.1) contrast(1.2) !important;
+}
+
+/* Плавный переход при смене логотипа */
+.logo {
+    transition: opacity var(--transition-normal), height var(--transition-normal), filter var(--transition-normal);
 }
 
 /* Кнопка гамбургер - скрыта по умолчанию */
@@ -68,7 +99,7 @@
 .hamburger-line {
     width: 25px;
     height: 3px;
-    background-color: #333;
+    background-color: var(--text-primary);
     transition: all 0.3s ease;
 }
 
@@ -103,7 +134,13 @@
     }
 
     .logo {
-        scale: 1;
+        height: 35px !important; /* Меньше на мобильных */
+        max-width: 150px !important;
+    }
+    
+    .header_name img {
+        height: 35px !important;
+        max-width: 150px !important;
     }
     
     /* Скрываем навигацию по умолчанию */
@@ -163,5 +200,15 @@
     .nav__link {
         padding: 0.75rem;
         font-size: 0.9rem;
+    }
+
+    .logo {
+        height: 30px !important; /* Еще меньше на очень маленьких экранах */
+        max-width: 120px !important;
+    }
+    
+    .header_name img {
+        height: 30px !important;
+        max-width: 120px !important;
     }
 }

@@ -4,30 +4,34 @@ html, body {
     overflow: hidden;
     margin: 0;
     padding: 0;
-    
+    background-color: var(--body-background) !important;
 }
 
 .page-wrapper {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    background-color: var(--body-background) !important;
 }
 
 .main {
     flex: 1;
     overflow: hidden;
     padding: 10px;
+    background-color: var(--background-color) !important;
 }
 
 .container {
     height: 98%;
     display: flex;
     flex-direction: column;
+    background-color: var(--background-color) !important;
 }
 
 .main__title {
     margin: 0 0 20px 0;
     flex-shrink: 0;
+    color: var(--text-primary) !important;
 }
 
 .profile-section {
@@ -50,14 +54,18 @@ html, body {
     overflow-y: hidden;
     min-height: 0;
     position: relative;
+    padding: 10px;
+    background-color: var(--card-background) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
 }
 
 .info-card h3, .form-card h3 {
     position: sticky;
     top: 0;
-    background: white;
+    background: var(--card-background) !important;
     z-index: 1;
-
+    color: var(--text-primary) !important;
 }
 
 .info-header{
@@ -72,7 +80,7 @@ html, body {
     display: flex;
     justify-content: space-between;
     padding: 10px 0;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .form-header{
@@ -85,10 +93,12 @@ html, body {
 
 .info-label {
     font-weight: bold;
+    color: var(--text-secondary) !important;
 }
 
 .info-value {
     text-align: right;
+    color: var(--text-primary) !important;
 }
 
 
@@ -125,17 +135,19 @@ html, body {
 .form-input {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--input-border) !important;
     border-radius: 4px;
     font-size: 13px;
     transition: border-color 0.3s;
     box-sizing: border-box;
+    background-color: var(--input-background) !important;
+    color: var(--text-primary) !important;
 }
 
 .form-input:focus {
     outline: none;
-    border-color: var(--golden-color);
-    box-shadow: 0 0 0 2px rgba(255,215,0,0.25);
+    border-color: var(--input-focus-border) !important;
+    box-shadow: 0 0 0 2px var(--input-focus-shadow) !important;
 }
 
 .passport-grid {
@@ -151,9 +163,9 @@ html, body {
 .form-actions {
     position: sticky;
     bottom: 0;
-    background: white;
+    background: var(--card-background, white) !important;
     padding: 15px 0 0 0;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--border-color, #e0e0e0) !important;
     display: flex;
     gap: 10px;
     flex-shrink: 0;

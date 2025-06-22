@@ -22,6 +22,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/footer.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/validation.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/user-profile.css') }}">
+
+    <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
+
 </head>
 <body>
     <div class="page-wrapper">
@@ -256,6 +259,7 @@
     </div>
     
     <!-- Подключение JavaScript файлов -->
+    <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
     <script src="{{ url_for('static', filename='js/validation/pinfl-validation.js') }}"></script>
     <script src="{{ url_for('static', filename='js/validation/email-validation.js') }}"></script>

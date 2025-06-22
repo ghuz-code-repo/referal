@@ -1,15 +1,20 @@
 /* Общие CSS переменные для всего проекта */
 :root {
     --main-font: 'Arial', sans-serif;
+    
+    /* Базовые цвета для светлой темы */
     --main-color: #333;
     --background-color: #f5f5f5;
+    --body-background: #ffffff;
+    --card-background: #ffffff;
+    --modal-background: #fff0c5;
     --golden-color: #d4af37;
     --hover-color: #b38e30;
     --font-size-large: 1.5em;
     --font-size-medium: 1.2em;
     --font-size-small: 1em;
     
-    /* Дополнительные цвета */
+    /* Цветовая палитра для светлой темы */
     --white: #fff;
     --light-gray: #f8f9fa;
     --border-gray: #e9ecef;
@@ -19,6 +24,23 @@
     --info-color: #17a2b8;
     --warning-color: #ffc107;
     --danger-color: #dc3545;
+    
+    /* Семантические цвета для светлой темы */
+    --text-primary: #333333;
+    --text-secondary: #6c757d;
+    --text-muted: #adb5bd;
+    --border-color: #dee2e6;
+    --header-background: #ffffff;
+    --header-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    --table-hover: #f8f9fa;
+    --table-background: #ffffff;
+    --table-header-background: #f8f9fa;
+    --input-background: #ffffff;
+    --input-border: #ced4da;
+    --input-focus-border: #d4af37;
+    --input-focus-shadow: rgba(212, 175, 55, 0.25);
+    --form-section-background: #f8f9fa;
+    --readonly-input-background: #f8f9fa;
     
     /* Тени и радиусы */
     --border-radius: 4px;
@@ -31,4 +53,374 @@
     --transition-fast: 0.2s ease;
     --transition-normal: 0.3s ease;
     --transition-slow: 0.5s ease;
+}
+
+/* Тёмная тема - более тёмные и контрастные цвета */
+.dark-theme {
+    --main-color: #e8e8e8;
+    --background-color: #0f0f0f;
+    --body-background: #000000;
+    --card-background: #1a1a1a;
+    --modal-background: #1f1f1f;
+    --golden-color: #d4af37;
+    --hover-color: #b38e30;
+    
+    /* Цветовая палитра для тёмной темы */
+    --white: #1a1a1a;
+    --light-gray: #2a2a2a;
+    --border-gray: #3a3a3a;
+    --text-gray: #b8b8b8;
+    --dark-gray: #ffffff;
+    --success-color: #4caf50;
+    --info-color: #29b6f6;
+    --warning-color: #ff9800;
+    --danger-color: #f44336;
+    
+    /* Семантические цвета для тёмной темы */
+    --text-primary: #ffffff;
+    --text-secondary: #b8b8b8;
+    --text-muted: #888888;
+    --border-color: #3a3a3a;
+    --header-background: #0a0a0a;
+    --header-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    --table-hover: #2a2a2a;
+    --table-background: #1a1a1a;
+    --table-header-background: #2a2a2a;
+    --input-background: #2a2a2a;
+    --input-border: #3a3a3a;
+    --input-focus-border: #ffd700;
+    --input-focus-shadow: rgba(255, 215, 0, 0.25);
+    --form-section-background: #2a2a2a;
+    --readonly-input-background: #1f1f1f;
+}
+
+/* Применение переменных к базовым элементам */
+html {
+    background-color: var(--body-background) !important;
+}
+
+body {
+    background-color: var(--body-background) !important;
+    color: var(--text-primary) !important;
+    transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* Обновление существующих стилей для использования переменных */
+.container {
+    background-color: var(--background-color) !important;
+}
+
+.main {
+    background-color: var(--background-color) !important;
+}
+
+.card, .info-card, .form-card, .data-card {
+    background-color: var(--card-background) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-content {
+    background-color: var(--modal-background) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Заголовок */
+.header {
+    background-color: var(--header-background) !important;
+    box-shadow: var(--header-shadow) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* Навигация */
+.nav__link {
+    color: var(--text-primary) !important;
+}
+
+.nav__link:hover {
+    background-color: var(--light-gray) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Инпуты и формы */
+input, select, textarea {
+    background-color: var(--input-background) !important;
+    border-color: var(--input-border) !important;
+    color: var(--text-primary) !important;
+    transition: all var(--transition-normal);
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: var(--input-focus-border) !important;
+    box-shadow: 0 0 0 2px var(--input-focus-shadow) !important;
+}
+
+.form-input {
+    background-color: var(--input-background) !important;
+    border-color: var(--input-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.readonly-input {
+    background-color: var(--readonly-input-background) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+}
+
+/* Секции форм */
+.form-section {
+    background-color: var(--form-section-background) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Таблицы */
+table, .referals-table, .admin-table {
+    background-color: var(--table-background) !important;
+    color: var(--text-primary) !important;
+}
+
+.table-container {
+    background-color: var(--card-background) !important;
+    border-color: var(--border-color) !important;
+}
+
+thead, .admin-table thead {
+    background-color: var(--table-header-background) !important;
+}
+
+tr:hover {
+    background-color: var(--table-hover) !important;
+}
+
+th {
+    background-color: var(--table-header-background) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+td {
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.referal-table-td {
+    color: var(--text-primary) !important;
+}
+
+/* Заголовки */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary) !important;
+}
+
+/* Вторичный текст */
+.text-secondary, .section-subtitle, .field-label {
+    color: var(--text-secondary) !important;
+}
+
+.info-label {
+    color: var(--text-secondary) !important;
+}
+
+.info-value {
+    color: var(--text-primary) !important;
+}
+
+/* Приглушённый текст */
+.text-muted, .info-value.no-data {
+    color: var(--text-muted) !important;
+}
+
+/* Фильтры заголовков таблиц */
+.header-filter {
+    background-color: var(--input-background) !important;
+    border-color: var(--input-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.header-select {
+    background-color: var(--input-background) !important;
+    border-color: var(--input-border) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Пагинация */
+.pagination {
+    background-color: var(--card-background) !important;
+}
+
+.page-link {
+    background-color: var(--card-background) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.page-item.active .page-link {
+    background-color: var(--golden-color) !important;
+    border-color: var(--golden-color) !important;
+    color: var(--body-background) !important;
+}
+
+.per-page-select {
+    background-color: var(--input-background) !important;
+    border-color: var(--input-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.pagination-text {
+    color: var(--text-secondary) !important;
+}
+
+/* Карточки */
+.macro-card, .referal-card {
+    background-color: var(--form-section-background) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Модальные окна - дополнительные элементы */
+.modal-header {
+    background-color: var(--modal-background) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-body {
+    background-color: var(--modal-background) !important;
+    color: var(--text-primary) !important;
+}
+
+.close {
+    color: var(--text-primary) !important;
+}
+
+/* Информационные элементы */
+.user-login-link {
+    color: var(--info-color) !important;
+}
+
+.user-login-link:hover {
+    color: var(--golden-color) !important;
+}
+
+/* Статусы и кнопки остаются с оригинальными цветами для узнаваемости */
+button, .btn {
+    transition: all var(--transition-normal);
+}
+
+/* Переключатель темы */
+#theme-switcher {
+    background: transparent !important;
+    border: 2px solid var(--golden-color) !important;
+    color: var(--golden-color) !important;
+    padding: 8px 12px;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 120px;
+}
+
+#theme-switcher:hover {
+    background-color: var(--golden-color) !important;
+    color: var(--body-background) !important;
+    transform: translateY(-1px);
+}
+
+#theme-switcher i {
+    font-size: 16px;
+    transition: transform var(--transition-normal);
+}
+
+#theme-switcher:hover i {
+    transform: rotate(180deg);
+}
+
+/* Принудительное применение тёмной темы ко всем текстовым элементам */
+.dark-theme * {
+    color: var(--text-primary);
+}
+
+.dark-theme input,
+.dark-theme select,
+.dark-theme textarea {
+    background-color: var(--input-background) !important;
+    border-color: var(--input-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.dark-theme .card,
+.dark-theme .info-card,
+.dark-theme .form-card {
+    background-color: var(--card-background) !important;
+}
+
+.dark-theme .table-container {
+    background-color: var(--card-background) !important;
+}
+
+/* Специальные правила для модальных окон в тёмной теме */
+.dark-theme .modal-content {
+    background-color: var(--card-background) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.dark-theme .modal-header {
+    background-color: var(--card-background) !important;
+    border-bottom-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.dark-theme .modal-body {
+    background-color: var(--card-background) !important;
+    color: var(--text-primary) !important;
+}
+
+.dark-theme .info-section {
+    background-color: var(--form-section-background) !important;
+    border-color: var(--border-color) !important;
+}
+
+.dark-theme .info-item span {
+    background-color: var(--input-background) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.dark-theme .user-card {
+    background-color: var(--card-background) !important;
+    border-color: var(--border-color) !important;
+}
+
+.dark-theme .close {
+    color: var(--text-primary) !important;
+}
+
+/* Скрытие переключателя на мобильных устройствах */
+@media (max-width: 768px) {
+    #theme-switcher {
+        display: none;
+    }
+}
+
+/* Принудительные стили для логотипа */
+.header_name img,
+.logo,
+#dynamic-logo {
+    height: 50px !important;
+    width: auto !important;
+    max-width: 200px !important;
+    min-width: 100px !important;
+    object-fit: contain !important;
+    display: block !important;
+}
+
+/* Дополнительная контрастность для тёмной темы */
+.dark-theme .header_name img,
+.dark-theme .logo,
+.dark-theme #dynamic-logo {
+    filter: brightness(1.2) contrast(1.3) drop-shadow(0 0 2px rgba(255, 255, 255, 0.3)) !important;
 }

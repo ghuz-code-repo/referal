@@ -113,7 +113,7 @@ function closeModal(modal) {
     if (modal) {
         console.log('Closing modal:', modal);
         modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
+        // document.body.style.overflow = 'auto';
         modal.classList.remove('modal-open');
     }
 }

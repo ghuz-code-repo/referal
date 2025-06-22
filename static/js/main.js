@@ -45,6 +45,11 @@ document.addEventListener('DOMContentLoaded', function() {
         initMacroTransfer();
         console.log('Macro transfer initialized');
     }
+
+    // Инициализация менеджера тем
+    if (window.themeManager) {
+        console.log('Theme manager initialized');
+    }
 });
 
 // Инициализация flash сообщений при загрузке страницы
@@ -52,4 +57,12 @@ window.addEventListener('load', function() {
     if (typeof hideFlashMessage === 'function') {
         hideFlashMessage();
     }
+});
+
+// Слушаем изменения темы для обновления компонентов
+document.addEventListener('themeChanged', function(event) {
+    console.log('Theme changed to:', event.detail.theme);
+    
+    // Здесь можно добавить дополнительную логику
+    // для компонентов, которые нужно обновить при смене темы
 });
