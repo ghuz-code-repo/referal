@@ -20,7 +20,7 @@ from flask_apscheduler import APScheduler
 from prefix_middleware import PrefixMiddleware
 
 import services
-import utils
+import utils as utils
 from header_utils import decode_header_full_name
 
 
@@ -149,5 +149,6 @@ if __name__ == '__main__':
             print(f"Scheduled daily update task. {scheduler.get_job('daily_update_job').next_run_time}")
 
     setup_locale() 
+    app.run(host='0.0.0.0', port=80, debug=True)
     app.run(host='0.0.0.0', port=80, debug=True)
     app.run(host='0.0.0.0', port=80, debug=True)

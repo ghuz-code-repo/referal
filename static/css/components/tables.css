@@ -17,38 +17,26 @@ th {
     color: white;
 }
 
-tr:nth-child(even) {
-    /* background-color: #f2f2f2; */
-}
+
 
 tr:hover {
     background-color: #ddd;
 }
 
-.table-container {
-    /* styles already exist in admin section */
+.referal-table-td{
+    max-width: 15%;
+    min-width: 100px;
 }
 
-.table {
-    /* styles already exist */
-}
+@media (max-width: 768px) {
+    th,
+    td {
+        padding: 10px;
+        font-size: 14px;
+    }
 
-.table__head {
-    /* styles already exist */
-}
-
-.table__body {
-    /* styles already exist */
-}
-
-.table__row {
-    /* styles already exist */
-}
-
-.table__header {
-    /* styles already exist */
-}
-
-.table__data {
-    /* styles already exist */
+    /* .referal-table-td {
+       width: 100px;
+    } */
+    
 }

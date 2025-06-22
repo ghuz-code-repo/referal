@@ -1,9 +1,4 @@
-.header_name {
-    position: absolute;
-    top: 0;
-    left: 0;
-    padding: 1rem;
-}
+
 
 .header_login {
     position: absolute;
@@ -25,7 +20,9 @@ header {
 nav {
     display: flex;
     justify-content: space-around;
-    padding: 1rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+
 }
 
 nav ul {
@@ -61,7 +58,7 @@ nav a {
     width: 100%;
     padding: 20px;
     background-color: var(--white);
-    box-shadow: var(--box-shadow-md);
+    /* box-shadow: var(--box-shadow-md); */
     border-radius: var(--border-radius-lg);
 }
 

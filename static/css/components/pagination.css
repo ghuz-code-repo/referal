@@ -9,7 +9,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding-left: 10px;
+    padding-right: 10px;
 }
+
 
 .pagination-info {
     font-size: 14px;
@@ -22,6 +25,7 @@
 
 .pagination {
     display: flex;
+    flex-direction: row;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -78,7 +82,8 @@
 
 .per-page-control {
     display: flex;
-    align-items: baseline;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 8px;
     font-size: 14px;
     color: var(--text-primary, #333);
@@ -101,8 +106,9 @@
 
 @media (max-width: 768px) {
     .pagination-controls {
-        flex-direction: column;
+        flex-direction: row;
         gap: 10px;
+        padding: 10px;
     }
     
     .pagination {
@@ -111,9 +117,38 @@
     }
     
     .page-link {
-        min-width: 35px;
+        min-width: 25px;
         height: 35px;
         padding: 6px 10px;
         font-size: 13px;
+    }
+    .page-item disabled{
+        display: none;
+    }
+
+    .pagination-info{
+        display: none;
+    }
+
+}
+
+@media (max-width: 591px) {
+    .per-page-control{
+        display: none;
+    }
+    .pagination-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+}
+
+@media (max-width: 383px) {
+    .last-page{
+        display: none;
+    }
+
+    .first-page{
+        display: none;
     }
 }

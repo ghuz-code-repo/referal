@@ -22,7 +22,7 @@ def profile():
         print("No user found, redirecting to referal profile")
         return redirect(url_for('referal.profile'))
     
-    if user.role == 'admin' or user.role == 'manager':
+    if user.role == 'admin' or user.role == 'manager' or user.role == 'call-center':
         """Перенаправление на административную панель для администраторов."""
         return redirect(url_for('admin.admin_panel'))
     

@@ -3,7 +3,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 20px;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 /* Базовые стили карточек */
@@ -39,7 +39,27 @@
     padding-bottom: 8px;
     border-bottom: 2px solid;
 }
+.card-header .download-act-btn{
+    background: linear-gradient(135deg, var(--success-color), #20c997);
+    display: flex;
+    color: var(--link-color);
+    gap: 5px;
+}
+.card-header .download-act-btn:hover{
+    background: linear-gradient(135deg, #20c997, var(--info-color));
+}
 
+.download-act-btn .download-act-link{
+    display: block;
+    color: var(--link-color);
+
+}
+
+.download-act-link .fa-file-download{
+    display: block;
+    color: var(--link-color);
+
+}
 .macro-card .card-header {
     border-bottom-color: #17a2b8;
 }

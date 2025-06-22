@@ -47,13 +47,11 @@ html, body {
     margin: 0;
     font-size: 14px;
 }
-
 .table-container {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: white;
+    /* Убираем все overflow и max-height */
 }
 
 .admin-table {
@@ -64,17 +62,42 @@ html, body {
     height: 100%;
 }
 
+.admin-table thead tr,
+.admin-table tbody tr {
+    display: table;
+    width: 100%; 
+    table-layout: fixed;
+}
+
 .admin-table thead {
-    flex-shrink: 0;
-    display: block;
-    width: 100%;
+    background-color: #f8f9fa;
+    /* Убираем все position и z-index */
+}
+
+.admin-table th {
+    /* background-color: #f8f9fa; */
+    border-bottom: 2px solid #dee2e6;
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: 600;
+    /* Убираем все position и z-index */
+}
+
+.admin-table td {
+    padding: 12px 8px;
+    border-bottom: 1px solid #dee2e6;
+    vertical-align: middle;
+}
+
+.admin-table tbody tr:hover {
+    background-color: #f5f5f5;
 }
 
 .admin-table tbody {
-    flex: 1;
     display: block;
     overflow-y: auto;
     overflow-x: hidden;
+    min-width: 768px;
 }
 
 .admin-table thead tr,
@@ -82,21 +105,6 @@ html, body {
     display: table;
     width: 100%;
     table-layout: fixed;
-}
-
-.admin-table th {
-    padding: 15px 10px;
-    font-weight: 600;
-    text-align: left;
-}
-
-.admin-table td {
-    padding: 12px 10px;
-    vertical-align: middle;
-}
-
-.admin-table tbody tr:hover {
-    background-color: #f8f9fa;
 }
 
 .empty-state {
@@ -141,7 +149,7 @@ html, body {
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 12px;
-    min-width: 120px;
+    /* min-width: 120px; */
 }
 
 .update-status-btn {
@@ -189,13 +197,6 @@ html, body {
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-.admin-panel__title {
-    /* existing styles */
-}
-
-.admin-panel__subtitle {
-    /* existing styles */
-}
 
 .requirements {
     color: blue;
@@ -205,4 +206,36 @@ html, body {
 
 .empty-state-row{
     height: 99%;
+}
+
+@media (max-width: 768px) {
+    .admin-panel {
+        padding: 10px;
+    }
+
+    .admin-table th, .admin-table td {
+        padding: 10px;
+        font-size: 14px;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .section-title h3 {
+        font-size: 18px;
+    }
+
+    .section-subtitle {
+        font-size: 12px;
+    }
+
+    .admin-table thead tr,
+    .admin-table tbody tr {
+        display: table;
+        min-width: 768px; /* Минимальная ширина для заголовков */
+        table-layout: fixed;
+}
+
 }

@@ -1,30 +1,22 @@
 <!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\components\referal_table_row.html -->
 <tr>
-    <td style="width: 15%;">{{ referal.referal_data.full_name if referal.referal_data else 'Не указано' }}</td>
-    <td style="width: 12%;">{{ referal.referal_data.phone_number if referal.referal_data else 'Не указано' }}</td>
-    <td style="width: 12%;">{{ referal.referal_data.contract_number if referal.referal_data else 'Не найден' }}</td>
-    <td style="width: 8%;">{{ referal.contact_id if referal.contact_id else 'Не найден' }}</td>
-    <td style="width: 10%;">{{ referal.status_name if referal.status_name else 'Не указан' }}</td>
-    <td style="width: 10%;">{{ referal.withdrawal_amount if referal.withdrawal_amount else '0' }}</td>
-    <td style="width: 12%;">
+    <td class="referal-table-td"  >{{ referal.referal_data.full_name if referal.referal_data else 'Не указано' }}</td>
+    <td class="referal-table-td"  >{{ referal.referal_data.phone_number if referal.referal_data else 'Не указано' }}</td>
+    <td class="referal-table-td"  >{{ referal.referal_data.contract_number if referal.referal_data else 'Не найден' }}</td>
+    <td class="referal-table-td"  >{{ referal.contact_id if referal.contact_id else 'Не найден' }}</td>
+    <td class="referal-table-td"  >{{ referal.status_name if referal.status_name else 'Не указан' }}</td>
+    <td class="referal-table-td"  >{{ referal.withdrawal_amount if referal.withdrawal_amount else '0' }}</td>
+    <td class="referal-table-td"  style="flex">
         <form method="POST" action="{{ url_for('referal.request_withdrawal', referal_id=referal.id) }}">
             <button type="submit" class="table_button" {{ 'disabled' if referal.balance_pending_withdrawal or not referal.withdrawal_amount else '' }}>
                 {{ 'Уже отправлено' if referal.balance_pending_withdrawal else 'Отправить на проверку' }}
             </button>
         </form>
-    </td>
-    <td style="width: 11%;">
-        <button class="table_button open_document_form" data-referal-id="{{ referal.id }}" {{'disabled' if referal.status_id != 0 else '' }}>
+        <button class="table_button open_document_form" data-referal-id="{{ referal.id }}" {{'disabled' if referal.status_id != 0 else '' }} style="    width: 100%;
+    margin-top: 5px;">
             Заполнить данные
         </button>
-        
-        <!-- Включаем модальное окно для каждого реферала -->
-        <!-- macro_contact уже прикреплен к объекту referal -->
         {% include 'modals/document_form_modal.html' %}
     </td>
-    <td style="width: 10%;">
-        <button id="open_act" class="table_button" {{ 'disabled' if referal.status_id != 200 else '' }}>
-            Скачать акт
-        </button>
-    </td>
+
 </tr>

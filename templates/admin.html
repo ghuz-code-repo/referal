@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}">
@@ -43,7 +44,10 @@
                             {% if current_user.role == 'manager' %}
                             <h3><i class="fas fa-money-check-alt"></i> Управление выплатами</h3>
                             <p class="section-subtitle">Рефералы готовые к выплате</p>
-                            {% else %}
+                            {% elif current_user.role == 'call-center' %}
+                            <h3><i class="fas fa-money-check-alt"></i>Проверка рефералов</h3>
+                            <p class="section-subtitle">Рефералы готовые к проверке</p>
+                            {% elif current_user.role == 'admin' %}
                             <h3><i class="fas fa-users-cog"></i> Управление рефералами</h3>
                             <p class="section-subtitle">Все рефералы в системе для модерации</p>
                             {% endif %}
@@ -54,7 +58,7 @@
                         <table class="admin-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 15%;">
+                                    <th>
                                         <div class="header-cell">
                                             <div class="header-title">
                                                 <span>ФИО</span>
@@ -92,7 +96,7 @@
                                             </div>
                                         </div>
                                     </th>
-                                    <th style="width: 12%;">
+                                    <th>
                                         <div class="header-cell">
                                             <div class="header-title">
                                                 <span>Телефон</span>
@@ -130,7 +134,7 @@
                                             </div>
                                         </div>
                                     </th>
-                                    <th style="width: 12%;">
+                                    <th>
                                         <div class="header-cell">
                                             <div class="header-title">
                                                 <span>Договор</span>
@@ -168,10 +172,10 @@
                                             </div>
                                         </div>
                                     </th>
-                                    <th style="width: 10%;">
+                                    <th >
                                         <div class="header-cell">
                                             <div class="header-title">
-                                                <span>Пользователь</span>
+                                                <span>Реферер</span>
                                                 <div class="sort-controls">
                                                     {% for sort_field in sort_fields %}
                                                         {% if sort_field.field == 'user' %}
@@ -206,7 +210,7 @@
                                             </div>
                                         </div>
                                     </th>
-                                    <th style="width: 8%;">
+                                    <th>
                                         <div class="header-cell">
                                             <div class="header-title">
                                                 <span>Macro ID</span>
@@ -225,7 +229,7 @@
                                             </div>
                                         </div>
                                     </th>
-                                    <th style="width: 10%;">
+                                    <th>
                                         <div class="header-cell">
                                             <div class="header-title">
                                                 <span>Статус</span>
@@ -250,9 +254,11 @@
                                                 </div>
                                             </div>
                                             <div class="header-controls">
-                                                <select class="header-filter header-select" data-filter="status">
+                                                
+                                                <select class="header-filter header-select" data-filter="status" style="{{'display: none;' if current_user.role == 'call-center' }}">
                                                     {% if current_user.role == 'manager' %}
                                                         <!-- Менеджеры видят только статусы для просмотра -->
+                                                        <option value="all_manager" {{ 'selected' if current_filters.status == 'all_manager' else '' }}>Все доступные</option>
                                                         {% for status in statuses %}
                                                             {% if status.id in [200, 300, 500] %}
                                                             <option value="{{ status.id }}" {{ 'selected' if current_filters.status == status.id|string else ('selected' if status.id == 200 and not current_filters.status else '') }}>
@@ -260,7 +266,10 @@
                                                             </option>
                                                             {% endif %}
                                                         {% endfor %}
-                                                    {% else %}
+                                                   {% elif current_user.role == 'call-center' %}
+                                                        <!-- Call-center не имеет фильтрации по статусу -->
+                                                        <option value="10" selected disabled>Проверка колл центром</option>
+                                                    {% elif current_user.role == 'admin' %}
                                                         <!-- Админы видят все статусы с опцией "Все" -->
                                                         <option value="-1">Все</option>
                                                         {% for status in statuses %}
@@ -270,7 +279,7 @@
                                                         {% endfor %}
                                                     {% endif %}
                                                 </select>
-                                                {% if current_filters and current_filters.status %}
+                                                {% if current_filters and current_filters.status and current_user.role != 'call-center' %}
                                                 <button type="button" class="clear-filter-btn" data-filter="status" title="Очистить фильтр">
                                                     <i class="fas fa-times"></i>
                                                 </button>
@@ -278,7 +287,7 @@
                                             </div>
                                         </div>
                                     </th>
-                                    <th style="width: 10%;">
+                                    <th >
                                         <div class="header-cell">
                                             <div class="header-title">
                                                 <span>Сумма к выводу</span>
@@ -304,7 +313,7 @@
                                             </div>
                                         </div>
                                     </th>
-                                    <th style="width: 23%;">
+                                    <th>
                                         <div class="header-cell">
                                             <div class="header-title">
                                                 <span>Действия</span>
@@ -318,18 +327,18 @@
                                 {% if referals %}
                                     {% for referal in referals %}
                                     <tr>
-                                        <td style="width: 15%;">{{ referal.referal_data.full_name if referal.referal_data else 'Не указано' }}</td>
-                                        <td style="width: 12%;">{{ referal.referal_data.phone_number if referal.referal_data else 'Не указано' }}</td>
-                                        <td style="width: 12%;">{{ referal.referal_data.contract_number if referal.referal_data else 'Не найден' }}</td>
-                                        <td style="width: 10%;">
+                                        <td  class="referal-table-td">{{ referal.referal_data.full_name if referal.referal_data else 'Не указано' }}</td>
+                                        <td  class="referal-table-td">{{ referal.referal_data.phone_number if referal.referal_data else 'Не указано' }}</td>
+                                        <td  class="referal-table-td">{{ referal.referal_data.contract_number if referal.referal_data else 'Не найден' }}</td>
+                                        <td  class="referal-table-td">
                                             <span class="user-login-link" data-user-id="{{ referal.user.id if referal.user else '' }}" title="Просмотр информации о пользователе">
                                                 {{ referal.user.login if referal.user else 'Не найден' }}
                                             </span>
                                         </td>
-                                        <td style="width: 8%;">{{ referal.contact_id if referal.contact_id else 'Не найден' }}</td>
-                                        <td style="width: 10%;">{{ referal.status_name if referal.status_name else 'Не указан' }}</td>
-                                        <td style="width: 10%;">{{ referal.withdrawal_amount if referal.withdrawal_amount else '0' }}</td>
-                                        <td style="width: 23%;">
+                                        <td  class="referal-table-td">{{ referal.contact_id if referal.contact_id else 'Не найден' }}</td>
+                                        <td  class="referal-table-td">{{ referal.status_name if referal.status_name else 'Не указан' }}</td>
+                                        <td  class="referal-table-td">{{ referal.withdrawal_amount if referal.withdrawal_amount else '0' }}</td>
+                                        <td  class="referal-table-td">
                                             <div class="admin-actions">
                                                 <button class="table_button open_document_form" data-referal-id="{{ referal.id }}">
                                                     Карточка
@@ -366,7 +375,17 @@
                                                                     {{ referal.status_name }} (недоступно для изменения)
                                                                 </option>
                                                             {% endif %}
-                                                        {% else %}
+                                                        {% elif current_user.role == 'call-center' %}
+                                                            <!-- Call-center видят только статусы 10 и 20 -->
+                                                            {% for status in statuses %}
+                                                                {% if status.id in [10, 20] %}
+                                                                <option value="{{ status.id }}" 
+                                                                        {{ 'selected' if status.id == referal.status_id else '' }}>
+                                                                    {{ status.name }}
+                                                                </option>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        {% elif current_user.role == 'admin' %}
                                                             <!-- Админы видят все статусы -->
                                                             {% for status in statuses %}
                                                             <option value="{{ status.id }}" 
@@ -377,11 +396,13 @@
                                                         {% endif %}
                                                     </select>
                                                     <button type="submit" class="update-status-btn" title="Обновить статус"
-                                                            {% if current_user.role == 'manager' and referal.status_id != 200 %}disabled{% endif %}>
+                                                    {% if (current_user.role == 'manager' and referal.status_id != 200) or (current_user.role == 'call-center' and referal.status_id != 10) %}disabled{% endif %}>
                                                         <i class="fas fa-sync-alt"></i>
                                                         {% if current_user.role == 'manager' and referal.status_id != 200 %}
                                                             Недоступно
-                                                        {% else %}
+                                                        {% elif current_user.role == 'call-center' and referal.status_id != 10 %}
+                                                            Недоступно
+                                                        {% elif current_user.role == 'admin' %}
                                                             Обновить
                                                         {% endif %}
                                                     </button>
@@ -434,33 +455,13 @@
     {% include 'components/modal_scripts.html' %}    <!-- Включаем компонент с модальными окнами -->        
 
     <!-- Автоматическая установка фильтра по умолчанию -->
+<!-- Автоматическая установка фильтра по умолчанию -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         const statusFilter = document.querySelector('.header-filter[data-filter="status"]');
-        const urlParams = new URLSearchParams(window.location.search);
         
-        // Проверяем, есть ли сохраненный статус в localStorage
-        const savedStatus = localStorage.getItem('admin_last_status_filter');
-        
-        // Проверяем, есть ли уже параметр status в URL
-        if (statusFilter && !urlParams.has('status')) {
-            if (savedStatus) {
-                // Используем сохраненный статус
-                statusFilter.value = savedStatus;
-            } else {
-                // Используем значения по умолчанию
-                {% if current_user.role == 'manager' %}
-                    // Для менеджеров устанавливаем статус 200
-                    statusFilter.value = '200';
-                {% else %}
-                    // Для админов устанавливаем статус 1
-                    statusFilter.value = '1';
-                {% endif %}
-            }
-            
-            // Автоматически применяем фильтр
-            statusFilter.dispatchEvent(new Event('change'));
-        }
+        // Убираем весь код автоматической установки фильтров по умолчанию
+        // Теперь это делается на серверной стороне только при первом заходе
         
         // Сохраняем выбранный статус при изменении фильтра
         if (statusFilter) {
@@ -478,19 +479,56 @@
                 if (statusFilter) {
                     localStorage.setItem('admin_last_status_filter', statusFilter.value);
                 }
+                
+                // Добавляем скрытое поле с текущими фильтрами для сохранения состояния
+                const currentUrl = new URL(window.location);
+                const params = new URLSearchParams(currentUrl.search);
+                
+                // Создаем скрытые поля для всех текущих параметров URL
+                ['status', 'name', 'phone', 'contract', 'user', 'contact_id', 'page', 'per_page', 'sort'].forEach(param => {
+                    const value = params.get(param);
+                    if (value) {
+                        const hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = 'return_' + param;
+                        hiddenInput.value = value;
+                        this.appendChild(hiddenInput);
+                    }
+                });
             });
         });
         
-        // Обработчик для кнопки очистки фильтра статуса
+        // Обработчик для кнопки очистки фильтра статуса с роль-специфичной логикой
         const clearStatusFilterBtn = document.querySelector('.clear-filter-btn[data-filter="status"]');
         if (clearStatusFilterBtn) {
             clearStatusFilterBtn.addEventListener('click', function() {
                 // Очищаем сохраненный статус из localStorage
                 localStorage.removeItem('admin_last_status_filter');
+                
+                // Получаем текущий URL и параметры
+                const currentUrl = new URL(window.location);
+                const params = new URLSearchParams(currentUrl.search);
+                
+                // Роль-специфичная логика очистки фильтра
+                {% if current_user.role == 'admin' %}
+                    // Для админа - показать все статусы
+                    params.set('status', '-1');
+                {% elif current_user.role == 'manager' %}
+                    // Для менеджера - показать все доступные статусы (200, 300, 500)
+                    params.set('status', 'all_manager');
+                {% elif current_user.role == 'call-center' %}
+                    // Для call-center - убрать фильтрацию по статусу вообще
+                    params.delete('status');
+                {% endif %}
+                
+                // Перенаправляем с новыми параметрами
+                currentUrl.search = params.toString();
+                window.location.href = currentUrl.toString();
             });
         }
     });
     </script>
+
 
 </body>
 </html>

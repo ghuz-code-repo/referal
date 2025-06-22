@@ -4,6 +4,7 @@ html, body {
     overflow: hidden;
     margin: 0;
     padding: 0;
+    
 }
 
 .page-wrapper {
@@ -35,6 +36,7 @@ html, body {
     grid-template-columns: 300px 1fr;
     gap: 20px;
     min-height: 0;
+    padding: 15px;
 }
 
 .profile-info, .profile-form {
@@ -55,8 +57,15 @@ html, body {
     top: 0;
     background: white;
     z-index: 1;
-    margin: 0 0 10px 0;
-    padding-bottom: 5px;
+
+}
+
+.info-header{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    /* gap: 20px; */
+    justify-content: space-between;
 }
 
 .info-row {
@@ -89,6 +98,14 @@ html, body {
     font-weight: 600;
     padding-bottom: 0px;
     border-bottom: 1px solid #e0e0e0;
+}
+
+.form-sections-container{
+    max-height: 70vh;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #f1f1f1;
+     /* Включаем вертикальную прокрутку */
 }
 
 .form-sections-container .form-section {
@@ -227,6 +244,13 @@ html, body {
         padding 0.25s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
 }
 
+@media (max-height: 700px) {
+    .form-sections-container {
+        max-height: 60vh; /* Ограничиваем высоту для маленьких экранов */
+        overflow-y: auto;
+    }
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
     .profile-section {
@@ -237,4 +261,11 @@ html, body {
     .profile-info {
         max-height: 200px;
     }
+
+    .form-sections-container {
+        max-height: 37vh; /* Меньше высота на мобильных */
+        overflow-y: auto;
+        /* overflow-x: hidden; Скрываем горизонтальную прокрутку */
+    }
 }
+

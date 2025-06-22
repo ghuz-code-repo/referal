@@ -10,27 +10,14 @@
             <option value="50" {{ 'selected' if pagination.per_page == 50 else '' }}>50</option>
         </select>
     </div>
-    
-    <div class="pagination-info">
-        {% if pagination and pagination.total > 0 %}
-            <span class="pagination-text">
-                Показано {{ pagination.per_page * (pagination.page - 1) + 1 }}-{{ 
-                    pagination.per_page * pagination.page if pagination.per_page * pagination.page <= pagination.total 
-                    else pagination.total 
-                }} из {{ pagination.total }} записей
-            </span>
-        {% endif %}
-    </div>
-</div>
-
-<nav aria-label="Page navigation" class="pagination-nav">
+    <nav aria-label="Page navigation" class="pagination-nav">
     <ul class="pagination">
         {% set base_url = base_pagination_url if base_pagination_url else url_for('referal.profile') %}
         {% set current_params = request.args.to_dict() %}
         
         <!-- Первая страница -->
         {% if pagination.page > 1 %}
-        <li class="page-item">
+        <li class="first-page page-item">
             {% set first_params = current_params.copy() %}
             {% set _ = first_params.update({'page': 1}) %}
             <a class="page-link" href="{{ base_url }}?{{ first_params | urlencode }}" title="Первая страница">
@@ -38,7 +25,7 @@
             </a>
         </li>
         {% else %}
-        <li class="page-item disabled">
+        <li class=" first-page page-item disabled">
             <span class="page-link" title="Первая страница">
                 <i class="fas fa-angle-double-left"></i>
             </span>
@@ -47,7 +34,7 @@
         
         <!-- Предыдущая страница -->
         {% if pagination.has_prev %}
-        <li class="page-item">
+        <li class=" page-item">
             {% set prev_params = current_params.copy() %}
             {% set _ = prev_params.update({'page': pagination.prev_num}) %}
             <a class="page-link" href="{{ base_url }}?{{ prev_params | urlencode }}" title="Предыдущая страница">
@@ -55,7 +42,7 @@
             </a>
         </li>
         {% else %}
-        <li class="page-item disabled">
+        <li class=" page-item disabled">
             <span class="page-link" title="Предыдущая страница">
                 <i class="fas fa-angle-left"></i>
             </span>
@@ -102,7 +89,7 @@
         
         <!-- Следующая страница -->
         {% if pagination.has_next %}
-        <li class="page-item">
+        <li class="page-item next-page">
             {% set next_params = current_params.copy() %}
             {% set _ = next_params.update({'page': pagination.next_num}) %}
             <a class="page-link" href="{{ base_url }}?{{ next_params | urlencode }}" title="Следующая страница">
@@ -110,7 +97,7 @@
             </a>
         </li>
         {% else %}
-        <li class="page-item disabled">
+        <li class="page-item disabled next-page">
             <span class="page-link" title="Следующая страница">
                 <i class="fas fa-angle-right"></i>
             </span>
@@ -119,7 +106,7 @@
         
         <!-- Последняя страница -->
         {% if pagination.page < pagination.pages %}
-        <li class="page-item">
+        <li class="last-page page-item">
             {% set last_params = current_params.copy() %}
             {% set _ = last_params.update({'page': pagination.pages}) %}
             <a class="page-link" href="{{ base_url }}?{{ last_params | urlencode }}" title="Последняя страница">
@@ -127,7 +114,7 @@
             </a>
         </li>
         {% else %}
-        <li class="page-item disabled">
+        <li class="last-page page-item disabled ">
             <span class="page-link" title="Последняя страница">
                 <i class="fas fa-angle-double-right"></i>
             </span>
@@ -135,4 +122,17 @@
         {% endif %}
     </ul>
 </nav>
+    <div class="pagination-info">
+        {% if pagination and pagination.total > 0 %}
+            <span class="pagination-text">
+                Показано {{ pagination.per_page * (pagination.page - 1) + 1 }}-{{ 
+                    pagination.per_page * pagination.page if pagination.per_page * pagination.page <= pagination.total 
+                    else pagination.total 
+                }} из {{ pagination.total }} записей
+            </span>
+        {% endif %}
+    </div>
+</div>
+
+
 {% endif %}

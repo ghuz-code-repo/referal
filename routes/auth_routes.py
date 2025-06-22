@@ -23,6 +23,8 @@ def get_current_user():
         role = 'referer'
     if 'referal-manager' in roles:
         role = 'manager' 
+    if 'referal-call-center' in roles:
+        role = 'call-center' 
     if 'admin' in roles or 'referal-admin' in roles:
         role = 'admin'  
     if user:

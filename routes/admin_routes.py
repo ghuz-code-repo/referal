@@ -10,63 +10,71 @@ import os
 admin_bp = Blueprint('admin', __name__)
 
 
-@admin_bp.route('/admin')
+@admin_bp.route('/admin', methods=['GET'])
 def admin_panel():
-    """Маршрут для отображения административной панели."""
+    """Административная панель для управления рефералами."""
     user = get_current_user()
-    if not user and (not user.role == 'admin' or not user.role == 'manager'):
-        flash('Access denied', 'error')
+    if not user or user.role not in ['admin', 'manager', 'call-center']:
+        flash('Доступ запрещен', 'error')
         return redirect(url_for('referal.profile'))
     
-    # Получаем параметры фильтрации, пагинации и сортировки
+    # Получаем параметры из URL
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 5, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    # Получаем фильтры
     status_filter = request.args.get('status', '')
     name_filter = request.args.get('name', '')
     phone_filter = request.args.get('phone', '')
     contract_filter = request.args.get('contract', '')
     contact_id_filter = request.args.get('contact_id', '')
     user_filter = request.args.get('user', '')
-    sort_param = request.args.get('sort', '')
     
-    # Парсим сортировку
+    # Проверяем наличие заголовка Referer для определения "чистого" захода
+    referer = request.headers.get('Referer', '')
+    is_direct_access = not referer or '/admin' not in referer
+    
+    # УСТАНАВЛИВАЕМ ФИЛЬТРЫ ПО УМОЛЧАНИЮ ТОЛЬКО ПРИ ПРЯМОМ ЗАХОДЕ
+    if not status_filter and not any([name_filter, phone_filter, contract_filter, contact_id_filter, user_filter]) and is_direct_access:
+        # Устанавливаем фильтр по умолчанию только при первом заходе на страницу
+        if user.role == 'manager':
+            default_status = '200'
+        elif user.role == 'call-center':
+            default_status = '10'
+        else:  # admin
+            default_status = '1'
+        
+        # Перенаправляем с фильтром по умолчанию
+        return redirect(url_for('admin.admin_panel', status=default_status))
+    
+    # Получаем сортировку
+    sort_param = request.args.get('sort', '')
     sort_fields = []
     if sort_param:
         for sort_item in sort_param.split(','):
             if ':' in sort_item:
                 field, order = sort_item.split(':')
                 sort_fields.append({'field': field, 'order': order})
-
-    # Базовый запрос с JOIN
-    query = Referal.query.join(User, Referal.user_id == User.id).filter(Referal.status_id != -1)
     
-    # Определяем, нужно ли присоединять ReferalData
-    needs_referal_data_join = (name_filter or phone_filter or contract_filter or 
-                              any(sf['field'] in ['name', 'phone', 'contract'] for sf in sort_fields))
-    
-    if needs_referal_data_join:
-        query = query.join(ReferalData)
+    # Базовый запрос
+    query = Referal.query
     
     # Применяем фильтры
-
     if status_filter:
-        if status_filter == '-1': 
-            if user.role == 'manager':
-                query = query.filter(Referal.status_id == 200)
-                # недостижимый код
-            elif user.role == 'admin':
-                query = query.filter(Referal.status_id != -1)
+        if status_filter == '-1':
+            # Админ выбрал "Все" - не применяем фильтр по статусу
+            pass
+        elif status_filter == 'all_manager':
+            # Менеджер выбрал "Все доступные" - фильтруем по доступным статусам
+            query = query.filter(Referal.status_id.in_([200, 300, 500]))
+        elif status_filter == 'no_status':
+            query = query.filter(Referal.status_id == 0)
         else:
             query = query.filter(Referal.status_id == int(status_filter))
     else:
-        if user.role == 'manager':
-            query = query.filter(Referal.status_id == 200)
-            # недостижимый код
-        elif user.role == 'admin':
-            query = query.filter(Referal.status_id == 1)
-            # недостижимый код
-
-    print(f"Filtering by status: {status_filter}, user role: {user.role}")
+        # Если нет фильтра по статусу для call-center - показываем все их доступные
+        if user.role == 'call-center':
+            query = query.filter(Referal.status_id == 10)
     
     if name_filter:
         query = query.filter(ReferalData.full_name.ilike(f'%{name_filter}%'))
@@ -138,10 +146,9 @@ def admin_panel():
 
     return render_template('admin.html', 
                           current_user=user,
-                          withdrawal_requests=withdrawal_requests,
-                          pagination=pagination,
-                          statuses=statuses,
                           referals=referals,
+                          pagination=pagination,
+                          statuses=Status.query.all(),
                           current_filters={
                               'status': status_filter,
                               'name': name_filter,
@@ -157,10 +164,10 @@ def admin_panel():
 
 @admin_bp.route('/update_withdrawal_stage/<int:referal_id>', methods=['POST'])
 def update_withdrawal_stage(referal_id):
-    """Маршрут для обновления статуса заявки на вывод средств."""
+    """Обновление статуса реферала."""
     user = get_current_user()
-    if not user or not (user.role == 'admin' or user.role == 'manager'):
-        flash('Access denied', 'error')
+    if not user or user.role not in ['admin', 'manager', 'call-center']:
+        flash('Доступ запрещен', 'error')
         return redirect(url_for('referal.profile'))
 
     referal = Referal.query.get_or_404(referal_id)
@@ -193,5 +200,33 @@ def update_withdrawal_stage(referal_id):
         referal.balance_withdrawn = True
 
     db.session.commit()
-    flash('Withdrawal stage updated successfully', 'success')
-    return redirect(url_for('admin.admin_panel'))
+    flash('Статус реферала обновлен успешно', 'success')
+    
+    # Восстанавливаем параметры фильтрации из формы
+    return_params = {}
+    for key in request.form.keys():
+        if key.startswith('return_'):
+            param_name = key.replace('return_', '')
+            return_params[param_name] = request.form[key]
+    
+    # Если есть сохраненные параметры, используем их для редиректа
+    if return_params:
+        return redirect(url_for('admin.admin_panel', **return_params))
+    else:
+        # Иначе просто возвращаемся на админ панель
+        return redirect(url_for('admin.admin_panel'))
+    flash('Статус реферала обновлен успешно', 'success')
+    
+    # Восстанавливаем параметры фильтрации из формы
+    return_params = {}
+    for key in request.form.keys():
+        if key.startswith('return_'):
+            param_name = key.replace('return_', '')
+            return_params[param_name] = request.form[key]
+    
+    # Если есть сохраненные параметры, используем их для редиректа
+    if return_params:
+        return redirect(url_for('admin.admin_panel', **return_params))
+    else:
+        # Иначе просто возвращаемся на админ панель
+        return redirect(url_for('admin.admin_panel'))

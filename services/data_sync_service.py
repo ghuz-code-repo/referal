@@ -7,7 +7,7 @@ import pymysql
 from pymysql import MySQLError
 from flask import current_app
 from models import *
-import utils
+import utils as utils
 
 
 def fetch_data_from_mysql():
@@ -630,4 +630,3 @@ def fetch_and_process_contacts(days_back=30):
             'success': False,
             'error': str(e)
         }
-            

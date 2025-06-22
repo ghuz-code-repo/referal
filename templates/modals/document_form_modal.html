@@ -2,9 +2,49 @@
 <div id="DocumentFormModal_{{ referal.id }}" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Заполнение документов реферала</h3>
+            <h1>Заполнение документов реферала</h1>
+            {% set user_data_complete = referal.user!=None and referal.user.user_data!=None and referal.user.user_data.full_name!='' and referal.user.user_data.phone_number!='' and referal.user.user_data.pinfl!='' and referal.user.user_data.passport_address!='' and referal.user.user_data.email!='' %}
+            {% set referal_data_complete = referal.referal_data!=None and referal.referal_data.full_name!='' and referal.referal_data.phone_number!='' and referal.referal_data.passport_number!='' and referal.referal_data.passport_date!=None and referal.referal_data.passport_giver!='' and referal.referal_data.contract_number!='' %}
+            {% set can_download_act = user_data_complete and referal_data_complete %}
+
+            <div class="download-act-container">
+                {%if can_download_act%}
+                <a href="{{ url_for('document.get_referal_act', referal_id=referal.id) }}" class="download-act-btn download-act-link">
+                <button type="button" class="download-agreement-btn">
+                    <i class="fas fa-file-download"></i>Акт
+                </button>
+                </a>
+                {% else %}
+                    <button type="button" class="download-agreement-btn disabled" disabled title="Заполните все обязательные поля ">
+                        <i class="fas fa-file-download"></i>Акт
+                    </button>
+                {% endif %}
+                <div class="tooltip-container">
+                    <i class="fas fa-question-circle help-icon" title="Информация об обязательных полях"></i>
+                    <div class="tooltip-content">
+                    <div class="tooltip-header">Обязательные поля для скачивания акта:</div>
+                    <div class="tooltip-section">
+                        <strong>Данные реферера (пользователя):</strong>
+                        <ul>
+                            <li>ФИО</li>
+                            <li>Номер телефона</li>
+                            <li>ПИНФЛ</li>
+                            <li>Адрес прописки</li>
+                            <li>Email</li>
+                        </ul>
+                    </div>
+                    <div class="tooltip-section">
+                        <strong>Данные реферала - все поля формы</strong>
+                        <ul>
+                            <li>Перед скачиванием акта сохраните данные реферала если вы их ещё не сохраняли!!!</li>
+                        </ul>
+                    </div>
+                    </div>
+                </div>
+            </div>
             <span class="close">&times;</span>
         </div>
+
         <div class="modal-body">
             <form method="POST" action="{{ url_for('referal.update_referal_documents', referal_id=referal.id) }}">
                 
@@ -165,7 +205,8 @@
                     <div class="referal-card" data-referal-id="{{ referal.id }}">
                         <div class="card-header">
                             <h3><i class="fas fa-user"></i> Данные реферала</h3>
-                        </div>
+
+                            </div>
                         
                         <!-- Поля для ввода данных реферала -->
                         <div class="name-row">

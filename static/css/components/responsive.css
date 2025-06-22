@@ -13,10 +13,6 @@
         overflow-x: auto;
     }
 
-    th,
-    td {
-        white-space: nowrap;
-    }
 
     .container,
     .form-container {
@@ -28,14 +24,16 @@
     }
 
     .modal-content {
-        min-width: 95vw;
-        max-width: 95vw;
-        margin: 5px;
-        max-height: 95vh;
+        min-width: 100vw;
+        top: 0%;
+        left: 0%;
+        transform: translate(0%, 0%) scale(1);
+        transition: transform var(--transition-normal);
+        overflow-x: hidden;
     }
 
     .modal-header {
-        padding: 12px 15px;
+        padding: 10px 0 10px 0;
     }
 
     .modal-body {
@@ -141,5 +139,10 @@
     .readonly-input.small {
         max-width: none;
         text-align: left;
+    }
+
+    .modal{
+        width: 100%;
+        
     }
 }
