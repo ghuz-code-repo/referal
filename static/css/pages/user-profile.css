@@ -18,14 +18,16 @@ html, body {
     flex: 1;
     overflow: hidden;
     padding: 10px;
-    background-color: var(--background-color) !important;
+    background-color: rgba(0, 0, 0, 0) !important; /* Лёгкий фон для контраста */
+
 }
 
 .container {
     height: 98%;
     display: flex;
     flex-direction: column;
-    background-color: var(--background-color) !important;
+    background-color: rgba(0, 0, 0, 0) !important; /* Лёгкий фон для контраста */
+
 }
 
 .main__title {
