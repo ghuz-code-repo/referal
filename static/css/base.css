@@ -46,22 +46,6 @@ a:hover {
     color: var(--hover-color);
 }
 
-/* === ТЁМНАЯ ТЕМА === */
-.dark-theme {
-    --body-background: #0d1117;
-    --text-primary: #f0f6fc;
-    --text-secondary: #8b949e;
-    --text-muted: #6e7681;
-    --border-color: #30363d;
-    --card-background: #1c2128;
-    --form-section-background: #21262d;
-    --input-background: #1c2128;
-    --input-border: #30363d;
-    --input-focus-border: #ffd700;
-    --input-focus-shadow: rgba(255, 215, 0, 0.25);
-    --modal-background: #1c2128;
-    --modal-backdrop: rgba(0, 0, 0, 0.8);
-}
 
 /* === БАЗОВЫЕ СТИЛИ === */
 html, body {

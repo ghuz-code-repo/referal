@@ -45,7 +45,7 @@
                                 <h3><i class="fas fa-user"></i> Основная информация</h3>
                                 {% set user_data_complete = current_user!=None and current_user.user_data!=None and current_user.user_data.full_name!=None and current_user.user_data.full_name!='' and current_user.user_data.passport_number!=None and current_user.user_data.passport_number!='' and current_user.user_data.passport_giver!=None and current_user.user_data.passport_giver!='' and current_user.user_data.passport_date!=None and current_user.user_data.passport_adress!=None and current_user.user_data.passport_adress!='' and current_user.user_data.pinfl!=None and current_user.user_data.pinfl!='' and current_user.user_data.bank_name!=None and current_user.user_data.bank_name!='' and current_user.user_data.trans_schet!=None and current_user.user_data.trans_schet!='' and current_user.user_data.card_number!=None and current_user.user_data.card_number!='' and current_user.user_data.mfo!=None and current_user.user_data.mfo!='' and current_user.user_data.phone!=None and current_user.user_data.phone!='' and current_user.user_data.e_mail!=None and current_user.user_data.e_mail!='' %}
                                 {% if current_user.role=='referer' %}
-
+                                <div class="download-act-container">
                                     {% if user_data_complete %}
 
                                     <a href="{{ url_for('document.get_agreement', user_id=current_user.id) }}" class="download-act-btn download-act-link">
@@ -57,7 +57,26 @@
                                         <button type="button" class="download-agreement-btn disabled" disabled>
                                             <i class="fas fa-file-download"></i> Соглашение
                                         </button>
+                                        <div class="tooltip-container">
+                                            <i class="fas fa-question-circle help-icon" title="Информация об обязательных полях"></i>
+                                            <div class="tooltip-content">
+                                            <div class="tooltip-header">Обязательные поля для скачивания соглашения:</div>
+                                            <div class="tooltip-section">
+                                                <strong>Данные реферера:</strong>
+                                                <ul>
+                                                    <li>ФИО</li>
+                                                    <li>Паспортные данные (серия, номер, кем выдан, дата выдачи, адрес)</li>
+                                                    <li>ПИНФЛ</li>
+                                                    <li>Банковские данные (номер карты, название банка, транзитный счет, МФО)</li>
+                                                    <li>Телефон</li>
+                                                    <li>Email</li>
+                                                </ul>
+                                            </div>
+                                            </div>
+                                        </div>
                                     {% endif %}
+
+                                </div>
                                 {% endif %}
                             </div>
                             <div class="info-row">

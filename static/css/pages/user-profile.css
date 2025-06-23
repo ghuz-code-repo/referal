@@ -53,7 +53,7 @@ html, body {
 
 .info-card, .form-card {
     flex: 1;
-    overflow-y: hidden;
+    overflow-x: hidden;
     min-height: 0;
     position: relative;
     padding: 10px;

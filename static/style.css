@@ -57,7 +57,7 @@
 
 /* Тёмная тема - более тёмные и контрастные цвета */
 .dark-theme {
-    --main-color: #e8e8e8;
+    --main-color: #ffffff;
     --background-color: #0f0f0f;
     --body-background: #000000;
     --card-background: #1a1a1a;
@@ -77,8 +77,8 @@
     --danger-color: #f44336;
     
     /* Семантические цвета для тёмной темы */
-    --text-primary: #ffffff;
-    --text-secondary: #b8b8b8;
+    --text-primary: #cac9c9;
+    --text-secondary: #b3b3b3;
     --text-muted: #888888;
     --border-color: #3a3a3a;
     --header-background: #0a0a0a;
