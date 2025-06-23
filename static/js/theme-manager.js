@@ -163,8 +163,8 @@ class ThemeManager {
      */
     initializeComponents() {
         this.loadLogoUrls();
-        this.createThemeSwitcher();
-        this.bindEvents();
+        this.findThemeSwitcher();
+        this.initMobileMenu();
         
         // Применяем текущую тему с обновлением UI
         const currentTheme = this.getCurrentTheme();
@@ -174,43 +174,84 @@ class ThemeManager {
     }
 
     /**
-     * Загрузка URL логотипов из data-атрибутов
+     * Поиск кнопки переключения темы в вёрстке
      */
-    loadLogoUrls() {
-        const logoElement = document.querySelector('.logo, #dynamic-logo');
-        if (logoElement) {
-            this.logos.light = logoElement.dataset.lightLogo || logoElement.src;
-            this.logos.dark = logoElement.dataset.darkLogo || logoElement.src;
-            
-            console.log('Logo URLs loaded:', this.logos);
+    findThemeSwitcher() {
+        this.themeSwitcher = document.getElementById('theme-switcher');
+        if (this.themeSwitcher) {
+            console.log('Theme switcher found in header');
+        } else {
+            console.warn('Theme switcher not found');
         }
     }
 
     /**
-     * Создание кнопки переключения темы
+     * Инициализация мобильного меню
+     */
+    initMobileMenu() {
+        const mobileToggle = document.getElementById('mobileMenuToggle');
+        const mobileNav = document.getElementById('mobileNav');
+        
+        if (mobileToggle && mobileNav) {
+            mobileToggle.addEventListener('click', () => {
+                mobileToggle.classList.toggle('active');
+                mobileNav.classList.toggle('active');
+                
+                // Блокируем скролл body при открытии меню
+                if (mobileNav.classList.contains('active')) {
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    document.body.style.overflow = '';
+                }
+                
+                console.log('Mobile menu toggled');
+            });
+            
+            // Закрытие меню при клике на ссылку
+            const navLinks = mobileNav.querySelectorAll('.nav__link:not(.theme-switcher)');
+            navLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    mobileToggle.classList.remove('active');
+                    mobileNav.classList.remove('active');
+                    document.body.style.overflow = '';
+                });
+            });
+            
+            console.log('Mobile menu initialized');
+        } else {
+            console.warn('Mobile menu elements not found');
+        }
+    }
+
+    /**
+     * Создание кнопки переключения темы в header
      */
     createThemeSwitcher() {
-        // Ищем существующий переключатель
-        let switcher = document.getElementById('theme-switcher');
-        
-        if (!switcher) {
-            // Создаём переключатель, если его нет
-            switcher = document.createElement('button');
-            switcher.id = 'theme-switcher';
-            switcher.innerHTML = '<span>Тёмная тема</span>';
-            switcher.title = 'Переключить тему';
-            
-            // Добавляем в навигацию
-            const nav = document.querySelector('.nav__list');
-            if (nav) {
-                const listItem = document.createElement('li');
-                listItem.className = 'nav__item';
-                listItem.appendChild(switcher);
-                nav.appendChild(listItem);
-            }
+        // Проверяем, нет ли уже кнопки
+        if (document.getElementById('theme-switcher')) {
+            this.themeSwitcher = document.getElementById('theme-switcher');
+            return;
         }
 
-        this.themeSwitcher = switcher;
+        // Создаём кнопку
+        const switcher = document.createElement('button');
+        switcher.id = 'theme-switcher';
+        switcher.className = 'theme-switcher';
+        switcher.innerHTML = '<i class="fas fa-moon"></i><span>Тёмная тема</span>';
+        switcher.title = 'Переключить тему';
+        
+        // Ищем место для вставки в header
+        const header = document.querySelector('.header-content') || 
+                      document.querySelector('header') ||
+                      document.querySelector('.header');
+        
+        if (header) {
+            header.appendChild(switcher);
+            this.themeSwitcher = switcher;
+            console.log('Theme switcher created and added to header');
+        } else {
+            console.warn('Header not found, cannot create theme switcher');
+        }
     }
 
     /**
@@ -221,6 +262,28 @@ class ThemeManager {
             this.themeSwitcher.addEventListener('click', () => {
                 this.toggleTheme();
             });
+            console.log('Theme switcher event bound');
+        }
+    }
+
+    /**
+     * НОВЫЙ МЕТОД: Обеспечение наличия кнопки темы в мобильном меню
+     */
+    ensureThemeSwitcherInMobileMenu() {
+        if (!this.themeSwitcher) return;
+        
+        // Проверяем размер экрана
+        if (window.innerWidth <= 768) {
+            const navList = document.querySelector('.nav__list');
+            const themeSwitcherParent = this.themeSwitcher.parentElement;
+            
+            // Если кнопка не в списке навигации, перемещаем её туда
+            if (navList && themeSwitcherParent !== navList && !themeSwitcherParent.classList.contains('nav__item')) {
+                const listItem = document.createElement('li');
+                listItem.className = 'nav__item theme-switcher-item';
+                listItem.appendChild(this.themeSwitcher);
+                navList.appendChild(listItem);
+            }
         }
     }
 
@@ -254,7 +317,52 @@ class ThemeManager {
     }
 
     /**
-     * Применение темы с максимальной агрессивностью
+     * Загрузка URL логотипов из data-атрибутов
+     */
+    loadLogoUrls() {
+        const logoElement = document.querySelector('.logo, #dynamic-logo');
+        if (logoElement) {
+            this.logos.light = logoElement.dataset.lightLogo;
+            this.logos.dark = logoElement.dataset.darkLogo;
+            
+            console.log('Logo URLs loaded:', this.logos);
+        } else {
+            console.warn('Logo element not found');
+        }
+    }
+
+    /**
+     * Обновление логотипа в зависимости от темы с плавной анимацией
+     */
+    updateLogo(theme) {
+        const logoElement = document.getElementById('dynamic-logo');
+        
+        if (!logoElement) {
+            console.warn('Logo element not found');
+            return;
+        }
+
+        const logoPath = this.logos[theme];
+
+        if (!logoPath) {
+            console.warn('Logo path not found for theme:', theme);
+            return;
+        }
+
+        if (logoElement.src !== logoPath) {
+            // Плавная смена логотипа
+            logoElement.style.opacity = '0';
+            
+            setTimeout(() => {
+                logoElement.src = logoPath;
+                logoElement.style.opacity = '1';
+                console.log(`Logo updated to: ${logoPath} for theme: ${theme}`);
+            }, 150);
+        }
+    }
+
+    /**
+     * Применение темы
      */
     applyTheme(theme, updateStorage = true) {
         const htmlElement = document.documentElement;
@@ -289,57 +397,31 @@ class ThemeManager {
     }
 
     /**
-     * Обновление логотипа в зависимости от темы с плавной анимацией
-     */
-    updateLogo(theme) {
-        const logoElements = document.querySelectorAll('.logo, #dynamic-logo, .header_name img');
-        const logoPath = this.logos[theme];
-
-        if (!logoPath) {
-            console.warn('Logo path not found for theme:', theme);
-            return;
-        }
-
-        logoElements.forEach(logo => {
-            if (logo && logoPath && logo.src !== logoPath) {
-                // Плавная смена логотипа
-                logo.style.opacity = '0';
-                
-                setTimeout(() => {
-                    logo.src = logoPath;
-                    logo.style.opacity = '1';
-                    console.log(`Logo updated to: ${logoPath}`);
-                }, 150); // Половина времени перехода
-            }
-        });
-    }
-
-    /**
      * Обновление UI переключателя
      */
     updateSwitcherUI(theme) {
-        if (!this.themeSwitcher) return;
-
-        const iconElement = this.themeSwitcher.querySelector('i');
-        const textElement = this.themeSwitcher.querySelector('span');
+        const themeSwitcher = document.getElementById('theme-switcher');
+        const textElement = document.getElementById('theme-text');
+        
+        if (!themeSwitcher) return;
         
         if (theme === this.themes.dark) {
-            if (iconElement) {
-                iconElement.className = 'fas fa-sun';
-            }
             if (textElement) {
                 textElement.textContent = 'Светлая тема';
+            } else {
+                themeSwitcher.innerHTML = '<span id="theme-text">Светлая тема</span>';
             }
-            this.themeSwitcher.title = 'Переключить на светлую тему';
+            themeSwitcher.title = 'Переключить на светлую тему';
         } else {
-            if (iconElement) {
-                iconElement.className = 'fas fa-moon';
-            }
             if (textElement) {
                 textElement.textContent = 'Тёмная тема';
+            } else {
+                themeSwitcher.innerHTML = '<span id="theme-text">Тёмная тема</span>';
             }
-            this.themeSwitcher.title = 'Переключить на тёмную тему';
+            themeSwitcher.title = 'Переключить на тёмную тему';
         }
+        
+        console.log('Theme switcher UI updated:', theme, textElement?.textContent);
     }
 
     /**
@@ -383,4 +465,4 @@ ThemeManager.init();
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ThemeManager;
 }
-            
+

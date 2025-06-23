@@ -17,60 +17,30 @@
     </button>
     
     <nav class="nav" id="mobileNav">
-        <ul class="nav__list">
+        <div class="nav__list">
             {% if request.path != '/' and current_user and current_user.role == 'referer' %}
-            <li class="nav__item">
+            <div class="nav__item">
                 <a href="{{ url_for('referal.profile') }}" class="nav__link"><i class="fas fa-users"></i>Мои рефералы</a>
-            </li>
+            </div>
             {% endif %}
             {% if current_user and request.path != '/profile' %}
-            <li class="nav__item">
+            <div class="nav__item">
                 <a href="{{ url_for('user.user_profile') }}" class="nav__link"><i class="fas fa-user"></i>Мой профиль</a>
-            </li>
+            </div>
             {% endif %}
             {% if current_user and (current_user.role=='admin' or current_user.role=='manager' or current_user.role=='call-center') and request.path != '/admin' %}
-            <li class="nav__item">
+            <div class="nav__item">
                 <a href="{{ url_for('admin.admin_panel') }}" class="nav__link">Управление рефералами</a>
-            </li>
+            </div>
             {% endif %}
-            <li class="nav__item">
+            <div class="nav__item">
                 <a href="/menu" class="nav__link"><i class="fas fa-th-list"></i> Меню сервисов</a>
-            </li>
-            <!-- Переключатель темы будет добавлен автоматически через JavaScript -->
-        </ul>
+            </div>
+            <div class="nav__item">
+                <button id="theme-switcher" class="nav__link theme-switcher" title="Переключить тему" onclick="window.themeManager && window.themeManager.toggleTheme()">
+                    <span id="theme-text">Тёмная тема</span>
+                </button>
+            </div>
+        </div>
     </nav>
 </header>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-    const mobileNav = document.getElementById('mobileNav');
-    
-    if (mobileMenuToggle && mobileNav) {
-        mobileMenuToggle.addEventListener('click', function() {
-            // Переключаем класс active у кнопки
-            mobileMenuToggle.classList.toggle('active');
-            
-            // Переключаем класс active у навигации
-            mobileNav.classList.toggle('active');
-        });
-        
-        // Закрываем меню при клике на ссылку
-        const navLinks = mobileNav.querySelectorAll('.nav__link');
-        navLinks.forEach(link => {
-            link.addEventListener('click', function() {
-                mobileMenuToggle.classList.remove('active');
-                mobileNav.classList.remove('active');
-            });
-        });
-        
-        // Закрываем меню при клике вне его
-        document.addEventListener('click', function(event) {
-            if (!mobileMenuToggle.contains(event.target) && !mobileNav.contains(event.target)) {
-                mobileMenuToggle.classList.remove('active');
-                mobileNav.classList.remove('active');
-            }
-        });
-    }
-});
-</script>

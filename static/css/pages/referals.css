@@ -100,10 +100,6 @@ html, body {
     vertical-align: middle;
 }
 
-.referals-table tbody tr:hover {
-    background-color: #f8f9fa;
-}
-
 .empty-state {
     flex: 1;
     display: flex;

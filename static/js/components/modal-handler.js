@@ -98,8 +98,6 @@ function openModal(modalId) {
         console.log('Modal found, opening:', modal);
         modal.style.display = 'block';
         document.body.style.overflow = 'hidden';
-        
-        // Добавляем класс для CSS анимации если нужно
         modal.classList.add('modal-open');
     } else {
         console.error('Modal not found:', modalId);

@@ -1,9 +1,11 @@
 button {
-    background-color: var(--golden-color);
-    color: var(--white);
+    /* border-color: var(--golden-color); */
+    background-color: transparent;
+    color: var(--text-primary);
     padding: 6px 12px;
     border: none;
     cursor: pointer;
+    border: 2px solid var(--golden-color);
     border-radius: var(--border-radius);
     transition: background-color var(--transition-normal);
 }
@@ -13,12 +15,12 @@ button:hover:enabled {
 }
 
 button:disabled {
-    background-color: #ccc;
+    background-color: var(--disabled-color);
     cursor: not-allowed;
 }
 
 button:hover:disabled {
-    background-color: #ccc;
+    background-color: var(--disabled-color);
     cursor: not-allowed;
 }
 

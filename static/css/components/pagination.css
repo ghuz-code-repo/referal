@@ -74,8 +74,9 @@
 
 .page-item.disabled .page-link {
     color: var(--text-muted, #6c757d);
-    background: var(--bg-disabled, #f8f9fa);
-    border-color: var(--border-disabled, #dee2e6);
+    /* background: var(--bg-disabled, #f8f9fa); */
+    /* border-color: var(--border-disabled, #dee2e6); */
+    background: transparent;
     cursor: not-allowed;
 }
 

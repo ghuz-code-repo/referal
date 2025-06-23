@@ -17,10 +17,8 @@ th {
     color: white;
 }
 
-
-
 tr:hover {
-    background-color: #ddd;
+    background-color: var(--table-hover);
 }
 
 .referal-table-td{
