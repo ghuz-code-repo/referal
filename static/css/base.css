@@ -94,3 +94,105 @@ input, select, textarea {
 .field-label, label {
     color: var(--text-primary) !important;
 }
+
+.ui-datepicker {
+  font-size: 1em !important;
+  padding: 0.5em 0.7em !important;
+  min-width: 220px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 16px 0 #0004 !important;
+}
+.ui-datepicker-header {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  padding: 0.5em 0.2em !important;
+}
+.ui-datepicker-title {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 13px !important;
+  max-width: 100%;
+  justify-content: space-between !important;
+}
+select.ui-datepicker-month,
+select.ui-datepicker-year {
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+  font-size: 1em !important;
+  margin: 0 2px !important;
+  height: 2em !important;
+}
+.ui-state-default,
+.ui-widget-content .ui-state-default {
+  border-radius: 4px !important;
+  width: 2.2em !important;
+  height: 2.2em !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s;
+}
+.ui-state-default:hover,
+.ui-widget-content .ui-state-default:hover {
+  filter: brightness(1.1);
+}
+.ui-state-active,
+.ui-widget-content .ui-state-active {
+  font-weight: bold !important;
+}
+.ui-datepicker-calendar th, 
+.ui-datepicker-calendar td {
+  padding: 0 !important;
+}
+.ui-datepicker-calendar td {
+  text-align: center !important;
+}
+.ui-datepicker-calendar .ui-state-default {
+  width: 100% !important;
+  height: 2.2em !important;
+  min-width: 2.2em !important;
+  min-height: 2.2em !important;
+}
+.ui-datepicker-buttonpane,
+.ui-datepicker-prev,
+.ui-datepicker-next {
+  display: none !important;
+}
+/* Тема */
+.ui-datepicker{
+  background: var(--form-section-background) !important;
+  color: var(--text-primary) !important;
+}
+ .ui-datepicker-header {
+  background: var(--form-section-background) !important;
+  color: var(--text-primary) !important;
+  border-color: #bbb !important;
+}
+ select.ui-datepicker-month,
+ select.ui-datepicker-year {
+  background: var(--form-section-background) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid #bbb !important;
+}
+ .ui-state-default,
+ .ui-widget-content .ui-state-default {
+  background: var(--form-section-background) !important;
+  color: var(--text-primary) !important;
+  border: 0px solid #bbb !important;
+}
+ .ui-state-default:hover,
+ .ui-widget-content .ui-state-default:hover {
+  background: var(--hover-color)!important;
+  color: var(--form-section-background) !important;
+}
+ .ui-state-active,
+ .ui-widget-content .ui-state-active {
+  background: var(--golden-color) !important;
+  color: var(--form-section-background) !important;
+}
+ .ui-state-highlight,
+ .ui-widget-content .ui-state-highlight {
+  color: var(--hover-color) !important;
+}

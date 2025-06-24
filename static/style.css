@@ -1,7 +1,7 @@
 /* Общие CSS переменные для всего проекта */
 :root {
     --main-font: 'Arial', sans-serif;
-    
+    --background-blur: blur(10px);
     /* Базовые цвета для светлой темы */
     --main-color: #333;
     --background-color: #f5f5f5;
@@ -57,6 +57,7 @@
 
 /* Тёмная тема - более тёмные и контрастные цвета */
 .dark-theme {
+    --background-blur: blur(4px);
     --main-color: #ffffff;
     --background-color: #0f0f0f;
     --body-background: #000000;
@@ -86,7 +87,7 @@
     --table-hover: #2a2a2a;
     --table-background: #1a1a1a;
     --table-header-background: #2a2a2a;
-    --input-background: #4b4b4b;
+    --input-background: #1a1a1a;
     --input-border: #3a3a3a;
     --input-focus-border: #ffd700;
     --input-focus-shadow: rgba(255, 215, 0, 0.25);
