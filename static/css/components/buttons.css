@@ -12,6 +12,7 @@ button {
 
 button:hover:enabled {
     background-color: var(--hover-color);
+    color: var(--background-color);
 }
 
 button:disabled {

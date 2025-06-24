@@ -409,14 +409,14 @@ class ThemeManager {
             if (textElement) {
                 textElement.textContent = 'Светлая тема';
             } else {
-                themeSwitcher.innerHTML = '<span id="theme-text">Светлая тема</span>';
+                themeSwitcher.innerHTML = 'Светлая тема';
             }
             themeSwitcher.title = 'Переключить на светлую тему';
         } else {
             if (textElement) {
                 textElement.textContent = 'Тёмная тема';
             } else {
-                themeSwitcher.innerHTML = '<span id="theme-text">Тёмная тема</span>';
+                themeSwitcher.innerHTML = 'Тёмная тема';
             }
             themeSwitcher.title = 'Переключить на тёмную тему';
         }
