@@ -1,6 +1,7 @@
 """Маршруты для администрирования"""
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from services import fetch_data_from_mysql
 from .auth_routes import get_current_user
 from models import *
 from services import withdrawal_service
@@ -58,7 +59,7 @@ def admin_panel():
     
     # Базовый запрос
     query = Referal.query
-    
+
     # Применяем фильтры
     if status_filter:
         if status_filter == '-1':
@@ -91,13 +92,27 @@ def admin_panel():
     if user_filter:
         query = query.filter(User.login.ilike(f'%{user_filter}%'))
     
+    # Для сортировки по user.login делаем join с User
+    need_user_join = False
+    need_referal_data_join = False
+    if sort_fields:
+        for sort_field in sort_fields:
+            if sort_field['field'] == 'user':
+                need_user_join = True
+            if sort_field['field'] in ['name', 'phone', 'contract']:
+                need_referal_data_join = True
+    if need_user_join:
+        query = query.join(User, Referal.user_id == User.id)
+    if need_referal_data_join:
+        query = query.join(ReferalData, Referal.referal_data)
+
     # Применяем сортировку
     if sort_fields:
         order_by_clauses = []
         for sort_field in sort_fields:
             field = sort_field['field']
             order = sort_field['order']
-            
+
             if field == 'name':
                 clause = ReferalData.full_name.desc() if order == 'desc' else ReferalData.full_name.asc()
             elif field == 'phone':
@@ -112,9 +127,9 @@ def admin_panel():
                 clause = Referal.withdrawal_amount.desc() if order == 'desc' else Referal.withdrawal_amount.asc()
             else:
                 continue
-            
+
             order_by_clauses.append(clause)
-        
+
         if order_by_clauses:
             query = query.order_by(*order_by_clauses)
     else:
@@ -175,20 +190,50 @@ def update_withdrawal_stage(referal_id):
     rejection_reason = request.form.get('rejection_reason', '')
     
     referal.status_id = withdrawal_stage
-    referal.status_name = Status.query.get(withdrawal_stage).name
+    # referal.status_name = Status.query.get(withdrawal_stage).name
     
+    if withdrawal_stage == 1:
+        utils.send_email(
+            os.getenv('MAIN_ADMIN_EMAIL'),
+            'Реферал поступил на проверку отделом аналитики',
+            f'Реферал от {user.user_data.full_name} поступил на проверку отделу аналитики:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+        )
+    
+    if withdrawal_stage == 20:
+        utils.send_email(
+            os.getenv('MAIN_ADMIN_EMAIL'),
+            'Реферал прошёл проверку колл-центром',
+            f'Реферал от {user.user_data.full_name} прошёл проверку колл-центром:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+        )
+        
     if withdrawal_stage == 10:
         utils.send_email(
             os.getenv('CALL-CENTER-MANAGER_EMAIL'),
             'Запрос на проверку реферала',
-            f'Пожалуйста созвонитесь с рефералом от {user.user_data.full_name}: ФИО: {referal.referal_data.full_name} Телефон: {referal.referal_data.phone_number} для проверки его данных.\n'
+            f'Пожалуйста созвонитесь с рефералом от {user.user_data.full_name}: ФИО: {referal.referal_data.full_name} Телефон: {referal.referal_data.phone_number} для проверки его данных после чего обязательно измените статус реферала в системе.\n'
         )
+        
     if withdrawal_stage == 200:
         utils.send_email(
-            os.getenv('CALL-CENTER-MANAGER_EMAIL'),
+            os.getenv('MANAGER_EMAIL'),
             'Запрос на выплату рефереру',
             f'{user.user_data.full_name} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
         )
+        
+    if withdrawal_stage == 300:
+        utils.send_email(
+            os.getenv('MAIN_ADMIN_EMAIL'),
+            'Реферал был оаплачен рефереру',
+            f'Реферал от {user.user_data.full_name} был помечен как оплаченый:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+        )
+
+    if withdrawal_stage == 500:
+        utils.send_email(
+            os.getenv('MAIN_ADMIN_EMAIL'),
+            'Реферал не прошёл проверку',
+            f'Реферал от {user.user_data.full_name} не прошёл проверку:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+        )
+    
     if withdrawal_stage == 500:
         referal.rejection_reason = rejection_reason
         user = User.query.get(referal.user_id)
@@ -215,18 +260,11 @@ def update_withdrawal_stage(referal_id):
     else:
         # Иначе просто возвращаемся на админ панель
         return redirect(url_for('admin.admin_panel'))
-    flash('Статус реферала обновлен успешно', 'success')
-    
-    # Восстанавливаем параметры фильтрации из формы
-    return_params = {}
-    for key in request.form.keys():
-        if key.startswith('return_'):
-            param_name = key.replace('return_', '')
-            return_params[param_name] = request.form[key]
-    
-    # Если есть сохраненные параметры, используем их для редиректа
-    if return_params:
-        return redirect(url_for('admin.admin_panel', **return_params))
-    else:
-        # Иначе просто возвращаемся на админ панель
-        return redirect(url_for('admin.admin_panel'))
+
+@admin_bp.route('/force_update', methods=['GET'])
+def force_update():
+    """Принудительное обновление всех рефералов."""
+    user = get_current_user()
+    if not user or user.role != 'admin':
+        flash('Доступ запрещен', 'error')
+    fetch_data_from_mysql()

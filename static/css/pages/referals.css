@@ -1,7 +1,9 @@
 /* Фиксированный layout для страницы рефералов */
 html, body {
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     margin: 0;
     padding: 0;
 }
@@ -9,18 +11,20 @@ html, body {
 .page-wrapper {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: 100vh;
+    height: auto;
 }
 
 .main {
     flex: 1;
-    overflow: hidden;
+    overflow: visible;
     padding: 20px;
     background-color: rgba(0, 0, 0, 0) !important; /* Лёгкий фон для контраста */
 }
 
 .container {
-    min-height: 98%;
+    min-height: 0;
+    height: auto;
     display: flex;
     flex-direction: column;
     background-color: rgba(0, 0, 0, 0) !important; /* Лёгкий фон для контраста */

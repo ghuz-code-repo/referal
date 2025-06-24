@@ -397,7 +397,7 @@
                                                             {% else %}
                                                                 <!-- Если статус не 300, показываем только текущий статус -->
                                                                 <option value="{{ referal.status_id }}" selected disabled>
-                                                                    {{ referal.status_name }} (недоступно для изменения)
+                                                                    {{ status.name }} (недоступно для изменения)
                                                                 </option>
                                                             {% endif %}
                                                         {% elif current_user.role == 'call-center' %}
@@ -533,30 +533,64 @@
         const clearStatusFilterBtn = document.querySelector('.clear-filter-btn[data-filter="status"]');
         if (clearStatusFilterBtn) {
             clearStatusFilterBtn.addEventListener('click', function() {
-                // Очищаем сохраненный статус из localStorage
                 localStorage.removeItem('admin_last_status_filter');
-                
-                // Получаем текущий URL и параметры
-                const currentUrl = new URL(window.location);
-                const params = new URLSearchParams(currentUrl.search);
-                
+                // Формируем новый URL вручную, чтобы избежать любых редиректов на /referal/
+                let base = window.location.origin + '/referal/admin';
+                let params = [];
+
                 // Роль-специфичная логика очистки фильтра
                 {% if current_user.role == 'admin' %}
-                    // Для админа - показать все статусы
-                    params.set('status', '-1');
+                    params.push('status=-1');
                 {% elif current_user.role == 'manager' %}
-                    // Для менеджера - показать все доступные статусы (200, 300, 500)
-                    params.set('status', 'all_manager');
-                {% elif current_user.role == 'call-center' %}
-                    // Для call-center - убрать фильтрацию по статусу вообще
-                    params.delete('status');
+                    params.push('status=all_manager');
                 {% endif %}
-                
-                // Перенаправляем с новыми параметрами
-                currentUrl.search = params.toString();
-                window.location.href = currentUrl.toString();
+
+                // Сохраняем остальные фильтры кроме status
+                const currentParams = new URLSearchParams(window.location.search);
+                ['name', 'phone', 'contract', 'user', 'contact_id', 'page', 'per_page', 'sort'].forEach(param => {
+                    if (currentParams.has(param)) {
+                        params.push(param + '=' + encodeURIComponent(currentParams.get(param)));
+                    }
+                });
+
+                // Собираем итоговый URL
+                let finalUrl = base;
+                if (params.length > 0) {
+                    finalUrl += '?' + params.join('&');
+                }
+                window.location.replace(finalUrl);
             });
         }
+
+        // Фикс для применения любого фильтра: всегда отправлять форму на /referal/admin
+        document.querySelectorAll('.header-filter').forEach(function(input) {
+            input.addEventListener('change', function(e) {
+                // Найти форму (или собрать параметры вручную)
+                let base = window.location.origin + '/referal/admin';
+                let params = [];
+
+                // Собираем все значения фильтров
+                document.querySelectorAll('.header-filter').forEach(function(f) {
+                    if (f.value && f.getAttribute('data-filter')) {
+                        params.push(f.getAttribute('data-filter') + '=' + encodeURIComponent(f.value));
+                    }
+                });
+
+                // Сохраняем сортировку, если есть
+                const currentParams = new URLSearchParams(window.location.search);
+                ['sort', 'page', 'per_page'].forEach(param => {
+                    if (currentParams.has(param)) {
+                        params.push(param + '=' + encodeURIComponent(currentParams.get(param)));
+                    }
+                });
+
+                let finalUrl = base;
+                if (params.length > 0) {
+                    finalUrl += '?' + params.join('&');
+                }
+                window.location.replace(finalUrl);
+            });
+        });
     });
     </script>
 

@@ -8,7 +8,7 @@
     <td class="referal-table-td"  >{{ referal.withdrawal_amount if referal.withdrawal_amount else '0' }}</td>
     <td class="referal-table-td"  style="flex">
         <form method="POST" action="{{ url_for('referal.request_withdrawal', referal_id=referal.id) }}">
-            <button type="submit" class="table_button" {{ 'disabled' if referal.balance_pending_withdrawal or not referal.withdrawal_amount else '' }}>
+            <button type="submit" class="table_button" {{ 'disabled' if referal.balance_pending_withdrawal or not referal.withdrawal_amount or referal.referal_data.passport_number=='' or referal.referal_data.passport_giver=='' or referal.referal_data.passport_adress=='' else '' }}>
                 {{ 'Уже отправлено' if referal.balance_pending_withdrawal else 'Отправить на проверку' }}
             </button>
         </form>

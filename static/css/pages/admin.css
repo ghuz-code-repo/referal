@@ -1,7 +1,9 @@
 /* Фиксированный layout для страницы админа */
 html, body {
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     margin: 0;
     padding: 0;
 }
@@ -9,17 +11,19 @@ html, body {
 .page-wrapper {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: 100vh;
+    height: auto;
 }
 
 .main {
     flex: 1;
-    overflow: hidden;
+    overflow: visible;
     padding: 20px;
 }
 
 .container {
-    height: 100%;
+    min-height: 0;
+    height: auto;
     display: flex;
     flex-direction: column;
 }

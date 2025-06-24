@@ -29,7 +29,7 @@ def fetch_data_from_mysql():
     # Execute contacts task first
     print("\n=== CONTACTS TASK ===")
     contacts_result = _fetch_and_process_contacts_task(mysql_config, app.app_context())
-    print(f"Contacts task result: {contacts_result}")
+    # print(f"Contacts task result: {contacts_result}")
     
     # Execute deals task second
     print("\n=== DEALS TASK ===")
@@ -280,7 +280,7 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                             emails = [email.strip() for email in email_raw.split(',') if email.strip()]
                             if emails:
                                 processed_email = emails[0]
-                                print(f"DEBUG: Processed email for contact {contact_id}: {processed_email}")
+                                # print(f"DEBUG: Processed email for contact {contact_id}: {processed_email}")
                         
                         # Handle multiple phone numbers separated by commas
                         if ',' in phone_number_raw:
@@ -321,7 +321,7 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                                 unformattable_phone_details_list.append({'id': contact_id, 'raw_phone': phone_number_raw})
                                 skipped_unformattable_phone_in_batch += 1
                     
-                    print(f"{task_name}: Expanded {len(expanded_contacts)} contact records from {current_mysql_batch_size} MySQL rows")
+                    # print(f"{task_name}: Expanded {len(expanded_contacts)} contact records from {current_mysql_batch_size} MySQL rows")
                     
                     # Show sample of expanded data
                     if batch_number == 1 and expanded_contacts:
@@ -342,7 +342,7 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                         try:
                             # Check for duplicate phones globally (across all batches)
                             if formatted_phone_number in global_processed_phones:
-                                print(f"{task_name}: Phone {formatted_phone_number} already processed globally, skipping")
+                                # print(f"{task_name}: Phone {formatted_phone_number} already processed globally, skipping")
                                 skipped_in_batch_conflict_in_batch += 1
                                 continue
                             

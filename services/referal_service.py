@@ -174,8 +174,7 @@ def update_deal_info(user):
     # Получение ID пользователя
     user_id = user.id
     # Получение списка всех рефералов пользователя
-    referals = Referal.query.filter_by(user_id=user_id).all()
-
+    referals = Referal.query.filter_by(user_id=user_id).join(ReferalData).filter(ReferalData.referal_id == Referal.id).all()
     # Для каждого реферала
     for referal in referals:
         # Обновление информации о сделке и баланса
