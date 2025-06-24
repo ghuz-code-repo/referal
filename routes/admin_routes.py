@@ -190,7 +190,7 @@ def update_withdrawal_stage(referal_id):
     rejection_reason = request.form.get('rejection_reason', '')
     
     referal.status_id = withdrawal_stage
-    # referal.status_name = Status.query.get(withdrawal_stage).name
+    referal.status_name = Status.query.get(withdrawal_stage).name
     
     if withdrawal_stage == 1:
         utils.send_email(
@@ -199,50 +199,56 @@ def update_withdrawal_stage(referal_id):
             f'Реферал от {user.user_data.full_name} поступил на проверку отделу аналитики:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
     
-    if withdrawal_stage == 20:
+    elif withdrawal_stage == 20:
         utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал прошёл проверку колл-центром',
             f'Реферал от {user.user_data.full_name} прошёл проверку колл-центром:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
         
-    if withdrawal_stage == 10:
+    elif withdrawal_stage == 10:
         utils.send_email(
-            os.getenv('CALL-CENTER-MANAGER_EMAIL'),
+            os.getenv('CALL_CENTER_MANAGER_EMAIL'),
             'Запрос на проверку реферала',
             f'Пожалуйста созвонитесь с рефералом от {user.user_data.full_name}: ФИО: {referal.referal_data.full_name} Телефон: {referal.referal_data.phone_number} для проверки его данных после чего обязательно измените статус реферала в системе.\n'
         )
         
-    if withdrawal_stage == 200:
-        utils.send_email(
-            os.getenv('MANAGER_EMAIL'),
-            'Запрос на выплату рефереру',
-            f'{user.user_data.full_name} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
-        )
-        
-    if withdrawal_stage == 300:
+    elif withdrawal_stage == 200:
+        print(f"DEBUG: Withdrawal stage set to 200 for referal {referal.id} by user {user.login}")
+        payment_email = os.getenv('PAYMENT_MANAGER_EMAIL')
+        print(f"DEBUG: PAYMENT_MANAGER_EMAIL from env: {payment_email}")
+        if payment_email:
+            utils.send_email(
+                payment_email,
+                'Запрос на выплату рефереру',
+                f'{user.user_data.full_name} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
+            )
+            print(f"DEBUG: Sending email to {payment_email} for referal {referal.id} with amount {referal.withdrawal_amount}")
+        else:
+            print("ERROR: PAYMENT_MANAGER_EMAIL is not set in environment variables!")
+
+
+    elif withdrawal_stage == 300:
         utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
-            'Реферал был оаплачен рефереру',
+            'Реферал был оплачен рефереру',
             f'Реферал от {user.user_data.full_name} был помечен как оплаченый:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
+        if not referal.balance_withdrawn:
+            user = User.query.get(referal.user_id)
+            user.pending_withdrawal -= referal.withdrawal_amount
+            user.total_withdrawal += referal.withdrawal_amount
+            referal.balance_withdrawn = True
 
-    if withdrawal_stage == 500:
+    elif withdrawal_stage == 500:
         utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал не прошёл проверку',
             f'Реферал от {user.user_data.full_name} не прошёл проверку:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
-    
-    if withdrawal_stage == 500:
         referal.rejection_reason = rejection_reason
         user = User.query.get(referal.user_id)
         user.pending_withdrawal -= referal.withdrawal_amount
-    elif withdrawal_stage == 200 and not referal.balance_withdrawn:
-        user = User.query.get(referal.user_id)
-        user.pending_withdrawal -= referal.withdrawal_amount
-        user.total_withdrawal += referal.withdrawal_amount
-        referal.balance_withdrawn = True
 
     db.session.commit()
     flash('Статус реферала обновлен успешно', 'success')

@@ -1,14 +1,34 @@
 """Утилиты для приложения - только необходимые функции"""
 
 import base64
-from datetime import datetime, time
+from datetime import datetime
+import threading
+import time
 import os
 import re
 import smtplib
 from typing import List, Optional, Tuple
 
-from flask import logging
+from flask import current_app, logging
 import requests
+
+# Вспомогательная функция для запуска задач в отдельном потоке с контекстом Flask
+def run_async_task(func, *args, **kwargs):
+    app_context = None
+    try:
+        # Попытка получить текущий контекст приложения, если он существует
+        if current_app:
+            app_context = current_app.app_context()
+            app_context.push()
+        func(*args, **kwargs)
+    except Exception as e:
+        # Здесь вы можете добавить логирование ошибки,
+        # например, using current_app.logger.error(f"Async task failed: {e}")
+        # Но учтите, что current_app может быть недоступен здесь без app_context()
+        print(f"Ошибка в асинхронной задаче {func.__name__}: {e}")
+    finally:
+        if app_context:
+            app_context.pop()
 
 
 def month_name_genitive(month_number):
@@ -151,19 +171,16 @@ def format_international_number(phone: str) -> Optional[str]:
     
     return None
 
-
-def send_sms(phone_number, user_full_name):
+def _send_sms_sync(phone_number, user_full_name):
     """
-    Отправляет SMS-сообщение через Playmobile API.
-    
-    Args:
-        phone_number (str): Номер телефона получателя (формат +998 XX XXX XX XX).
-        user_full_name (str): Полное имя пользователя, который рекомендует.
+    Внутренняя функция для синхронной отправки SMS-сообщения через Playmobile API.
+    Предназначена для вызова из send_sms_async.
     """
     # Clean the phone number - remove spaces and ensure it starts with "+998"
     clean_phone = phone_number.replace(" ", "").replace("+", "")
     if not clean_phone.startswith("998"):
         print(f"Invalid phone number format: {phone_number}")
+        # Можно использовать current_app.logger.error, если контекст доступен
         return False
         
     # Ensure user_full_name is properly decoded from Base64 if needed
@@ -176,7 +193,7 @@ def send_sms(phone_number, user_full_name):
             try:
                 user_full_name = base64.b64decode(user_full_name).decode('utf-8')
             except:
-                pass  # Keep as is if all decoding attempts fail
+                pass   # Keep as is if all decoding attempts fail
     
     # SMS text with recommendation
     sms_text = f"Вы были рекомендованы {user_full_name}. Вам предоставлена персональная скидка. Уточните удобное место и время встречи по номеру {os.getenv('GH_PHONE_NUMBER')}"
@@ -188,15 +205,16 @@ def send_sms(phone_number, user_full_name):
     username = os.getenv('SMS_API_USERNAME')
     password = os.getenv('SMS_API_PASSWORD')
     originator = os.getenv('SMS_API_ORIGINATOR')
-    message_id = (datetime.now().strftime("%Y%m%d%H%M%S").encode('utf-8')).decode('utf-8')  # Unique message ID
+    message_id = (datetime.now().strftime("%Y%m%d%H%M%S").encode('utf-8')).decode('utf-8')   # Unique message ID
+    
     # Format payload according to Playmobile's requirements
     payload = {
         "messages": [
             {
-                "recipient": clean_phone,  # Correctly formatted
+                "recipient": clean_phone,   # Correctly formatted
                 "message-id": message_id,
                 "sms": {
-                    "originator": originator,  # Ensure this is a string
+                    "originator": originator,   # Ensure this is a string
                     "content": {
                         "text": sms_text
                     }
@@ -205,13 +223,6 @@ def send_sms(phone_number, user_full_name):
         ]
     }
     
-    # # Set up authentication
-    # auth = (username, password)
-    
-    # headers = {
-    #     'Content-Type': 'application/json'
-    # }
-    
     try:
         userpass = username + ':' + password
         b64Val = base64.b64encode(userpass.encode('utf-8')).decode('utf-8')
@@ -219,13 +230,8 @@ def send_sms(phone_number, user_full_name):
         headers = {
             "Authorization": "Basic %s" % b64Val,
             "Content-Type": "application/json",
-            "charset": "UTF-8"  # Explicitly set charset as mentioned in docs
+            "charset": "UTF-8"   # Explicitly set charset as mentioned in docs
         }
-
-        # Print debug info
-        #print(f"Sending to: {api_url}")
-        #print(f"Headers: {headers}")
-        #print(f"Payload: {payload}")
 
         response = requests.post(api_url, headers=headers, json=payload, timeout=30)
 
@@ -243,10 +249,19 @@ def send_sms(phone_number, user_full_name):
         print(f"Error connecting to Playmobile: {e}")
         return False
     
-    
-def send_email(recipient_email, subject, body):
+def send_sms(phone_number, user_full_name):
     """
-    Отправляет email сообщение с использованием SMTP.
+    Запускает отправку SMS в отдельном потоке.
+    """
+    thread = threading.Thread(target=run_async_task, args=(_send_sms_sync, phone_number, user_full_name))
+    thread.daemon = True # Позволяет программе завершиться, даже если поток еще работает
+    thread.start()
+
+
+def _send_email_sync(recipient_email, subject, body):
+    """
+    Внутренняя функция для синхронной отправки email сообщения.
+    Предназначена для вызова из send_email_async.
     """
     from email.mime.text import MIMEText
     msg = MIMEText(body)
@@ -262,6 +277,19 @@ def send_email(recipient_email, subject, body):
             print("Email sent successfully")
     except Exception as e:
         print(f"Failed to send email: {e}")
-        time.sleep(10)
-        send_email(recipient_email, subject, body)
-        raise e
+        # Убрана рекурсивная попытка, т.к. это плохая практика в асинхронных задачах
+        # и может привести к бесконечному циклу.
+        # Вместо этого можно добавить более умную логику повторных попыток
+        # с задержками, если это необходимо.
+        # print(f"Retrying email send in 10 seconds...")
+        # time.sleep(10)
+        # _send_email_sync(recipient_email, subject, body) # Это может быть бесконечная рекурсия
+        # Также можно использовать current_app.logger.error, если контекст доступен
+        
+def send_email(recipient_email, subject, body):
+    """
+    Запускает отправку email в отдельном потоке.
+    """
+    thread = threading.Thread(target=run_async_task, args=(_send_email_sync, recipient_email, subject, body))
+    thread.daemon = True # Позволяет программе завершиться, даже если поток еще работает
+    thread.start()
