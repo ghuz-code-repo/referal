@@ -397,13 +397,13 @@
                                                             {% else %}
                                                                 <!-- Если статус не 300, показываем только текущий статус -->
                                                                 <option value="{{ referal.status_id }}" selected disabled>
-                                                                    {{ status.name }} (недоступно для изменения)
+                                                                    {{ referal.status_name }} (недоступно для изменения)
                                                                 </option>
                                                             {% endif %}
                                                         {% elif current_user.role == 'call-center' %}
                                                             <!-- Call-center видят только статусы 10 и 20 -->
                                                             {% for status in statuses %}
-                                                                {% if status.id in [20] %}
+                                                                {% if status.id in [20, 500] %}
                                                                 <option value="{{ status.id }}" 
                                                                         {{ 'selected' if status.id == referal.status_id else '' }}>
                                                                     {{ status.name }}
