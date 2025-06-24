@@ -7,10 +7,14 @@
             <span class="close" id="closeRejectionModal" style="cursor:pointer;">&times;</span>
         </div>
         <div class="modal-body">
-            <textarea id="rejectionReasonInput" class="form-input input" rows="3" placeholder="Укажите причину отказа" required></textarea>
-            <div style="margin-top: 1em; text-align: right;">
-                <button type="button" id="submitRejectionReason" class="btn button button--primary">Отправить</button>
-            </div>
+            <textarea id="rejectionReasonInput" class="form-input input" rows="3" placeholder="Укажите причину отказа" required>{{referal.rejection_reason if referal.rejection_reason else ''}}</textarea>
+            {% if current_user %}
+                {%if current_user.role and current_user.role in ['admin', 'manager', 'call-center']%}
+                    <div style="margin-top: 1em; text-align: right;">
+                        <button type="button" id="submitRejectionReason" class="btn button button--primary">Отправить</button>
+                    </div>
+                {% endif %}
+            {% endif %}
         </div>
     </div>
 </div>

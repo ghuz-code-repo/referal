@@ -75,7 +75,7 @@ def profile():
             query = query.filter(Referal.status_id == int(status_filter))
     else:
         # Когда выбрано "Все статусы", исключаем "Оплачено" (300) и "Отказано" (500)
-        query = query.filter(Referal.status_id.notin_([300, 500]))
+        query = query.filter(Referal.status_id)
     
     if name_filter:
         query = query.filter(ReferalData.full_name.ilike(f'%{name_filter}%'))

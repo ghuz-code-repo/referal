@@ -224,6 +224,7 @@ select.ui-datepicker-year {
 }
 
 #rejectionReasonInput {
+    width: 100%;
     min-height: 30vh;
 }
 

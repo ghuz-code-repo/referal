@@ -16,6 +16,11 @@
     margin-top: 5px;">
             Заполнить данные
         </button>
+        {% if referal.status_id == 500 %}
+        <button typr='button' class="update-status-btn" data-referal-id="{{ referal.id }}" style="min-width: 100%; margin-top: 5px;">
+            Причина октаза
+        </button>
+        {%endif%}
         {% include 'modals/document_form_modal.html' %}
     </td>
 

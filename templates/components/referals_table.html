@@ -239,6 +239,7 @@
                 {% if referals %}
                     {% for referal in referals %}
                         {% include 'components/referal_table_row.html' %}
+                        {% include 'modals/rejection_reason_modal.html' %}
                     {% endfor %}
                 {% else %}
                     <tr>
