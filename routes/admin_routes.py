@@ -180,17 +180,46 @@ def admin_panel():
 @admin_bp.route('/update_withdrawal_stage/<int:referal_id>', methods=['POST'])
 def update_withdrawal_stage(referal_id):
     """Обновление статуса реферала."""
-    user = get_current_user()
-    if not user or user.role not in ['admin', 'manager', 'call-center']:
+    current_user = get_current_user()
+    if not current_user or current_user.role not in ['admin', 'manager', 'call-center']:
         flash('Доступ запрещен', 'error')
         return redirect(url_for('referal.profile'))
 
     referal = Referal.query.get_or_404(referal_id)
     withdrawal_stage = int(request.form.get('withdrawal_stage'))
-    rejection_reason = request.form.get('rejection_reason', '')
+    user = User.query.get(referal.user_id)
     
-    referal.status_id = withdrawal_stage
-    referal.status_name = Status.query.get(withdrawal_stage).name
+    from flask import session
+    filter_keys = ['status', 'name', 'phone', 'contract', 'contact_id', 'user', 'per_page', 'sort', 'page']
+    return_params = {}
+    # 1. Сначала пробуем получить из формы (скрытые поля)
+    for key in request.form.keys():
+        if key.startswith('return_'):
+            param_name = key.replace('return_', '')
+            return_params[param_name] = request.form[key]
+    # 2. Если не переданы, пробуем получить из referer (URL)
+    if not return_params:
+        referer_url = request.headers.get('Referer', '')
+        from urllib.parse import urlparse, parse_qs
+        if referer_url:
+            parsed = urlparse(referer_url)
+            qs = parse_qs(parsed.query)
+            for key in filter_keys:
+                val = qs.get(key)
+                if val:
+                    return_params[key] = val[0]
+    # 3. Если не переданы, пробуем получить из сессии
+    if not return_params:
+        for key in filter_keys:
+            val = session.get(f'admin_filter_{key}')
+            if val is not None:
+                return_params[key] = val
+
+    # 4. Сохраняем фильтры в сессии для будущих переходов
+    for key in filter_keys:
+        if key in return_params:
+            session[f'admin_filter_{key}'] = return_params[key]
+
     
     if withdrawal_stage == 1:
         utils.send_email(
@@ -217,15 +246,14 @@ def update_withdrawal_stage(referal_id):
         print(f"DEBUG: Withdrawal stage set to 200 for referal {referal.id} by user {user.login}")
         payment_email = os.getenv('PAYMENT_MANAGER_EMAIL')
         print(f"DEBUG: PAYMENT_MANAGER_EMAIL from env: {payment_email}")
-        if payment_email:
-            utils.send_email(
-                payment_email,
-                'Запрос на выплату рефереру',
-                f'{user.user_data.full_name} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
-            )
-            print(f"DEBUG: Sending email to {payment_email} for referal {referal.id} with amount {referal.withdrawal_amount}")
-        else:
-            print("ERROR: PAYMENT_MANAGER_EMAIL is not set in environment variables!")
+
+        utils.send_email(
+            os.getenv('PAYMENT_MANAGER_EMAIL'),
+            'Запрос на выплату рефереру',
+            f'{user.user_data.full_name} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
+        )
+        print(f"DEBUG: Sending email to {payment_email} for referal {referal.id} with amount {referal.withdrawal_amount}")
+
 
 
     elif withdrawal_stage == 300:
@@ -235,36 +263,42 @@ def update_withdrawal_stage(referal_id):
             f'Реферал от {user.user_data.full_name} был помечен как оплаченый:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
         if not referal.balance_withdrawn:
-            user = User.query.get(referal.user_id)
             user.pending_withdrawal -= referal.withdrawal_amount
             user.total_withdrawal += referal.withdrawal_amount
             referal.balance_withdrawn = True
 
     elif withdrawal_stage == 500:
+        rejection_reason = request.form.get('rejection_reason', '')
+        if not rejection_reason:
+            flash('Пожалуйста, укажите причину отказа', 'error')
+            return redirect(url_for('admin.admin_panel', **return_params))
+        referal.rejection_reason = rejection_reason
+        rejecter_name = current_user.user_data.full_name
         utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал не прошёл проверку',
-            f'Реферал от {user.user_data.full_name} не прошёл проверку:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+            f"""
+            Реферал от {user.user_data.full_name} не прошёл проверку {referal.status_name}\n
+            Причина: {rejection_reason}.\n
+            Отклонил: {rejecter_name}\n
+            Данные реферала:\n
+            ФИО: {referal.referal_data.full_name}\n
+            Macro ID: {referal.contact_id}\n"""
         )
-        referal.rejection_reason = rejection_reason
-        user = User.query.get(referal.user_id)
         user.pending_withdrawal -= referal.withdrawal_amount
 
+    referal.status_id = withdrawal_stage
+    referal.status_name = Status.query.get(withdrawal_stage).name
     db.session.commit()
     flash('Статус реферала обновлен успешно', 'success')
+
+    # --- Восстанавливаем параметры фильтрации из referer (URL) если их нет в форме ---
     
-    # Восстанавливаем параметры фильтрации из формы
-    return_params = {}
-    for key in request.form.keys():
-        if key.startswith('return_'):
-            param_name = key.replace('return_', '')
-            return_params[param_name] = request.form[key]
-    
-    # Если есть сохраненные параметры, используем их для редиректа
+
+    # 5. Редиректим с фильтрами, если есть
     if return_params:
         return redirect(url_for('admin.admin_panel', **return_params))
     else:
-        # Иначе просто возвращаемся на админ панель
         return redirect(url_for('admin.admin_panel'))
 
 @admin_bp.route('/force_update', methods=['GET'])

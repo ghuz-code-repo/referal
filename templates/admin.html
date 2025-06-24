@@ -381,8 +381,8 @@
                                                 
                                                 <form method="POST" 
                                                       action="{{ url_for('admin.update_withdrawal_stage', referal_id=referal.id) }}" 
-                                                      class="status-update-form">
-                                                    <select name="withdrawal_stage" class="status-select" required 
+                                                      class="status-update-form" data-referal-id="{{ referal.id }}">
+                                                    <select id="new_status_{{ referal.id }}" name="withdrawal_stage" class="status-select" required 
                                                             {% if current_user.role == 'manager' and referal.status_id != 200 %}disabled{% endif %}>
                                                         <option value="">Выберите статус</option>
                                                         {% if current_user.role == 'manager' %}
@@ -422,7 +422,7 @@
                                                             {% endfor %}
                                                         {% endif %}
                                                     </select>
-                                                    <button type="submit" class="update-status-btn" title="Обновить статус"
+                                                    <button type="button" class="update-status-btn" title="Обновить статус"
                                                     {% if (current_user.role == 'manager' and referal.status_id != 200) or (current_user.role == 'call-center' and referal.status_id != 10) %}disabled{% endif %}>
                                                         <i class="fas fa-sync-alt"></i>
                                                         {% if current_user.role == 'manager' and referal.status_id != 200 %}
@@ -434,6 +434,7 @@
                                                         {% endif %}
                                                     </button>
                                                 </form>
+                                                {% include 'modals/rejection_reason_modal.html' %}
                                             </div>
                                         </td>
                                     </tr>
@@ -598,6 +599,69 @@
     });
     </script>
 
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ...existing code...
+
+    // Логика для модального окна причины отказа
+    let pendingForm = null;
+    let pendingStatusValue = null;
+
+    // Перехват клика по кнопке "Обновить статус"
+    document.querySelectorAll('.status-update-form .update-status-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            const form = btn.closest('form');
+            const select = form.querySelector('.status-select');
+            if (select && select.value == '500') { // 500 - отказ
+                e.preventDefault();
+                pendingForm = form;
+                pendingStatusValue = select.value;
+                document.getElementById('rejectionReasonInput').value = '';
+                document.getElementById('rejectionReasonModal').style.display = 'block';
+                document.getElementById('rejectionReasonInput').focus();
+            } else {
+                // Если не отказ, отправляем форму обычным образом
+                form.submit();
+            }
+        });
+    });
+
+    document.getElementById('submitRejectionReason').onclick = function() {
+        const reason = document.getElementById('rejectionReasonInput').value.trim();
+        if (!reason) {
+            document.getElementById('rejectionReasonInput').focus();
+            return;
+        }
+        if (pendingForm) {
+            // Добавляем скрытое поле с причиной отказа
+            let hidden = pendingForm.querySelector('input[name="rejection_reason"]');
+            if (!hidden) {
+                hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = 'rejection_reason';
+                pendingForm.appendChild(hidden);
+            }
+            hidden.value = reason;
+            document.getElementById('rejectionReasonModal').style.display = 'none';
+            pendingForm.submit();
+            pendingForm = null;
+        }
+    };
+
+    document.getElementById('closeRejectionModal').onclick = function() {
+        document.getElementById('rejectionReasonModal').style.display = 'none';
+        pendingForm = null;
+    };
+
+    window.onclick = function(event) {
+        const modal = document.getElementById('rejectionReasonModal');
+        if (event.target === modal) {
+            modal.style.display = 'none';
+            pendingForm = null;
+        }
+    };
+});
+</script>
 
 </body>
 </html>

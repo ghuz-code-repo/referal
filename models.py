@@ -53,7 +53,8 @@ class Referal(db.Model):
     #Status
     status_id = db.Column(db.Integer, db.ForeignKey('status.id'), nullable=False, default=0)
     status_name = db.Column(db.String(50), nullable=True, default='Не начата')
-    rejection_reason = db.Column(db.String(255), nullable=True)
+    rejection_reason = db.Column(db.String(1024), nullable=True)
+    rejecter_name = db.Column(db.String(100), nullable=True)
     #Approvals
     initial_approval = db.Column(db.Boolean, default=False)
     analytics_approval = db.Column(db.Boolean, default=False)
