@@ -18,6 +18,7 @@ button:hover:enabled {
 button:disabled {
     background-color: var(--disabled-color);
     cursor: not-allowed;
+    color: var(--text-muted);
 }
 
 button:hover:disabled {
