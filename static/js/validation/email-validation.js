@@ -3,7 +3,7 @@
  */
 function validateEmail(input) {
     const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-    if (!emailPattern.test(input.value)) {
+    if (!emailPattern.test(input.value) && input.value !== '') {
         input.setCustomValidity('Пожалуйста, введите корректный email');
         return false;
     } else {

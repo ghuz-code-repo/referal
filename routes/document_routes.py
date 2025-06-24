@@ -209,7 +209,6 @@ def get_referal_act(referal_id):
             'passport_address': 'Адрес прописки реферера',
             'pinfl': 'ПИНФЛ реферера',
             'referer_phone': 'Телефон реферера',
-            'referer_email': 'Email реферера'
         }
         
         missing_fields = []
