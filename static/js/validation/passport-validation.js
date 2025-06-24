@@ -417,8 +417,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return true; // Поле не обязательное
         }
         
-        if (value.length < 10) {
-            showValidationError(input, 'Орган выдачи должен содержать минимум 10 символов');
+        if (value.length < 5) {
+            showValidationError(input, 'Орган выдачи должен содержать минимум 5 символов');
             return false;
         }
         
