@@ -74,7 +74,6 @@ def get_agreement(user_id):
             'bank': 'Название банка',
             'mfo': 'МФО Банка',
             'phone': 'Телефон',
-            'e_mail': 'Эл почта'
         }
 
         missing_fields = []
