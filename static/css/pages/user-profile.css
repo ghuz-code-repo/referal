@@ -18,7 +18,7 @@ html, body {
 }
 
 .main {
-    flex: 1;
+    /* flex: 1; */
     overflow: visible;
     padding: 10px;
     background-color: rgba(0, 0, 0, 0) !important; /* Лёгкий фон для контраста */
