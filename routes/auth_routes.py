@@ -63,8 +63,8 @@ def get_current_user():
     if user and not user.user_data:
         user.user_data = UserData(user_id=user.id, full_name=full_name)
 
-    if user and (user.user_data.full_name != full_name):
-        user.user_data.full_name = full_name
+    # if user and (user.user_data.full_name != full_name):
+    #     user.user_data.full_name = full_name
     if user and (user.role != role):
         user.role = role
     try:
