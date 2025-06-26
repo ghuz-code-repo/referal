@@ -1,5 +1,6 @@
 """Маршруты для работы с рефералами"""
 
+from random import random
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from datetime import datetime
 import re
@@ -160,6 +161,41 @@ def profile():
 @referal_bp.route('/add', methods=['POST'])
 def add_referal():
     """Добавление нового реферала через модальную форму"""
+    
+    managers = ["""Mamatov A'zam""",
+                """Buaxunov Baxtiyor""",
+                """Magovskiy Aleksandr""",
+                """RU Saytxalilov Alisher""",
+                """Komilov Sunnatilla""",
+                """Dayanova Aida""",
+                """Mirvosikov Mirazim""",
+                """Suleymanov Artur""",
+                """Krubayev Enver""",
+                """Xolidova Asal""",
+                """Matxalikov Jasurbek""",
+                """Raximberdiyev Raxmonberdi""",
+                """Kadirov Timur""",
+                """Kaxarov Sherzod Yuldashevich""",
+                """Mirzaolimov Nurmuhammad""",
+                """Uzakova Alina""",
+                """Atamatov Davron""",
+                """Nikiforova Kseniya""",
+                """Yulchiyev Umidjon""",
+                """Zairov Odil Kamildjanovich""",
+                """Yulchiyev Ramazon""",
+                """Rustamov Azizbek""",
+                """Miraxmad Mirboboev""",
+                """Djumabayev Akbar""",
+                """Lyovkin Dmitriy""",
+                """Abdukhalikova Jasmina""",
+                """Bekov Abbosbek Alisher ogli""",
+                """Mukhsinov Sukhrob""",
+                """Parpiyeva Nasibaxon"""]
+    
+    
+    manager = managers[random.randint(0, len(managers) - 1)]
+    
+    
     user = get_current_user()
     if not user:
         flash('Необходимо войти в систему', 'error')
@@ -239,6 +275,11 @@ def add_referal():
         db.session.commit()
         db.session.flush()
         flash(f'Реферал {full_name} успешно добавлен', 'success')
+        utils.send_email(
+            os.getenv('CALL_CENTER_MANAGER_EMAIL'),
+            subject='Назначение встречи для реферала',
+            body=f'Пользователь {user.user_data.full_name} добавил нового реферала: {full_name} ({formatted_phone}). Создайте встречу реферала с менеджером: {manager} для дальнейшего взаимодействия с клиентом.'
+        )
         print(f"Successfully added referal: {full_name} ({formatted_phone}) for user {user.login}")
         
     except Exception as e:
