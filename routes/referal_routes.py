@@ -1,6 +1,6 @@
 """Маршруты для работы с рефералами"""
 
-from random import random
+import random
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from datetime import datetime
 import re
