@@ -636,7 +636,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const checkedCount = dropdown.querySelectorAll('input[type="checkbox"]:checked').length;
         const btnText = btn.querySelector('span');
         if (checkedCount > 0) {
-            btnText.textContent = `Статусы (выбрано ${checkedCount})`;
+            btnText.textContent = `выбрано ${checkedCount}`;
         } else {
             btnText.textContent = 'Статусы';
         }
