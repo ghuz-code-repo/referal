@@ -8,6 +8,7 @@ from services import withdrawal_service
 import utils
 import os
 
+
 admin_bp = Blueprint('admin', __name__)
 
 
@@ -60,22 +61,38 @@ def admin_panel():
     # Базовый запрос
     query = Referal.query
 
-    # Применяем фильтры
+
+    selected_statuses = []
+    status_ids = []
     if status_filter:
-        if status_filter == '-1':
-            # Админ выбрал "Все" - не применяем фильтр по статусу
-            pass
-        elif status_filter == 'all_manager':
-            # Менеджер выбрал "Все доступные" - фильтруем по доступным статусам
-            query = query.filter(Referal.status_id.in_([200, 300, 500]))
-        elif status_filter == 'no_status':
-            query = query.filter(Referal.status_id == 0)
-        else:
-            query = query.filter(Referal.status_id == int(status_filter))
+        try:
+            statuses = status_filter.split(',')
+            for status in statuses:
+                if status.isdigit():
+                    # Если статус - это число, добавляем его в фильтр
+                    status_ids.append(int(status))
+                else:
+                    flash(f'Неверный формат статуса: {status}', 'warning')
+            query = query.filter(Referal.status_id.in_(status_ids))
+            selected_statuses = status_ids
+        except ValueError:
+            # Если в параметре что-то не то, игнорируем его
+            flash('Получен неверный формат статусов в фильтре.', 'warning')
+            pass 
     else:
-        # Если нет фильтра по статусу для call-center - показываем все их доступные
-        if user.role == 'call-center':
-            query = query.filter(Referal.status_id == 10)
+        # СТАНДАРТНОЕ ПОВЕДЕНИЕ: Показываем все, кроме "Оплачено" (300)
+        # Убедитесь, что у вас есть эти ID в модели Status
+        INCLUDED_STATUSES = [] 
+
+        if user.role == 'manager':
+            INCLUDED_STATUSES = [200, 300, 500]
+        elif user.role == 'call-center':
+            INCLUDED_STATUSES = [10]
+        elif user.role == 'admin':
+            INCLUDED_STATUSES = [s.id for s in Status.query.all()]
+            # INCLUDED_STATUSES = [1]
+        query = query.filter(Referal.status_id.in_(INCLUDED_STATUSES))
+        selected_statuses = [s.id for s in Status.query.filter(Status.id.in_(INCLUDED_STATUSES)).all()]
     
     if name_filter:
         query = query.filter(ReferalData.full_name.ilike(f'%{name_filter}%'))
@@ -141,10 +158,6 @@ def admin_panel():
         per_page=per_page, 
         error_out=False
     )
-    withdrawal_requests = pagination.items
-    
-    statuses = Status.query.filter(Status.id != -1).all()
-
     referals = pagination.items
 
     # Обогащаем каждый реферал данными MacroContact
@@ -163,7 +176,6 @@ def admin_panel():
                           current_user=user,
                           referals=referals,
                           pagination=pagination,
-                          statuses=Status.query.all(),
                           current_filters={
                               'status': status_filter,
                               'name': name_filter,
@@ -173,6 +185,8 @@ def admin_panel():
                               'user': user_filter,
                               'per_page': per_page
                           },
+                          selected_statuses=selected_statuses,
+                          statuses=Status.query.all(),
                           current_sort=sort_param,
                           sort_fields=sort_fields)
 
@@ -180,7 +194,7 @@ def admin_panel():
 @admin_bp.route('/update_withdrawal_stage/<int:referal_id>', methods=['POST'])
 def update_withdrawal_stage(referal_id):
     """Обновление статуса реферала."""
-    current_user = get_current_user()
+    current_user =  get_current_user()
     if not current_user or current_user.role not in ['admin', 'manager', 'call-center']:
         flash('Доступ запрещен', 'error')
         return redirect(url_for('referal.profile'))
@@ -222,21 +236,21 @@ def update_withdrawal_stage(referal_id):
 
     
     if withdrawal_stage == 1:
-        utils.send_email(
+         utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал поступил на проверку отделом аналитики',
             f'Реферал от {user.user_data.full_name} поступил на проверку отделу аналитики:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
     
     elif withdrawal_stage == 20:
-        utils.send_email(
+         utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал прошёл проверку колл-центром',
             f'Реферал от {user.user_data.full_name} прошёл проверку колл-центром:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
         
     elif withdrawal_stage == 10:
-        utils.send_email(
+         utils.send_email(
             os.getenv('CALL_CENTER_MANAGER_EMAIL'),
             'Запрос на проверку реферала',
             f'Пожалуйста созвонитесь с рефералом от {user.user_data.full_name}: ФИО: {referal.referal_data.full_name} Телефон: {referal.referal_data.phone_number} для проверки его данных после чего обязательно измените статус реферала в системе.\n'
@@ -304,7 +318,7 @@ def update_withdrawal_stage(referal_id):
 @admin_bp.route('/force_update', methods=['GET'])
 def force_update():
     """Принудительное обновление всех рефералов."""
-    user = get_current_user()
+    user =  get_current_user()
     if not user or user.role != 'admin':
         flash('Доступ запрещен', 'error')
     fetch_data_from_mysql()

@@ -181,22 +181,32 @@
                                 </div>
                             </div>
                             <div class="header-controls">
-                                <select class="header-filter header-select" data-filter="status">
-                                    <option value="">Все</option>
-                                    <option value="no_status" {{ 'selected' if current_filters.status == 'no_status' else '' }}>Не начата</option>
-                                    {% for status in statuses %}
-                                        {% if status.id != 0 %}
-                                        <option value="{{ status.id }}" {{ 'selected' if current_filters.status == status.id|string else '' }}>
-                                            {{ status.name }}
-                                        </option>
-                                        {% endif %}
-                                    {% endfor %}
-                                </select>
-                                {% if current_filters.status %}
-                                <button type="button" class="clear-filter-btn" data-filter="status" title="Очистить фильтр">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                                {% endif %}
+                                <div class="multiselect-filter" id="status-filter-container">
+                                    <button type="button" class="multiselect-btn" id="status-filter-btn">
+                                        <span>Статусы</span> <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                    <div class="multiselect-dropdown" id="status-filter-dropdown">
+                                        <div class="multiselect-options">
+                                            <div class="multiselect-actions">
+                                            <button class="action-btn apply-btn" id='all_btn'>Выбрать все</button>
+                                            <button class="action-btn apply-btn" id='clear_btn'>Очистить</button>
+                                            </div>
+                                            {% for status in statuses %}
+                                                <label>
+                                                <div class="multiselect-option">
+                                                    <input type="checkbox" name="status" value="{{ status.id }}" 
+                                                           {% if status.id in selected_statuses %}checked{% endif %}>
+                                                            <span>{{ status.name }}</span>
+                                                        </input>
+                                                </div></label>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="multiselect-actions">
+                                            <button type="button" class="action-btn apply-btn" id="apply-status-filter">Применить</button>
+                                            <button type="button" class="action-btn default-btn" id="default-status-filter">По умолчанию</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </th>
@@ -271,3 +281,100 @@
     {% include 'components/pagination.html' %}
     {% endif %}
 </div>
+<script>
+    // static/js/components/multiselect-filter.js
+
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('status-filter-container');
+    if (!container) return;
+
+    const btn = document.getElementById('status-filter-btn');
+    const dropdown = document.getElementById('status-filter-dropdown');
+    const applyBtn = document.getElementById('apply-status-filter');
+    const clearBtn = document.getElementById('clear-status-filter');
+    const defaultBtn = document.getElementById('default-status-filter');
+    const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+    const all_btn = document.getElementById('all_btn');
+    const clear_btn = document.getElementById('clear_btn');
+
+    all_btn.addEventListener('click', (e) => {
+      // e.target — это элемент, по которому кликнули (в нашем случае all_checkbox)
+      // e.target.checked — это его состояние (true, если выбран, false — если нет)
+      // Перебираем все чекбоксы в списке checkboxes
+      checkboxes.forEach(checkbox => {
+        // Каждому чекбоксу присваиваем то же состояние, что и у главного
+        checkbox.checked = true;
+      });
+    });
+
+    clear_btn.addEventListener('click', (e) => {
+      // e.target — это элемент, по которому кликнули (в нашем случае all_checkbox)
+      // e.target.checked — это его состояние (true, если выбран, false — если нет)
+      // Перебираем все чекбоксы в списке checkboxes
+      checkboxes.forEach(checkbox => {
+        // Каждому чекбоксу присваиваем то же состояние, что и у главного
+        checkbox.checked = false;
+      });
+    });
+    // Функция для обновления текста на кнопке
+    const updateButtonText = () => {
+        const checkedCount = dropdown.querySelectorAll('input[type="checkbox"]:checked').length;
+        const btnText = btn.querySelector('span');
+        if (checkedCount > 0) {
+            btnText.textContent = `Статусы (выбрано ${checkedCount})`;
+        } else {
+            btnText.textContent = 'Статусы';
+        }
+    };
+
+    // Открытие/закрытие выпадающего списка
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('active');
+    });
+
+    // Закрытие по клику вне элемента
+    document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) {
+            dropdown.classList.remove('active');
+        }
+    });
+    
+    // Не закрывать меню при клике внутри него
+    dropdown.addEventListener('click', (e) => e.stopPropagation());
+
+    // Кнопка "Применить"
+    applyBtn.addEventListener('click', () => {
+        const selectedStatuses = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
+        const currentUrl = new URL(window.location);
+        const params = currentUrl.searchParams;
+
+        if (selectedStatuses.length > 0) {
+            params.set('status', selectedStatuses.join(','));
+        } else {
+            params.delete('status'); // Если ничего не выбрано, убираем параметр
+        }
+        
+        params.set('page', '1'); // Сбрасываем на первую страницу при смене фильтра
+        window.location.search = params.toString();
+    });
+    
+    // Кнопка "Все доступные" (сбрасывает URL к состоянию по умолчанию)
+    defaultBtn.addEventListener('click', () => {
+        const currentUrl = new URL(window.location);
+        const params = currentUrl.searchParams;
+        
+        // Эта кнопка приводит фильтр статусов в стандартное значение, удаляя параметр 'status'
+        params.delete('status');
+        params.set('page', '1');
+        
+        window.location.search = params.toString();
+    });
+    
+    // Инициализация текста кнопки при загрузке страницы
+    updateButtonText();
+});
+</script>

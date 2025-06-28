@@ -95,9 +95,10 @@ html, body {
 
 .admin-table tbody {
     display: block;
-    overflow-y: auto;
+    overflow-y: scroll;
     overflow-x: hidden;
     min-width: 768px;
+    max-height: 45vh;
 }
 
 .admin-table thead tr,

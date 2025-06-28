@@ -68,15 +68,31 @@ def profile():
     if needs_referal_data_join:
         query = query.join(ReferalData)
     
-    # Применяем фильтры
+    selected_statuses = []
+    status_ids = []
     if status_filter:
-        if status_filter == 'no_status':
-            query = query.filter(Referal.status_id == 0)
-        else:
-            query = query.filter(Referal.status_id == int(status_filter))
+        try:
+            statuses = status_filter.split(',')
+            for status in statuses:
+                if status.isdigit():
+                    # Если статус - это число, добавляем его в фильтр
+                    status_ids.append(int(status))
+                else:
+                    flash(f'Неверный формат статуса: {status}', 'warning')
+            query = query.filter(Referal.status_id.in_(status_ids))
+            selected_statuses = status_ids
+        except ValueError:
+            # Если в параметре что-то не то, игнорируем его
+            flash('Получен неверный формат статусов в фильтре.', 'warning')
+            pass 
     else:
-        # Когда выбрано "Все статусы", исключаем "Оплачено" (300) и "Отказано" (500)
-        query = query.filter(Referal.status_id)
+        # СТАНДАРТНОЕ ПОВЕДЕНИЕ: Показываем все, кроме "Оплачено" (300)
+        # Убедитесь, что у вас есть эти ID в модели Status
+        EXCLUDED_STATUSES = [300] 
+        query = query.filter(Referal.status_id.notin_(EXCLUDED_STATUSES))
+        selected_statuses = [s.id for s in Status.query.filter(Status.id.notin_(EXCLUDED_STATUSES)).all()]
+
+
     
     if name_filter:
         query = query.filter(ReferalData.full_name.ilike(f'%{name_filter}%'))
@@ -136,7 +152,8 @@ def profile():
             referal.macro_contact = None
     
     print(f"Found {len(referals)} referals for user {user.login}")
-    
+
+
     return render_template('profile.html', 
                           current_user=user,
                           current_balance=user.current_balance,
@@ -154,6 +171,7 @@ def profile():
                               'contact_id': contact_id_filter,
                               'per_page': per_page
                           },
+                          selected_statuses=selected_statuses,
                           current_sort=sort_param,
                           sort_fields=sort_fields if sort_fields else [])
 
