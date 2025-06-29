@@ -4,8 +4,8 @@
         <div class="modal-header">
             <h1>Заполнение документов реферала</h1>
             {% set user_data_complete = referal.user!=None and referal.user.user_data!=None and referal.user.user_data.full_name!='' and referal.user.user_data.phone_number!='' and referal.user.user_data.pinfl!='' and referal.user.user_data.passport_address!='' %}
-            {% set referal_data_complete = referal.referal_data!=None and referal.referal_data.full_name!='' and referal.referal_data.phone_number!='' and referal.referal_data.passport_number!='' and referal.referal_data.passport_date!=None and referal.referal_data.passport_giver!='' and referal.referal_data.contract_number!='' %}
-            {% set can_download_act = user_data_complete and referal_data_complete %}
+            {% set referal_data_complete = referal.referal_data!=None and referal.referal_data.full_name!='' and referal.referal_data.phone_number!='' and referal.referal_data.passport_number!='' and referal.referal_data.passport_date!=None and referal.referal_data.passport_giver!='' and referal.referal_data.contract_number!='' and referal.referal_data.contract_number!=None %}
+            {% set can_download_act = user_data_complete and referal_data_complete%}
 
             <div class="download-act-container">
                 {%if can_download_act%}
