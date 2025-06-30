@@ -264,19 +264,41 @@ def _send_email_sync(recipient_email, subject, body):
     Предназначена для вызова из send_email_async.
     """
     from email.mime.text import MIMEText
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = os.getenv('SEND_FROM_EMAIL') 
-    msg['To'] = recipient_email
+
 
     try:
         with smtplib.SMTP(os.getenv('EMAIL_SERVER'), os.getenv('EMAIL_SERVER_PORT')) as server:
+            msg = MIMEText(body)
+            msg['Subject'] = subject
+            msg['From'] = os.getenv('SEND_FROM_EMAIL') 
+            msg['To'] = recipient_email
             server.starttls()
             server.login(os.getenv('SEND_FROM_EMAIL') , os.getenv('SEND_FROM_EMAIL_PASSWORD'))
-            server.sendmail(os.getenv('SEND_FROM_EMAIL'), recipient_email, msg.as_string())
-            print("Email sent successfully")
+            server.sendmail(os.getenv('SEND_FROM_EMAIL'), recipient_email, msg.as_string().encode('utf-8').strip())
+            print("Email sent to recipient")
+        with smtplib.SMTP(os.getenv('EMAIL_SERVER'), os.getenv('EMAIL_SERVER_PORT')) as server:
+            msg = MIMEText(f'Письмо отправлено {recipient_email} с темой {subject}\nтело:\n{body}')
+            msg['Subject'] = f'Ответсвенное лицой реферальной программы {recipient_email} получило письмо'
+            msg['From'] = os.getenv('SEND_FROM_EMAIL') 
+            msg['To'] = os.getenv('MAIN_ADMIN_EMAIL')
+            server.starttls()
+            server.login(os.getenv('SEND_FROM_EMAIL') , os.getenv('SEND_FROM_EMAIL_PASSWORD'))
+            server.sendmail(os.getenv('SEND_FROM_EMAIL'), os.getenv('MAIN_ADMIN_EMAIL'), msg.as_string().encode('utf-8').strip())
+            print("Email sent to admin")
+        print(f"Email sent successfully {recipient_email} {subject}")
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        try:
+            with smtplib.SMTP(os.getenv('EMAIL_SERVER'), os.getenv('EMAIL_SERVER_PORT')) as server:
+                msg = MIMEText(f'Письмо не было отправлено {recipient_email} с темой {subject}\nтело:\n{body}\nОшибка {e}')
+                msg['Subject'] = f'Ответсвенное лицой реферальной программы {recipient_email} НЕ получило письмо'
+                msg['From'] = os.getenv('SEND_FROM_EMAIL') 
+                msg['To'] = os.getenv('MAIN_ADMIN_EMAIL')
+                server.starttls()
+                server.login(os.getenv('SEND_FROM_EMAIL') , os.getenv('SEND_FROM_EMAIL_PASSWORD'))
+                server.sendmail(os.getenv('SEND_FROM_EMAIL'), os.getenv('MAIN_ADMIN_EMAIL'), msg.as_string().encode('utf-8').strip())
+                print("Email sent successfully to admin")
+        except Exception as e:
+            print(f"Failed to send even admin email: {e}")
         # Убрана рекурсивная попытка, т.к. это плохая практика в асинхронных задачах
         # и может привести к бесконечному циклу.
         # Вместо этого можно добавить более умную логику повторных попыток
