@@ -21,17 +21,17 @@
             Заполнить данные
         </button>
         {%else%}
-
-        {%if can_download_act%}
-        <a href="{{ url_for('document.get_referal_act', referal_id=referal.id) }}" >
-            <button type="button" class="download-agreement-btn" style="min-width: 100%; margin-top: 5px;">
-                Скачать Акт
-            </button>
-        </a>{% else %}
-                    <button type="button" class="download-agreement-btn disabled" disabled title="Заполните все обязательные поля " style="min-width: 100%; margin-top: 5px;">
+            {%if can_download_act%}
+                <a href="{{ url_for('document.get_referal_act', referal_id=referal.id) }}" >
+                    <button type="button" class="download-agreement-btn" style="min-width: 100%; margin-top: 5px;">
                         Скачать Акт
                     </button>
-                {% endif %}
+                </a>
+            {% else %}
+                <button type="button" class="download-agreement-btn disabled" disabled title="Заполните все обязательные поля " style="min-width: 100%; margin-top: 5px;">
+                    Скачать Акт
+                </button>
+            {% endif %}
         {%endif%}
         {% if referal.status_id == 500 %}
         <button typr='button' class="update-status-btn" data-referal-id="{{ referal.id }}" style="min-width: 100%; margin-top: 5px;">

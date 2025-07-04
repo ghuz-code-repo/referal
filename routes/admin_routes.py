@@ -64,6 +64,16 @@ def admin_panel():
 
     selected_statuses = []
     status_ids = []
+
+    ALL_STATUSES = []
+
+    if user.role == 'manager':
+        ALL_STATUSES = [200, 300, 500]
+    elif user.role == 'call-center':
+         ALL_STATUSES = [10, 500]
+    elif user.role == 'admin':
+         ALL_STATUSES = [s.id for s in Status.query.all()]
+         
     if status_filter:
         try:
             statuses = status_filter.split(',')
@@ -82,17 +92,18 @@ def admin_panel():
     else:
         # СТАНДАРТНОЕ ПОВЕДЕНИЕ: Показываем все, кроме "Оплачено" (300)
         # Убедитесь, что у вас есть эти ID в модели Status
-        INCLUDED_STATUSES = [] 
 
         if user.role == 'manager':
             INCLUDED_STATUSES = [200, 300, 500]
         elif user.role == 'call-center':
-            INCLUDED_STATUSES = [10]
+            INCLUDED_STATUSES = [10, 500]
         elif user.role == 'admin':
             INCLUDED_STATUSES = [s.id for s in Status.query.all()]
             # INCLUDED_STATUSES = [1]
         query = query.filter(Referal.status_id.in_(INCLUDED_STATUSES))
         selected_statuses = [s.id for s in Status.query.filter(Status.id.in_(INCLUDED_STATUSES)).all()]
+    
+    statuses = [s for s in Status.query.filter(Status.id.in_(ALL_STATUSES)).all()]
     
     if name_filter:
         query = query.filter(ReferalData.full_name.ilike(f'%{name_filter}%'))
@@ -186,7 +197,7 @@ def admin_panel():
                               'per_page': per_page
                           },
                           selected_statuses=selected_statuses,
-                          statuses=Status.query.all(),
+                          statuses=statuses,
                           current_sort=sort_param,
                           sort_fields=sort_fields)
 
