@@ -70,9 +70,9 @@ def admin_panel():
     if user.role == 'manager':
         ALL_STATUSES = [200, 300, 500]
     elif user.role == 'call-center':
-         ALL_STATUSES = [10, 500]
+        ALL_STATUSES = [10, 500, 20]
     elif user.role == 'admin':
-         ALL_STATUSES = [s.id for s in Status.query.all()]
+        ALL_STATUSES = [s.id for s in Status.query.all()]
          
     if status_filter:
         try:
