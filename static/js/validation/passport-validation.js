@@ -335,7 +335,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let value = this.value;
             
             // Убираем цифры и специальные символы, оставляем только буквы, пробелы и дефисы
-            value = value.replace(/[^а-яёА-ЯЁa-zA-Z\s\-]/g, '');
+            value = value.replace(/[^а-яёА-ЯЁa-zA-Z\s\-`']/g, '');
             
             // Убираем множественные пробелы
             value = value.replace(/\s+/g, ' ');
