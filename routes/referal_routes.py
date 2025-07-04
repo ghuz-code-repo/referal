@@ -264,6 +264,7 @@ def add_referal():
             return redirect(url_for('referal.profile'))
 
         # Создаем новый реферал
+        print(user.id)
         new_referal = Referal(user_id=user.id)
         db.session.add(new_referal)
         db.session.commit()
@@ -329,7 +330,7 @@ def request_withdrawal(referal_id):
     """Маршрут для запроса на вывод средств."""
     user = get_current_user()
     try:
-        withdrawal_service.request_withwithdrawal(referal_id, user=user)
+        withdrawal_service.request_withdrawal(referal_id, user=user)
     except Exception as e:
         flash(f'Ошибка при запросе на вывод средств: {e}', 'error')
     return redirect(url_for('referal.profile'))
