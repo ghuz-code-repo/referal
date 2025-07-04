@@ -13,7 +13,7 @@ def request_withdrawal(referal_id, user):
         user.pending_withdrawal += referal.withdrawal_amount
         user.current_balance -= referal.withdrawal_amount
         referal.status_id = 1
-        # referal.status_name = Status.query.filter_by(id=1).first().name
+        referal.status_name = Status.query.filter_by(id=1).first().name
         referal.balance_pending_withdrawal = True
         db.session.commit()
         
