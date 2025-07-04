@@ -25,12 +25,12 @@ def get_property_details(agreement_number):
                     c.geo_street_name AS house_address,
                     c.geo_house AS house_number,
                     b.estate_rooms AS apartment_number,
-                    a.deal_price AS agreement_price,
+                    a.finances_income AS agreement_price,
                     a.agreement_date AS agreement_date
                 FROM (
                     SELECT 
                         d.estate_sell_id,
-                        d.deal_price,
+                        d.finances_income,
                         d.agreement_date
                     FROM estate_deals d
                     WHERE d.agreement_number = %s
