@@ -7,15 +7,26 @@
     <td class="referal-table-td"  >{{ referal.status_name if referal.status_name else 'Не указан' }}</td>
     <td class="referal-table-td"  >{{ referal.withdrawal_amount if referal.withdrawal_amount else '0' }}</td>
     <td class="referal-table-td"  style="flex">
+        {% set user_data_complete = referal.user!=None and referal.user.user_data!=None and referal.user.user_data.full_name!='' and referal.user.user_data.phone_number!='' and referal.user.user_data.pinfl!='' and referal.user.user_data.passport_address!='' %}
+        {% set referal_data_complete = referal.referal_data!=None and referal.referal_data.full_name!='' and referal.referal_data.phone_number!='' and referal.referal_data.passport_number!='' and referal.referal_data.passport_date!=None and referal.referal_data.passport_giver!='' and referal.referal_data.contract_number!='' and referal.referal_data.contract_number!=None %}
+        {% set can_download_act = user_data_complete and referal_data_complete%}
         <form method="POST" action="{{ url_for('referal.request_withdrawal', referal_id=referal.id) }}">
             <button type="submit" class="table_button" {{ 'disabled' if referal.balance_pending_withdrawal or not referal.withdrawal_amount or referal.referal_data.passport_number=='' or referal.referal_data.passport_giver=='' or referal.referal_data.passport_adress=='' else '' }}>
                 {{ 'Уже отправлено' if referal.balance_pending_withdrawal else 'Отправить на проверку' }}
             </button>
         </form>
+        {%if referal.status_id == 0%}
         <button class="table_button open_document_form" data-referal-id="{{ referal.id }}" {{'disabled' if referal.status_id != 0 else '' }} style="    width: 100%;
     margin-top: 5px;">
             Заполнить данные
         </button>
+        {%else%}
+        <a href="{{ url_for('document.get_referal_act', referal_id=referal.id) }}" class="download-act-btn download-act-link">
+            <button type="button" class="download-agreement-btn">
+                <i class="fas fa-file-download"></i>Скачать Акт
+            </button>
+        </a>
+        {%endif%}
         {% if referal.status_id == 500 %}
         <button typr='button' class="update-status-btn" data-referal-id="{{ referal.id }}" style="min-width: 100%; margin-top: 5px;">
             Причина октаза
