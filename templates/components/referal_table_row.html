@@ -21,8 +21,8 @@
             Заполнить данные
         </button>
         {%else%}
-        <a href="{{ url_for('document.get_referal_act', referal_id=referal.id) }}" class="download-act-btn download-act-link">
-            <button type="button" class="download-agreement-btn">
+        <a href="{{ url_for('document.get_referal_act', referal_id=referal.id) }}">
+            <button type="button" class="table_button open_document_form">
                 <i class="fas fa-file-download"></i>Скачать Акт
             </button>
         </a>
