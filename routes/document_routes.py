@@ -1,5 +1,6 @@
 """Маршруты для работы с документами и актами"""
 
+import math
 from flask import Blueprint, request, redirect, url_for, flash, send_file, current_app
 from datetime import datetime
 import os
@@ -180,7 +181,7 @@ def get_referal_act(referal_id):
             'appartment_number': appartment_info['apartment_number'],
             'appartment_area': real_deal.deal_metr,
             'contract_price': appartment_info['agreement_price'],
-            'withdrawal_amount': str(round(referal.withdrawal_amount/(1-float(os.getenv('NDS_PERCENT'))/100)) or 0),
+            'withdrawal_amount': str(math.ceil(referal.withdrawal_amount/(1-float(os.getenv('NDS_PERCENT'))/100)) or 0),
             
             'referer_name': user_data.full_name or '',
             'passport_address': user_data.passport_adress or '',
