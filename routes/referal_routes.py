@@ -189,7 +189,6 @@ def add_referal():
                 """Mirvosikov Mirazim""",
                 """Suleymanov Artur""",
                 """Krubayev Enver""",
-                """Xolidova Asal""",
                 """Raximberdiyev Raxmonberdi""",
                 """Kadirov Timur""",
                 """Kaxarov Sherzod Yuldashevich""",
