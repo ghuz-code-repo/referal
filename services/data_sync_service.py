@@ -195,8 +195,8 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
             with connection.cursor() as cursor:
                 print(f"{task_name}: Created cursor, preparing queries...")
                 
-                # Get date threshold (last 180 days)
-                date_threshold = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%d')
+                # Get date threshold (last N days)
+                date_threshold = (datetime.now() - timedelta(days=os.getenv("TRASHHOLDDAYS",45))).strftime('%Y-%m-%d')
                 print(f"{task_name}: Date threshold: {date_threshold}")
                 
                 # Count total records
