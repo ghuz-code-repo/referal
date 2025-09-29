@@ -11,14 +11,78 @@ import os
 
 admin_bp = Blueprint('admin', __name__)
 
+@admin_bp.route('/debug/current-user', methods=['GET'])
+def debug_current_user():
+    """Отладочный маршрут для проверки текущего пользователя"""
+    from flask import jsonify
+    
+    # Выводим все заголовки
+    print("=== ALL HEADERS ===")
+    for header, value in request.headers:
+        print(f"{header}: {value}")
+    print("==================")
+    
+    try:
+        user = get_current_user()
+        
+        if not user:
+            return jsonify({
+                'status': 'no_user',
+                'message': 'Пользователь не найден',
+                'headers': dict(request.headers)
+            })
+        
+        user_info = {
+            'status': 'user_found',
+            'user': {
+                'id': user.id,
+                'login': user.login,
+                'role': user.role,
+                'auth_user_id': user.auth_user_id,
+                'full_name': user.user_data.full_name if user.user_data else None
+            },
+            'headers': dict(request.headers),
+            'admin_access': user.role in ['admin', 'manager', 'call-center']
+        }
+        
+        return jsonify(user_info)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'headers': dict(request.headers)
+        })
+
 
 @admin_bp.route('/admin', methods=['GET'])
 def admin_panel():
     """Административная панель для управления рефералами."""
+    print("=== ADMIN PANEL ACCESS ATTEMPT ===")
+    
+    # Выводим все заголовки для отладки
+    print("Headers received:")
+    for header, value in request.headers:
+        print(f"  {header}: {value}")
+    
     user = get_current_user()
-    if not user or user.role not in ['admin', 'manager', 'call-center']:
-        flash('Доступ запрещен', 'error')
+    print(f"User from get_current_user(): {user}")
+    if user:
+        print(f"User role: {user.role}")
+        print(f"User login: {user.login}")
+    
+    if not user:
+        print("No user found - access denied")
+        flash('Доступ запрещен - пользователь не найден', 'error')
         return redirect(url_for('referal.profile'))
+        
+    if user.role not in ['admin', 'manager', 'call-center']:
+        print(f"User role {user.role} not in allowed roles ['admin', 'manager', 'call-center']")
+        flash('Доступ запрещен - недостаточно прав', 'error')
+        return redirect(url_for('referal.profile'))
+    
+    print(f"Access granted to user {user.login} with role {user.role}")
+    print("=====================================")
     
     # Получаем параметры из URL
     page = request.args.get('page', 1, type=int)
@@ -329,7 +393,15 @@ def update_withdrawal_stage(referal_id):
 @admin_bp.route('/force_update', methods=['GET'])
 def force_update():
     """Принудительное обновление всех рефералов."""
-    user =  get_current_user()
+    user = get_current_user()
     if not user or user.role != 'admin':
         flash('Доступ запрещен', 'error')
-    fetch_data_from_mysql()
+        return redirect(url_for('admin.admin_panel'))
+    
+    try:
+        fetch_data_from_mysql()
+        flash('Данные успешно обновлены', 'success')
+    except Exception as e:
+        flash(f'Ошибка при обновлении данных: {str(e)}', 'error')
+    
+    return redirect(url_for('admin.admin_panel'))

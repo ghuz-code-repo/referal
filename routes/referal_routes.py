@@ -20,12 +20,25 @@ def profile():
     print(f"User after get_current_user: {user}")
     
     if not user:
-        print("No user found, redirecting to referal profile")
-        return redirect(url_for('referal.profile'))
+        print("No user found, returning error instead of redirect loop")
+        from flask import render_template_string
+        return render_template_string("""
+        <html>
+        <body>
+        <h1>Authentication Required</h1>
+        <p>Please log in to access the referal system.</p>
+        <a href="/login">Login</a>
+        </body>
+        </html>
+        """), 401
     
     if user.role == 'admin' or user.role == 'manager' or user.role == 'call-center':
         """Перенаправление на административную панель для администраторов."""
         return redirect(url_for('admin.admin_panel'))
+    
+    # Автоматически синхронизируем данные пользователя из auth-service
+    from utils import sync_user_data_from_auth_service
+    sync_user_data_from_auth_service(user)
     
     referal_service.update_deal_info(user)
     
@@ -244,7 +257,7 @@ def add_referal():
             flash(f'Реферал с номером {formatted_phone} уже добавлен', 'error')
             return redirect(url_for('referal.profile'))
         
-                # Проверяем, не существует ли уже реферал с таким телефоном 
+                # Проверяем, не существует ли уже реферал с таким именем 
         existing_referal = Referal.query.join(ReferalData).filter(
             ReferalData.full_name == full_name
         ).first()

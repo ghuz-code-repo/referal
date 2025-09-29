@@ -21,11 +21,17 @@ ENV FLASK_APP=app.py
 # Set the working directory in the container
 WORKDIR /app
 
+# Copy auth-connector package
+COPY auth-connector /tmp/auth-connector
+
 # Copy the requirements file into the container at /app
 COPY requirements.txt .
 
+# Install auth-connector first
+RUN pip install --no-cache-dir /tmp/auth-connector
+
 # Install any needed packages specified in requirements.txt
-# Use --no-cache-dir to reduce image size
+# Use --no-cache-dir to reduce image size  
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code into the container at /app
@@ -38,5 +44,5 @@ EXPOSE 80
 # Set environment variable to use this file
 ENV RESOLV_CONF=/etc/resolv.conf.override
 
-# Run app.py using flask run (or python app.py if preferred)
-CMD ["python", "app.py"]
+# Run app_with_auth_connector.py for auth integration
+CMD ["python", "app_with_auth_connector.py"]

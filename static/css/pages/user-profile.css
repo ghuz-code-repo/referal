@@ -287,3 +287,63 @@ html, body {
     }
 }
 
+
+/* Стили для readonly полей и информационного сообщения */
+.form-input[readonly] {
+    background-color: var(--input-bg-disabled, #f5f5f5) !important;
+    color: var(--text-disabled, #666) !important;
+    cursor: not-allowed;
+    opacity: 0.7;
+    border-color: var(--border-disabled, #ddd) !important;
+}
+
+.info-message {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background-color: var(--info-bg, #e3f2fd);
+    border: 1px solid var(--info-border, #2196f3);
+    border-radius: 6px;
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--info-color, #1976d2);
+}
+
+.info-message i {
+    color: var(--info-icon, #2196f3);
+    font-size: 16px;
+}
+
+.info-message a {
+    color: var(--link-color, #1976d2);
+    text-decoration: underline;
+    font-weight: 500;
+}
+
+.info-message a:hover {
+    text-decoration: none;
+    color: var(--link-hover-color, #0d47a1);
+}
+
+/* Темная тема для информационного сообщения */
+:root.dark-theme .info-message {
+    background-color: var(--info-bg-dark, #1a237e);
+    border-color: var(--info-border-dark, #3f51b5);
+    color: var(--info-color-dark, #90caf9);
+}
+
+:root.dark-theme .info-message a {
+    color: var(--link-color-dark, #90caf9);
+}
+
+:root.dark-theme .info-message a:hover {
+    color: var(--link-hover-color-dark, #bbdefb);
+}
+
+:root.dark-theme .form-input[readonly] {
+    background-color: var(--input-bg-disabled-dark, #2d2d2d) !important;
+    color: var(--text-disabled-dark, #999) !important;
+    border-color: var(--border-disabled-dark, #444) !important;
+}
+

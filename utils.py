@@ -315,3 +315,131 @@ def send_email(recipient_email, subject, body):
     thread = threading.Thread(target=run_async_task, args=(_send_email_sync, recipient_email, subject, body))
     thread.daemon = True # Позволяет программе завершиться, даже если поток еще работает
     thread.start()
+
+
+def sync_user_data_from_auth_service(user, force_sync=False):
+    """
+    Синхронизирует данные пользователя из auth-service.
+    
+    Args:
+        user: Объект пользователя из referal сервиса
+        force_sync: Принудительная синхронизация даже если данные уже есть
+    
+    Returns:
+        bool: True если синхронизация прошла успешно
+    """
+    from models import UserData, db
+    
+    try:
+        # Импортируем auth_client из app контекста
+        from flask import current_app
+        auth_client = getattr(current_app, 'auth_client', None)
+        
+        if not auth_client:
+            print("AuthClient not available")
+            return False
+            
+        # Проверяем, есть ли уже данные пользователя
+        user_data = UserData.query.filter_by(user_id=user.id).first()
+        
+        # Если данные есть и принудительная синхронизация не требуется, пропускаем
+        if user_data and not force_sync and user_data.full_name:
+            return True
+            
+        # Получаем данные профиля из auth-service
+        profile_url = f"/api/users/{user.auth_user_id}/profile"
+        profile_response = requests.get(
+            f"{auth_client.auth_service_url.rstrip('/')}{profile_url}",
+            timeout=10
+        )
+        
+        if profile_response.status_code != 200:
+            print(f"Failed to get user profile from auth-service: {profile_response.status_code}")
+            return False
+            
+        profile_data = profile_response.json()
+        
+        # Создаем или обновляем UserData
+        if not user_data:
+            user_data = UserData(user_id=user.id)
+            db.session.add(user_data)
+        
+        # Синхронизируем данные профиля
+        user_data.full_name = profile_data.get('full_name', '')
+        user_data.phone = profile_data.get('phone', '')
+        user_data.e_mail = profile_data.get('email', '')
+        user_data.passport_number = profile_data.get('passport_number', '')
+        user_data.passport_giver = profile_data.get('passport_issued_by', '')
+        user_data.passport_adress = profile_data.get('address', '')
+        
+        # Парсим даты если они есть
+        if profile_data.get('passport_issued_date'):
+            try:
+                user_data.passport_date = datetime.fromisoformat(
+                    profile_data['passport_issued_date'].replace('Z', '+00:00')
+                ).date()
+            except (ValueError, AttributeError):
+                pass
+                
+        if profile_data.get('birth_date'):
+            try:
+                user_data.birth_date = datetime.fromisoformat(
+                    profile_data['birth_date'].replace('Z', '+00:00')
+                ).date()
+            except (ValueError, AttributeError):
+                pass
+        
+        # Получаем документы из auth-service
+        documents_url = f"/api/users/{user.auth_user_id}/documents"
+        documents_response = requests.get(
+            f"{auth_client.auth_service_url.rstrip('/')}{documents_url}",
+            timeout=10
+        )
+        
+        if documents_response.status_code == 200:
+            documents_data = documents_response.json()
+            documents = documents_data.get('documents', [])
+            
+            # Обновляем данные на основе документов
+            for doc in documents:
+                if doc.get('document_type') == 'pinfl':
+                    fields = doc.get('fields', {})
+                    if 'pinfl' in fields and fields['pinfl']:
+                        user_data.pinfl = fields['pinfl']
+                        
+                elif doc.get('document_type') == 'passport':
+                    fields = doc.get('fields', {})
+                    if 'passport_number' in fields and fields['passport_number']:
+                        user_data.passport_number = fields['passport_number']
+                    if 'passport_giver' in fields and fields['passport_giver']:
+                        user_data.passport_giver = fields['passport_giver']
+                    if 'passport_address' in fields and fields['passport_address']:
+                        user_data.passport_adress = fields['passport_address']
+                    if 'passport_date' in fields and fields['passport_date']:
+                        try:
+                            from datetime import datetime
+                            user_data.passport_date = datetime.strptime(
+                                fields['passport_date'], '%Y-%m-%d'
+                            ).date()
+                        except (ValueError, AttributeError):
+                            pass
+                            
+                elif doc.get('document_type') == 'bank_details':
+                    fields = doc.get('fields', {})
+                    if 'bank_name' in fields and fields['bank_name']:
+                        user_data.bank_name = fields['bank_name']
+                    if 'card_number' in fields and fields['card_number']:
+                        user_data.card_number = fields['card_number']
+                    if 'trans_schet' in fields and fields['trans_schet']:
+                        user_data.trans_schet = fields['trans_schet']
+                    if 'mfo' in fields and fields['mfo']:
+                        user_data.mfo = fields['mfo']
+        
+        db.session.commit()
+        print(f"Successfully synced user data for {user.login}")
+        return True
+        
+    except Exception as e:
+        print(f"Error syncing user data from auth-service: {e}")
+        db.session.rollback()
+        return False

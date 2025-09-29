@@ -22,6 +22,11 @@ def get_agreement(user_id):
     try:
         # Получаем данные пользователя из базы
         user = User.query.get_or_404(user_id)
+        
+        # Автоматически синхронизируем данные пользователя из auth-service
+        from utils import sync_user_data_from_auth_service
+        sync_user_data_from_auth_service(user)
+        
         user_data = user.user_data  # Получаем связанные данные пользователя
         
         if not user_data:

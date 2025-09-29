@@ -53,6 +53,14 @@
     --transition-fast: 0.2s ease;
     --transition-normal: 0.3s ease;
     --transition-slow: 0.5s ease;
+    
+    /* Дополнительные переменные для совместимости с auth-service */
+    --primary-color: #d4af37;
+    --primary-color-rgb: 212, 175, 55;
+    --primary-color-hover: #b8860b;
+    --primary-text-color: white;
+    --card-background-color: #fff;
+    --text-color: #333;
 }
 
 /* Тёмная тема - более тёмные и контрастные цвета */
@@ -94,6 +102,14 @@
     --form-section-background: #2a2a2a;
     --readonly-input-background: #1f1f1f;
     --disabled-color: #5f5f5f;
+    
+    /* Дополнительные переменные для совместимости с auth-service в темной теме */
+    --primary-color: #b8860b;
+    --primary-color-rgb: 184, 134, 11;
+    --primary-color-hover: #a0740a;
+    --primary-text-color: #e0e0e0;
+    --card-background-color: #1e1e1e;
+    --text-color: #e0e0e0;
 
 }
 

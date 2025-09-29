@@ -8,6 +8,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_data = db.relationship('UserData', backref='user', lazy=True, uselist=False)
     login = db.Column(db.String(80), unique=True, nullable=False)
+    auth_user_id = db.Column(db.String(24), nullable=True)  # MongoDB ObjectId from auth-service
     role = db.Column(db.String(50), nullable=False, default='user')
     referals = db.relationship('Referal', backref='user', lazy=True)
     current_balance = db.Column(db.Integer, default=0)
@@ -16,6 +17,35 @@ class User(db.Model):
     
     def get_id(self):
         return str(self.id)
+
+    @property 
+    def full_name(self):
+        """Получить полное имя пользователя из user_data"""
+        if self.user_data and self.user_data.full_name:
+            return self.user_data.full_name
+        return None
+
+    @property
+    def short_name(self):
+        """Получить короткое имя (Фамилия И.О.) из полного имени"""
+        if not self.full_name:
+            return None
+        
+        name_parts = self.full_name.strip().split()
+        if len(name_parts) >= 3:
+            # Фамилия Имя Отчество -> Фамилия И.О.
+            surname = name_parts[0]
+            name_initial = name_parts[1][0] + '.' if name_parts[1] else ''
+            patronymic_initial = name_parts[2][0] + '.' if name_parts[2] else ''
+            return f"{surname} {name_initial}{patronymic_initial}"
+        elif len(name_parts) == 2:
+            # Фамилия Имя -> Фамилия И.
+            surname = name_parts[0]
+            name_initial = name_parts[1][0] + '.' if name_parts[1] else ''
+            return f"{surname} {name_initial}"
+        else:
+            # Если только одно слово, возвращаем как есть
+            return self.full_name
 
     def __repr__(self):
         return f'<User {self.login}>'

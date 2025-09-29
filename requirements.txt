@@ -14,3 +14,4 @@ python-docx
 openpyxl
 dotenv
 flask_apscheduler
+PyJWT

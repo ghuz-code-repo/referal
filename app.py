@@ -10,7 +10,7 @@ import pymysql
 from models import MacroContact, MacroDeal, db, User, Referal, Status
 
 # Импортируем все Blueprint'ы из папки routes
-from routes import auth_bp, referal_bp, admin_bp, document_bp, user_bp  # Убрали main_bp
+from routes import auth_bp, referal_bp, admin_bp, document_bp, user_bp, sync_bp
 
 import pandas as pd
 from werkzeug.security import generate_password_hash
@@ -80,6 +80,7 @@ app.register_blueprint(referal_bp)  # Убрали url_prefix='/referal'
 app.register_blueprint(admin_bp)
 app.register_blueprint(document_bp)
 app.register_blueprint(user_bp)
+app.register_blueprint(sync_bp, url_prefix='/api/sync')
 
 # Add prefix middleware after registering blueprint but before initializing scheduler
 # This will strip the /referal prefix when running behind proxy
@@ -106,7 +107,11 @@ def process_request_headers():
     g.username = username
     g.full_name = full_name
     g.is_admin = request.headers.get('X-User-Admin', 'false').lower() == 'true'
-    g.roles = request.headers.get('X-User-Roles', '').split(',') if request.headers.get('X-User-Roles') else []
+    # Try service-specific roles first, fallback to legacy roles
+    service_roles = request.headers.get('X-User-Service-Roles', '')
+    legacy_roles = request.headers.get('X-User-Roles', '')
+    roles_str = service_roles if service_roles else legacy_roles
+    g.roles = roles_str.split(',') if roles_str else []
 
 # Add this after the imports section
 import locale
