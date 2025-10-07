@@ -13,7 +13,7 @@ Supports:
 __version__ = "1.0.0"
 __author__ = "Analytics Team"
 
-from .auth_middleware import AuthMiddleware, require_permission, get_current_user
+from .auth_middleware import AuthMiddleware, require_permission, require_any_permission, get_current_user
 from .auth_client import AuthClient
 from .permissions import PermissionRegistry, CommonPermissions
 from .exceptions import AuthError, PermissionDeniedError, InvalidTokenError
@@ -24,6 +24,7 @@ __all__ = [
     "PermissionRegistry",
     "CommonPermissions",
     "require_permission",
+    "require_any_permission",
     "get_current_user",
     "AuthError",
     "PermissionDeniedError", 

@@ -273,3 +273,124 @@
         padding: 0.6rem 0.8rem;
     }
 }
+
+/* Стили для ссылки на основной профиль */
+.profile-link {
+    margin-left: auto; /* Сдвигаем в правую часть */
+}
+
+.profile-nav-link {
+    background-color: var(--card-background-color, #fff) !important;
+    border: 1px solid var(--border-color, #ddd) !important;
+    border-radius: 5px !important;
+    padding: 0px 5px !important;
+    height: 50px !important;
+    min-width: auto !important;
+    color: var(--primary-color, #d4af37) !important;
+    font-weight: bold !important;
+    transition: all var(--transition-normal) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 15px !important;
+}
+
+.profile-nav-link:hover {
+    background-color: var(--primary-color-hover, #b8860b) !important;
+    color: var(--text-color, #333) !important;
+    transform: none;
+    box-shadow: none !important;
+}
+
+.profile-mini {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+}
+
+.user-avatar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--card-background-color, #fff);
+    border: 1px solid var(--primary-color, #d4af37);
+    color: var(--primary-color, #d4af37);
+    font-size: 18px;
+    overflow: hidden;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+.user-avatar .avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    line-height: 1.2;
+}
+
+.user-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-primary, #333);
+}
+
+.user-login {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #666);
+    opacity: 0.8;
+}
+
+/* Темная тема для профиля */
+:root.dark-theme .profile-nav-link {
+    background-color: var(--card-background-color, #1e1e1e) !important;
+    border-color: var(--border-color, #444) !important;
+    color: var(--primary-color, #b8860b) !important;
+}
+
+:root.dark-theme .profile-nav-link:hover {
+    background-color: var(--primary-color-hover, #a0740a) !important;
+    color: var(--text-color, #e0e0e0) !important;
+}
+
+:root.dark-theme .user-avatar {
+    background-color: var(--card-background-color, #1e1e1e);
+    border-color: var(--primary-color, #b8860b);
+    color: var(--primary-color, #b8860b);
+}
+
+:root.dark-theme .user-name {
+    color: var(--text-primary-dark, #f7fafc);
+}
+
+:root.dark-theme .user-login {
+    color: var(--text-secondary-dark, #a0aec0);
+}
+
+/* Мобильная адаптивность для профиля */
+@media (max-width: 768px) {
+    .profile-mini {
+        flex-direction: column;
+        gap: 4px;
+        text-align: center;
+    }
+    
+    .user-info {
+        align-items: center;
+    }
+    
+    .user-name,
+    .user-login {
+        font-size: 0.8rem;
+    }
+}

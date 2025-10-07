@@ -14,13 +14,12 @@ referal_bp = Blueprint('referal', __name__)
 
 
 @referal_bp.route('/', methods=['GET'])
-def profile():
-    print("Profile route accessed")
+@referal_bp.route('/list', methods=['GET']) 
+def referal_list():
+    """Главная страница рефералки - список рефералов пользователя"""
     user = get_current_user()
-    print(f"User after get_current_user: {user}")
     
     if not user:
-        print("No user found, returning error instead of redirect loop")
         from flask import render_template_string
         return render_template_string("""
         <html>
@@ -164,8 +163,7 @@ def profile():
             referal.macro_contacts = []
             referal.macro_contact = None
     
-    print(f"Found {len(referals)} referals for user {user.login}")
-
+    
 
     return render_template('profile.html', 
                           current_user=user,
@@ -375,9 +373,16 @@ def update_referal_documents(referal_id):
         mail_adress = request.form.get('mail_adress', '').strip()
         passport_date_str = request.form.get('passport_date', '').strip()
         
+        # Форматируем номер телефона через utils функцию
+        formatted_phone = None
+        if phone_number:
+            # Если есть запятые, берем только первый номер
+            first_phone = phone_number.split(',')[0].strip()
+            formatted_phone = utils.format_phone_number(first_phone)
+        
         # Обновляем поля реферала
         referal.referal_data.full_name = full_name if full_name else None
-        referal.referal_data.phone_number = phone_number if phone_number else None
+        referal.referal_data.phone_number = formatted_phone if formatted_phone else phone_number if phone_number else None
         referal.referal_data.passport_number = passport_number if passport_number else None
         referal.referal_data.passport_giver = passport_giver if passport_giver else None
         referal.referal_data.passport_adress = passport_adress if passport_adress else None
@@ -408,8 +413,8 @@ def update_referal_documents(referal_id):
             return redirect(url_for('referal.profile'))
         
         # Валидация телефона
-        if phone_number and not re.match(r'^\+998 \d{2} \d{3} \d{2} \d{2}$', phone_number):
-            flash('Неверный формат телефона. Используйте формат +998 XX XXX XX XX', 'error')
+        if phone_number and not formatted_phone:
+            flash('Неверный формат телефона. Введите корректный номер телефона', 'error')
             return redirect(url_for('referal.profile'))
         
         db.session.commit()

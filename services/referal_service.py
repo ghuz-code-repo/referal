@@ -80,6 +80,7 @@ def update_deal_and_balance(referal, user):
     
     print(f"DEBUG update_deal_and_balance: Searching for contact with formatted phone: {formatted_referal_phone}")
     
+    # ПРИОРИТЕТ 1: Поиск по номеру телефона
     # If the referal has multiple phones (comma-separated), try to find exact match
     if ',' in referal_phone:
         phones = [phone.strip() for phone in referal_phone.split(',')]
@@ -96,6 +97,14 @@ def update_deal_and_balance(referal, user):
     else:
         # Single phone number - direct lookup with formatted phone
         contact = MacroContact.query.filter_by(phone_number=formatted_referal_phone).first()
+    
+    # ПРИОРИТЕТ 2: Если не найден по телефону, ищем по имени
+    if not contact and referal.referal_data.full_name:
+        referal_full_name = referal.referal_data.full_name.strip()
+        print(f"DEBUG update_deal_and_balance: Phone not found, searching by name: {referal_full_name}")
+        contact = MacroContact.query.filter_by(full_name=referal_full_name).first()
+        if contact:
+            print(f"DEBUG update_deal_and_balance: Found contact by name match: {contact.full_name}")
     
     current_user = user
 
@@ -114,24 +123,29 @@ def update_deal_and_balance(referal, user):
             print(f"DEBUG update_deal_and_balance: No MacroDeals found in local DB for contacts_buy_id: {contact.contacts_id}")
             return 
         
-        print(f"DEBUG update_deal_and_balance: Found {len(deals)} MacroDeal(s) for contacts_buy_id: {contact.contacts_id}. Iterating to check status...")
+        print(f"DEBUG update_deal_and_balance: Found {len(deals)} MacroDeal(s) for contacts_buy_id: {contact.contacts_id}. Iterating to check status and payments...")
         
         suitable_deal_found = False
         for deal_obj in deals:
-            print(f"DEBUG update_deal_and_balance: Checking Deal - Local DB ID: {deal_obj.id}, Agreement No: '{deal_obj.agreement_number}', Status: '{deal_obj.deal_status_name}', contacts_buy_id: {deal_obj.contacts_buy_id}")
-            if deal_obj.deal_status_name == "Сделка проведена":
-                print(f"DEBUG update_deal_and_balance: MATCH! Suitable deal found: Agreement No: '{deal_obj.agreement_number}', Status: '{deal_obj.deal_status_name}'")
+            print(f"DEBUG update_deal_and_balance: Checking Deal - Agreement No: '{deal_obj.agreement_number}', Status: '{deal_obj.deal_status_name}', Total Payments: {deal_obj.total_payments}")
+            
+            # Проверяем только наличие оплат больше чем бронь (3млн)
+            # Статус сделки НЕ важен - платежи могут быть и в работающей сделке
+            if deal_obj.has_valid_payment():
+                print(f"✅ MATCH! Suitable deal found: Agreement '{deal_obj.agreement_number}', Payments: {deal_obj.total_payments} (exceeds booking payment)")
                 if deal_obj not in referal.deals:
                     referal.deals.append(deal_obj)
                 
                 referal.referal_data.contract_number = deal_obj.agreement_number
                 referal.deal_metr = deal_obj.deal_metr
-                print(f"DEBUG update_deal_and_balance: Set referal_data.contract_number to '{deal_obj.agreement_number}' and deal_metr to {deal_obj.deal_metr}")
+                print(f"DEBUG update_deal_and_balance: Set contract_number to '{deal_obj.agreement_number}' and deal_metr to {deal_obj.deal_metr}")
                 suitable_deal_found = True
                 break
+            else:
+                print(f"⚠️ SKIPPED: Deal '{deal_obj.agreement_number}' has payments ({deal_obj.total_payments}) ≤ booking payment (3000000)")
 
         if not suitable_deal_found:
-            print(f"DEBUG update_deal_and_balance: No deals with status 'Сделка проведена' found for contacts_buy_id: {contact.contacts_id}")
+            print(f"❌ No suitable deals found for contacts_buy_id: {contact.contacts_id} (insufficient payments > 3млн)")
         
         # The balance update logic depends on referal.deal_metr being set.
         if suitable_deal_found and not referal.balance_updated:

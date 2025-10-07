@@ -7,3 +7,8 @@ __pycache__/*
 Пользуны.xlsx
 employees.csv
 documents/*
+z_junk/*
+tests/*
+routes/__pycache__/*
+auth-connector/auth_connector/__pycache__/*
+services/__pycache__/*

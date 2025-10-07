@@ -1,3 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест валидации телефонов</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-form { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        input[type="text"] { width: 200px; padding: 5px; margin: 5px; }
+        button { padding: 10px 15px; margin: 5px; }
+        .result { margin: 10px 0; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест валидации телефонов</h1>
+
+    <div class="test-form">
+        <h3>Одиночный номер (как в форме реферала)</h3>
+        <form id="singlePhoneForm">
+            <label>Номер телефона:</label><br>
+            <input type="text" name="phone_number" placeholder="+998 XX XXX XX XX"><br>
+            <button type="submit">Проверить</button>
+        </form>
+        <div id="singleResult" class="result"></div>
+    </div>
+
+    <div class="test-form">
+        <h3>Множественные номера (админ функции)</h3>
+        <form id="multiplePhoneForm">
+            <label>Номера телефонов (через запятую):</label><br>
+            <input type="text" name="phone" class="multiple-phones-supported" placeholder="+998 XX XXX XX XX, +998 YY YYY YY YY"><br>
+            <button type="submit">Проверить</button>
+        </form>
+        <div id="multipleResult" class="result"></div>
+    </div>
+
+    <script>
 /**
  * Функция форматирования телефона для одиночного номера
  */
@@ -180,4 +218,34 @@ function formatPhone(input) {
 // Запускаем инициализацию при загрузке DOM
 document.addEventListener('DOMContentLoaded', function() {
     initPhoneValidation();
+    
+    // Тестовые обработчики форм
+    document.getElementById('singlePhoneForm').addEventListener('submit', function(e) {
+        const input = this.querySelector('input[name="phone_number"]');
+        const result = document.getElementById('singleResult');
+        if (!e.defaultPrevented) {
+            e.preventDefault();
+            result.innerHTML = `✅ Валидация прошла! Номер: "${input.value}"`;
+            result.style.color = 'green';
+        } else {
+            result.innerHTML = `❌ Валидация не прошла!`;
+            result.style.color = 'red';
+        }
+    });
+    
+    document.getElementById('multiplePhoneForm').addEventListener('submit', function(e) {
+        const input = this.querySelector('input[name="phone"]');
+        const result = document.getElementById('multipleResult');
+        if (!e.defaultPrevented) {
+            e.preventDefault();
+            result.innerHTML = `✅ Валидация прошла! Номера: "${input.value}"`;
+            result.style.color = 'green';
+        } else {
+            result.innerHTML = `❌ Валидация не прошла!`;
+            result.style.color = 'red';
+        }
+    });
 });
+    </script>
+</body>
+</html>

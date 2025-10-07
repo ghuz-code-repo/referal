@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Доступ запрещен</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Загружаем базовые стили с переменными ПЕРВЫМИ -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    
+    <!-- Inline критический JavaScript для предотвращения FOUC -->
+    <script>
+        (function() {
+            function getCookie(name) {
+                const nameEQ = name + "=";
+                const ca = document.cookie.split(';');
+                for(let i = 0; i < ca.length; i++) {
+                    let c = ca[i];
+                    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+                }
+                return null;
+            }
+            
+            const cookieTheme = getCookie('gh_theme');
+            const savedTheme = cookieTheme || localStorage.getItem('gh_theme_preference') || 'light';
+            
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark-theme');
+            }
+        })();
+    </script>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    
+    <!-- Остальные CSS файлы -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/access-denied.css') }}">
+    
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+</head>
+<body>
+    <div id="particles-js" class="bg-parts"></div>
+    <div class="page-wrapper">
+        {% include 'components/header.html' %}
+        {% include 'components/flash_messages.html' %}
+        
+        <div class="access-denied-wrapper">
+            <div class="access-denied-container">
+                <div class="icon-container">
+                    <i class="fas fa-lock"></i>
+                </div>
+                
+                <h1 class="access-denied-title">Недостаточно разрешений</h1>
+                <p class="access-denied-subtitle">{{ service_name if service_name else 'Этот сервис' }}</p>
+            
+            <div class="access-denied-message">
+                <p><strong>У вас недостаточно прав для использования этого сервиса.</strong></p>
+                <p>Для доступа к функционалу реферальной программы требуются специальные разрешения.</p>
+            </div>
+            
+            {% if required_permissions and required_permissions|length > 0 %}
+            <div class="required-permissions">
+                <h3>
+                    <i class="fas fa-key"></i>
+                    Необходимые разрешения (хотя бы одно):
+                </h3>
+                <ul>
+                    {% for permission in required_permissions %}
+                    <li>
+                        <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
+                        <code>{{ permission }}</code>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            
+            <div class="info-box">
+                <p>
+                    <strong><i class="fas fa-info-circle"></i> Что делать?</strong><br>
+                    Если вам нужен доступ к реферальной программе, обратитесь к администратору системы для назначения соответствующих разрешений.
+                </p>
+            </div>
+            
+            <div class="actions">
+                <a href="/" class="btn btn-primary">
+                    <i class="fas fa-home"></i>
+                    На главную
+                </a>
+                <a href="javascript:history.back()" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    Назад
+                </a>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- Particles.js config - точно такой же как на всех остальных страницах -->
+    <script>
+    particlesJS('particles-js', {
+        "particles": { "number": { "value": 50, "density": { "enable": true, "value_area": 800 } }, "color": { "value": "#c4a668" }, "shape": { "type": "polygon", "stroke": { "width": 1, "color": "#c4a668" }, "polygon": { "nb_sides": 6 } }, "opacity": { "value": 0.2, "random": true, "anim": { "enable": true, "speed": 0.5, "opacity_min": 0.05, "sync": false } }, "size": { "value": 4, "random": true }, "line_linked": { "enable": true, "distance": 180, "color": "#c4a668", "opacity": 0.15, "width": 1 }, "move": { "enable": true, "speed": 0.8, "direction": "none", "random": true, "straight": false, "out_mode": "out" } }, "interactivity": { "detect_on": "canvas", "events": { "onhover": { "enable": true, "mode": "bubble" } }, "modes": { "bubble": { "distance": 200, "size": 6, "duration": 2, "opacity": 0.6 } } }, "retina_detect": true
+    });
+    </script>
+</body>
+</html>

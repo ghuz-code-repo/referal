@@ -78,6 +78,9 @@
                             {% elif current_user.role == 'call-center' %}
                             <h3>Проверка рефералов</h3>
                             <p class="section-subtitle">Рефералы готовые к проверке</p>
+                            {% elif current_user.role == 'analytics' %}
+                            <h3>Аналитика рефералов</h3>
+                            <p class="section-subtitle">Рефералы для аналитической обработки</p>
                             {% elif current_user.role == 'admin' %}
                             <h3>Управление рефералами</h3>
                             <p class="section-subtitle">Все рефералы в системе для модерации</p>
@@ -295,7 +298,7 @@
                                                             <button class="action-btn apply-btn" id='all_btn'>Выбрать все</button>
                                                             <button class="action-btn apply-btn" id='clear_btn'>Очистить</button>
                                                             </div>
-                                                            {% for status in statuses %}
+                                                            {% for status in filter_statuses %}
                                                                 <label>
                                                                 <div class="multiselect-option">
                                                                     <input type="checkbox" name="status" value="{{ status.id }}" 
@@ -412,6 +415,16 @@
                                                                 </option>
                                                                 {% endif %}
                                                             {% endfor %}
+                                                        {% elif current_user.role == 'analytics' %}
+                                                            <!-- Аналитики видят только разрешённые статусы -->
+                                                            {% for status in statuses %}
+                                                                {% if status.id in allowed_status_changes %}
+                                                                <option value="{{ status.id }}" 
+                                                                        {{ 'selected' if status.id == referal.status_id else '' }}>
+                                                                    {{ status.name }}
+                                                                </option>
+                                                                {% endif %}
+                                                            {% endfor %}
                                                         {% elif current_user.role == 'admin' %}
                                                             <!-- Админы видят все статусы -->
                                                             {% for status in statuses %}
@@ -429,7 +442,7 @@
                                                             Недоступно
                                                         {% elif current_user.role == 'call-center' and referal.status_id != 10 %}
                                                             Недоступно
-                                                        {% elif current_user.role == 'admin' %}
+                                                        {% elif current_user.role in ['admin', 'analytics'] %}
                                                             Обновить
                                                         {% endif %}
                                                     </button>

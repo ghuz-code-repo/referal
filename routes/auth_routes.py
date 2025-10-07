@@ -3,6 +3,7 @@
 from flask import Blueprint, request, g, jsonify
 from header_utils import decode_header_full_name
 from models import User, UserData, db
+from permission_utils import get_user_role_type
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -10,53 +11,53 @@ auth_bp = Blueprint('auth', __name__)
 def get_current_user():
     """Get current user information from request headers"""
     username = request.headers.get('X-User-Name')
-    print(f"DEBUG get_current_user: X-User-Name = {username}")
+    auth_user_id = request.headers.get('X-User-ID')
     
-    # Log ALL headers for debugging
-    print("DEBUG: ALL HEADERS:")
-    for header_name, header_value in request.headers.items():
-        if header_name.lower().startswith('x-user'):
-            print(f"  {header_name}: {header_value}")
+    # First try to find user by auth_user_id (more reliable after migration)
+    user = None
+    if auth_user_id:
+        user = User.query.filter_by(auth_user_id=auth_user_id).first()
     
-    user = User.query.filter_by(login=username).first()
+    # Fallback to username search if not found by auth_user_id
+    if not user and username:
+        user = User.query.filter_by(login=username).first()
     
     is_admin = request.headers.get('X-User-Admin', 'false').lower() == 'true'
     full_name = decode_header_full_name(request)
 
-    # Try service-specific roles first, fallback to legacy roles
-    service_role_str = request.headers.get('X-User-Service-Roles')
-    legacy_role_str = request.headers.get('X-User-Roles')
-    role_str = service_role_str if service_role_str else legacy_role_str
-    roles = str.split(role_str, ',') if role_str else []
-    role = ''
+    # Get user permissions and determine role type based on permissions
+    permissions_str = request.headers.get('X-User-Service-Permissions', '')
+    if not permissions_str:
+        permissions_str = request.headers.get('X-User-Permissions', '')
+    permissions = permissions_str.split(',') if permissions_str else []
     
-    print(f"DEBUG: Headers - X-User-Service-Roles: {service_role_str}, X-User-Roles: {legacy_role_str}, parsed roles: {roles}")
-    print(f"DEBUG: is_admin from header: {is_admin}")
+    # Determine role type based on permissions instead of hardcoded roles
+    role = get_user_role_type()
+    
+    # Legacy fallback: Try service-specific roles if no permissions found
+    if role == 'none':
+        service_role_str = request.headers.get('X-User-Service-Roles')
+        legacy_role_str = request.headers.get('X-User-Roles')
+        role_str = service_role_str if service_role_str else legacy_role_str
+        roles = str.split(role_str, ',') if role_str else []
 
-    if 'referal' in roles or 'referal-user' in roles or 'referer' in roles :
-        role = 'referer'
-    if 'referal-manager' in roles:
-        role = 'manager' 
-    if 'referal-call-center' in roles:
-        role = 'call-center' 
-    if 'admin' in roles or 'referal-admin' in roles:
-        role = 'admin'
+        if 'referal' in roles or 'referal-user' in roles or 'referer' in roles:
+            role = 'referer'
+        if 'referal-manager' in roles:
+            role = 'manager' 
+        if 'referal-call-center' in roles:
+            role = 'call-center' 
+        if 'admin' in roles or 'referal-admin' in roles:
+            role = 'admin'
         
-    print(f"DEBUG: Final determined role: {role}")  
     if user:
-        print(f"DEBUG: User found: {user.login}, current role: {user.role}, determined role: {role}, is_admin: {is_admin}")
         if user.role != 'admin' and is_admin:
             user.role = 'admin'
             db.session.commit()
-    else:
-        print(f"DEBUG: No user found with username: {username}")
-
+    
     # Создание нового пользователя если не найден
-    if not user and username:
+    if not user and username and auth_user_id:
         full_name = decode_header_full_name(request)
-        
-        # Получаем auth_user_id из заголовка
-        auth_user_id = request.headers.get('X-User-ID')
         
         user = User(
             login=username,
@@ -97,7 +98,6 @@ def get_current_user():
             user.auth_user_id = auth_user_id
             
     try:
-        print(f"User {user.login} updated with full_name: {user.user_data.full_name}, role: {user.role}")
         db.session.commit()
         
         # Синхронизируем данные с auth-service если есть auth_user_id

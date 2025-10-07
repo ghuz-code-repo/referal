@@ -11,6 +11,7 @@ from models import MacroContact, MacroDeal, db, User, Referal, Status
 
 # Импортируем все Blueprint'ы из папки routes
 from routes import auth_bp, referal_bp, admin_bp, document_bp, user_bp, sync_bp
+from routes.auth_routes import get_current_user
 
 import pandas as pd
 from werkzeug.security import generate_password_hash
@@ -90,7 +91,52 @@ if os.getenv('BEHIND_PROXY', 'false').lower() == 'true':
 
 @app.route('/')
 def home():
-    """Корневой маршрут - редирект на профиль рефералов."""
+    """Корневой маршрут - умное перенаправление на основе разрешений."""
+    print("DEBUG HOME: function called")
+    
+    # Получаем текущего пользователя
+    user = get_current_user()
+    print(f"DEBUG HOME: User: {user.login if user else 'None'}")
+    
+    if not user:
+        print("DEBUG HOME: No user, redirecting to profile")
+        return redirect(url_for('referal.profile'))
+    
+    # AUTH-CONNECTOR INTEGRATION
+    try:
+        from auth_connector import get_current_user as get_auth_user
+        auth_user = get_auth_user()
+        if auth_user:
+            print(f"DEBUG HOME: Auth-connector user found: {auth_user.username}")
+            
+            # Admin panel access for admin roles
+            has_admin_panel = auth_user.has_permission('referal.admin.panel')
+            has_manage_users = auth_user.has_any_permission(['referal.admin.manage_users', 'referal.users.manage'])
+            print(f"DEBUG HOME: has_admin_panel={has_admin_panel}, has_manage_users={has_manage_users}")
+            
+            if has_admin_panel or has_manage_users:
+                print("DEBUG HOME: Redirecting to admin panel")
+                return redirect(url_for('admin.admin_panel'))
+            
+            # For users without referral list permissions, redirect to a page they can access
+            has_referral_list = auth_user.has_permission('referal.referrals.list')
+            print(f"DEBUG HOME: has_referral_list={has_referral_list}")
+            
+            if not has_referral_list:
+                print("DEBUG HOME: User has no referral list permission")
+                # Check what they can access and redirect accordingly
+                if auth_user.has_permission('referal.payments.view'):
+                    print("DEBUG HOME: Redirecting to payments")
+                    return redirect(url_for('referal.payments'))
+                else:
+                    # Redirect to a basic profile page or show limited access message
+                    print("DEBUG HOME: Redirecting to limited profile")
+                    return redirect(url_for('referal.limited_profile'))
+    except ImportError:
+        print("DEBUG HOME: Auth-connector not available, using legacy logic")
+        pass
+    
+    print("DEBUG HOME: Default path - redirecting to profile")
     return redirect(url_for('referal.profile'))
 
 

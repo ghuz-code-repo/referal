@@ -36,6 +36,31 @@ def fetch_data_from_mysql():
     deals_result = _fetch_and_process_deals_task(mysql_config, app.app_context())
     print(f"Deals task result: {deals_result}")
     
+    # Update referal-deal links after synchronization
+    print("\n=== UPDATING REFERAL-DEAL LINKS ===")
+    with app.app_context():
+        from models import Referal, User
+        from services import referal_service
+        
+        # Get all users who have referals
+        users_with_referals = User.query.join(Referal).distinct().all()
+        updated_users = 0
+        updated_referals = 0
+        
+        print(f"Found {len(users_with_referals)} users with referals")
+        
+        for user in users_with_referals:
+            try:
+                referals_before = len(user.referals) if hasattr(user, 'referals') else 0
+                referal_service.update_deal_info(user)
+                updated_users += 1
+                updated_referals += referals_before
+                print(f"✅ Updated deals for user {user.login} ({referals_before} referals)")
+            except Exception as e:
+                print(f"❌ Error updating deals for user {user.login}: {e}")
+        
+        print(f"✅ Updated {updated_users} users with {updated_referals} referals")
+    
     # Final verification of both tables
     with app.app_context():
         final_contacts_count = MacroContact.query.count()
@@ -177,16 +202,11 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
         with app_context:
             print(f"{task_name}: Inside app context")
             
-            # Clear existing contacts for fresh import
-            print(f"{task_name}: Clearing existing contacts...")
-            try:
-                deleted_count = MacroContact.query.count()
-                MacroContact.query.delete()
-                db.session.commit()
-                print(f"{task_name}: Cleared {deleted_count} existing contacts.")
-            except Exception as e:
-                print(f"{task_name}: Error clearing contacts: {e}")
-                db.session.rollback()
+            # Instead of clearing all contacts, we'll use upsert logic
+            # This preserves existing data and only updates/adds new records
+            print(f"{task_name}: Starting incremental sync (preserving existing data)...")
+            existing_contacts_count = MacroContact.query.count()
+            print(f"{task_name}: Current contacts in database: {existing_contacts_count}")
             
             print(f"{task_name}: Attempting to connect to MySQL...")
             connection = pymysql.connect(**mysql_config)
@@ -196,8 +216,9 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                 print(f"{task_name}: Created cursor, preparing queries...")
                 
                 # Get date threshold (last N days)
-                date_threshold = (datetime.now() - timedelta(days=os.getenv("TRASHHOLDDAYS",45))).strftime('%Y-%m-%d')
-                print(f"{task_name}: Date threshold: {date_threshold}")
+                threshold_days = int(os.getenv("TRASHHOLDDAYS", 45))
+                date_threshold = (datetime.now() - timedelta(days=threshold_days)).strftime('%Y-%m-%d')
+                print(f"{task_name}: Date threshold: {date_threshold} (last {threshold_days} days)")
                 
                 # Count total records
                 query_count_contacts = "SELECT COUNT(*) FROM estate_deals_contacts WHERE date_modified >= %s AND contacts_buy_phones IS NOT NULL AND contacts_buy_phones != ''"
@@ -511,11 +532,10 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
     print(f"{task_name}: Starting.")
     try:
         with app_context:
-            # Clear existing deals for fresh import
-            print(f"{task_name}: Clearing existing deals...")
-            MacroDeal.query.delete()
-            db.session.commit()
-            print(f"{task_name}: Existing deals cleared.")
+            # Instead of clearing all deals, use incremental sync
+            print(f"{task_name}: Starting incremental sync (preserving existing data)...")
+            existing_deals_count = MacroDeal.query.count()
+            print(f"{task_name}: Current deals in database: {existing_deals_count}")
             
             connection = pymysql.connect(**mysql_config)
             print(f"{task_name}: Connected to MySQL database successfully")
@@ -529,12 +549,37 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                     total_deals_to_process = count_result[0]
                 print(f"{task_name}: Total deals to process: {total_deals_to_process}")
 
-                # Fetch deals data
+                # Fetch deals data with total payments from finances table + property details
+                # Суммируем все ПРОВЕДЕННЫЕ платежи по договору из таблицы finances (кроме брони)
+                # Также получаем данные о недвижимости для генерации актов
                 query_deals = """
-                    SELECT deal_status_name, agreement_number, contacts_buy_id, deal_area
-                    FROM estate_deals 
-                    WHERE contacts_buy_id IS NOT NULL
-                    AND agreement_number IS NOT NULL
+                    SELECT 
+                        ed.deal_status_name, 
+                        ed.agreement_number, 
+                        ed.contacts_buy_id, 
+                        ed.deal_area,
+                        COALESCE(SUM(
+                            CASE 
+                                WHEN f.status_name = 'Проведено' AND f.types_name != 'Бронь' 
+                                THEN f.summa 
+                                ELSE 0 
+                            END
+                        ), 0) as total_payments,
+                        h.complex_name as project_name,
+                        h.geo_street_name as house_address,
+                        h.geo_house as house_number,
+                        es.estate_rooms as apartment_number,
+                        ed.finances_income as agreement_price,
+                        ed.agreement_date
+                    FROM estate_deals ed
+                    LEFT JOIN finances f ON ed.id = f.deal_id
+                    LEFT JOIN estate_sells es ON ed.estate_sell_id = es.estate_sell_id
+                    LEFT JOIN estate_houses h ON es.house_id = h.id
+                    WHERE ed.contacts_buy_id IS NOT NULL
+                    AND ed.agreement_number IS NOT NULL
+                    GROUP BY ed.id, ed.deal_status_name, ed.agreement_number, ed.contacts_buy_id, ed.deal_area,
+                             h.complex_name, h.geo_street_name, h.geo_house, es.estate_rooms, 
+                             ed.finances_income, ed.agreement_date
                 """
                 cursor.execute(query_deals)
                 print(f"{task_name}: Executed SELECT query for deals.")
@@ -552,32 +597,70 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                     print(f"{task_name}: Processing batch {batch_number} with {current_batch_size} rows")
                     
                     deals_in_batch_to_add = []
+                    deals_updated_count = 0
                     for row_data in rows: 
-                        deal_status_name, agreement_number, contacts_buy_id, deal_area = row_data
+                        (deal_status_name, agreement_number, contacts_buy_id, deal_area, total_payments,
+                         project_name, house_address, house_number, apartment_number, 
+                         agreement_price, agreement_date) = row_data
                         try:
-                            new_deal = MacroDeal(
-                                deal_status_name=deal_status_name,
-                                agreement_number=agreement_number,
-                                contacts_buy_id=contacts_buy_id,
-                                deal_metr=deal_area
-                            )
-                            deals_in_batch_to_add.append(new_deal)
+                            # Check if deal already exists by agreement_number
+                            existing_deal = MacroDeal.query.filter_by(agreement_number=agreement_number).first()
+                            
+                            if existing_deal:
+                                # Update existing deal with all fields including property details
+                                existing_deal.deal_status_name = deal_status_name
+                                existing_deal.contacts_buy_id = contacts_buy_id
+                                existing_deal.deal_metr = deal_area
+                                existing_deal.total_payments = total_payments or 0
+                                existing_deal.project_name = project_name
+                                existing_deal.house_address = house_address
+                                existing_deal.house_number = house_number
+                                existing_deal.apartment_number = apartment_number
+                                existing_deal.agreement_price = agreement_price
+                                existing_deal.agreement_date = agreement_date
+                                deals_updated_count += 1
+                            else:
+                                # Create new deal with all fields including property details
+                                new_deal = MacroDeal(
+                                    deal_status_name=deal_status_name,
+                                    agreement_number=agreement_number,
+                                    contacts_buy_id=contacts_buy_id,
+                                    deal_metr=deal_area,
+                                    total_payments=total_payments or 0,
+                                    project_name=project_name,
+                                    house_address=house_address,
+                                    house_number=house_number,
+                                    apartment_number=apartment_number,
+                                    agreement_price=agreement_price,
+                                    agreement_date=agreement_date
+                                )
+                                deals_in_batch_to_add.append(new_deal)
                         except Exception as e:
-                            error_msg = f"{task_name}: Error creating MacroDeal object for agreement {agreement_number}: {str(e)}"
+                            error_msg = f"{task_name}: Error processing deal for agreement {agreement_number}: {str(e)}"
                             print(error_msg)
                             errors.append(error_msg)
                     
+                    # Insert new deals
                     if deals_in_batch_to_add:
                         try:
                             db.session.add_all(deals_in_batch_to_add)
-                            db.session.commit() 
                             loaded_deals += len(deals_in_batch_to_add)
-                            print(f"{task_name}: Successfully committed {len(deals_in_batch_to_add)} deals to database")
                         except Exception as e:
                             db.session.rollback()
-                            error_msg = f"{task_name}: Error committing batch of {len(deals_in_batch_to_add)} deals: {str(e)}"
+                            error_msg = f"{task_name}: Error adding new deals: {str(e)}"
                             print(error_msg)
                             errors.append(error_msg)
+                    
+                    # Commit all changes (updates + inserts)
+                    try:
+                        db.session.commit() 
+                        total_processed_in_batch = len(deals_in_batch_to_add) + deals_updated_count
+                        print(f"{task_name}: Successfully committed {len(deals_in_batch_to_add)} new deals and updated {deals_updated_count} existing deals")
+                    except Exception as e:
+                        db.session.rollback()
+                        error_msg = f"{task_name}: Error committing batch of {len(deals_in_batch_to_add)} deals: {str(e)}"
+                        print(error_msg)
+                        errors.append(error_msg)
                     
                     # Progress update
                     if total_deals_to_process > 0:

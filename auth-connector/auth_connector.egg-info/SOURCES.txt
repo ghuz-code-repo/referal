@@ -1,0 +1,13 @@
+README.md
+setup.py
+auth_connector/__init__.py
+auth_connector/auth_client.py
+auth_connector/auth_middleware.py
+auth_connector/exceptions.py
+auth_connector/permissions.py
+auth_connector/setup.py
+auth_connector.egg-info/PKG-INFO
+auth_connector.egg-info/SOURCES.txt
+auth_connector.egg-info/dependency_links.txt
+auth_connector.egg-info/requires.txt
+auth_connector.egg-info/top_level.txt

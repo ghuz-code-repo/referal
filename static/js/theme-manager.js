@@ -325,9 +325,14 @@ class ThemeManager {
             this.logos.light = logoElement.dataset.lightLogo;
             this.logos.dark = logoElement.dataset.darkLogo;
             
-            console.log('Logo URLs loaded:', this.logos);
+            console.log('🖼️ Logo URLs loaded:', this.logos);
+            console.log('🖼️ Logo element found:', logoElement);
+            console.log('🖼️ Current logo src:', logoElement.src);
+            
+            // url_for() уже возвращает правильные пути с префиксом, не нужно добавлять origin
+            console.log('🖼️ Final logo URLs:', this.logos);
         } else {
-            console.warn('Logo element not found');
+            console.warn('❌ Logo element not found');
         }
     }
 
@@ -338,26 +343,46 @@ class ThemeManager {
         const logoElement = document.getElementById('dynamic-logo');
         
         if (!logoElement) {
-            console.warn('Logo element not found');
+            console.warn('❌ Logo element not found in updateLogo');
             return;
         }
 
         const logoPath = this.logos[theme];
 
         if (!logoPath) {
-            console.warn('Logo path not found for theme:', theme);
+            console.warn('❌ Logo path not found for theme:', theme, 'Available logos:', this.logos);
             return;
         }
 
-        if (logoElement.src !== logoPath) {
+        console.log('🖼️ Updating logo for theme:', theme);
+        console.log('🖼️ Current logo src:', logoElement.src);
+        console.log('🖼️ Target logo path:', logoPath);
+
+        // Проверяем, отличается ли текущий src от целевого
+        const currentSrc = logoElement.src;
+        const targetSrc = logoPath;
+        
+        if (currentSrc !== targetSrc) {
+            console.log('🔄 Logo needs update, switching...');
             // Плавная смена логотипа
-            logoElement.style.opacity = '0';
+            logoElement.style.opacity = '0.3';
             
             setTimeout(() => {
-                logoElement.src = logoPath;
+                logoElement.src = targetSrc;
                 logoElement.style.opacity = '1';
-                console.log(`Logo updated to: ${logoPath} for theme: ${theme}`);
-            }, 150);
+                console.log(`✅ Logo updated to: ${targetSrc} for theme: ${theme}`);
+                
+                // Проверяем, что логотип загрузился
+                logoElement.onload = () => {
+                    console.log('✅ Logo loaded successfully');
+                };
+                logoElement.onerror = (error) => {
+                    console.error('❌ Logo failed to load:', error);
+                    console.error('❌ Failed URL:', logoElement.src);
+                };
+            }, 100);
+        } else {
+            console.log('🖼️ Logo already correct for theme:', theme);
         }
     }
 

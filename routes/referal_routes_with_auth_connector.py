@@ -3,20 +3,23 @@ Example referal_routes.py updated with auth-connector
 Shows how to migrate from simple role checks to permission-based authorization
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, g, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, g, current_app, flash
 import services.referal_service as referal_service
-from models import User, Referal, db
+from models import User, Referal, ReferalData, MacroContact, Status, db
 import re
 import os
 import random
 from services import notification_service
 from routes.auth_routes import get_current_user
+import utils
 
 # AUTH-CONNECTOR INTEGRATION
 try:
     from auth_connector import require_permission, require_any_permission, get_current_user as get_auth_user
     AUTH_CONNECTOR_AVAILABLE = True
-except ImportError:
+    print("✅ referal_routes_with_auth_connector: auth_connector imported successfully")
+except ImportError as e:
+    print(f"⚠️  referal_routes_with_auth_connector: Failed to import auth_connector: {e}")
     AUTH_CONNECTOR_AVAILABLE = False
     # Fallback decorators
     def require_permission(permission, allow_admin=True):
@@ -34,46 +37,173 @@ referal_bp = Blueprint('referal', __name__)
 def get_user():
     """Get current user - uses auth-connector if available, falls back to legacy"""
     if AUTH_CONNECTOR_AVAILABLE:
-        return get_auth_user()
+        auth_user = get_auth_user()
+        print(f"🔍 get_user() | AUTH_CONNECTOR_AVAILABLE: True | get_auth_user() returned: {type(auth_user).__name__ if auth_user else 'None'}")
+        return auth_user
     else:
-        return get_current_user()
+        legacy_user = get_current_user()
+        print(f"🔍 get_user() | AUTH_CONNECTOR_AVAILABLE: False | get_current_user() returned: {type(legacy_user).__name__ if legacy_user else 'None'}")
+        return legacy_user
 
-@referal_bp.route('/', methods=['GET'])
-@require_permission('referal.profile.view')  # NEW: Permission-based authorization
-def index():
-    """Main referral page with permission check"""
-    user = get_user()
-    
-    if not user:
-        print("No user found, redirecting to referal profile")
-        return redirect(url_for('referal.profile'))
-    
-    # OLD WAY (keep as fallback):
-    # if user.role == 'admin' or user.role == 'manager' or user.role == 'call-center':
-    
-    # NEW WAY: Check permissions
-    if AUTH_CONNECTOR_AVAILABLE:
-        if user.has_any_permission(['referal.admin.manage_users', 'referal.users.manage', 'referal.leads.view']):
-            return redirect(url_for('admin.admin_panel'))
-    else:
-        # Legacy fallback
-        if hasattr(user, 'role') and user.role in ['admin', 'manager', 'call-center']:
-            return redirect(url_for('admin.admin_panel'))
-    
-    # Update deal info for regular users
-    if hasattr(user, 'id'):
-        referal_service.update_deal_info(user)
-    
-    return redirect(url_for('referal.profile'))
+# COMMENTED OUT - now handled by @app.route('/') in app_with_auth_connector.py
+# @referal_bp.route('/', methods=['GET'])
+# @require_permission('referal.profile.view')  # NEW: Permission-based authorization
+# def index():
+#     """Main referral page with smart redirection based on permissions"""
+#     print("DEBUG INDEX: function called")
+#     user = get_user()
+#     
+#     if not user:
+#         print("DEBUG INDEX: No user found, redirecting to referal profile")
+#         return redirect(url_for('referal.profile'))
+#     
+#     print(f"DEBUG INDEX: User found: {user.login if hasattr(user, 'login') else 'unknown'}")
+#     
+#     # Check permissions and redirect accordingly
+#     if AUTH_CONNECTOR_AVAILABLE:
+#         print("DEBUG INDEX: AUTH_CONNECTOR_AVAILABLE = True")
+#         
+#         # Admin panel access for admin roles
+#         has_admin_panel = user.has_permission('referal.admin.panel')
+#         has_manage_users = user.has_any_permission(['referal.admin.manage_users', 'referal.users.manage'])
+#         print(f"DEBUG INDEX: has_admin_panel={has_admin_panel}, has_manage_users={has_manage_users}")
+#         
+#         if has_admin_panel or has_manage_users:
+#             print("DEBUG INDEX: Redirecting to admin panel")
+#             return redirect(url_for('admin.admin_panel'))
+#         
+#         # For users without referral list permissions, redirect to a page they can access
+#         has_referral_list = user.has_permission('referal.referrals.list')
+#         print(f"DEBUG INDEX: has_referral_list={has_referral_list}")
+#         
+#         if not has_referral_list:
+#             print("DEBUG INDEX: User has no referral list permission")
+#             # Check what they can access and redirect accordingly
+#             if user.has_permission('referal.payments.view'):
+#                 print("DEBUG INDEX: Redirecting to payments")
+#                 return redirect(url_for('referal.payments'))
+#             else:
+#                 # Redirect to a basic profile page or show limited access message
+#                 print("DEBUG INDEX: Redirecting to limited profile")
+#                 return redirect(url_for('referal.limited_profile'))
+#     else:
+#         print("DEBUG INDEX: AUTH_CONNECTOR_AVAILABLE = False, using legacy")
+#         # Legacy fallback
+#         if hasattr(user, 'role') and user.role in ['admin', 'manager', 'call-center']:
+#             print("DEBUG INDEX: Legacy redirect to admin panel")
+#             return redirect(url_for('admin.admin_panel'))
+#     
+#     print("DEBUG INDEX: Default path - updating deal info and redirecting to profile")
+#     # Update deal info for regular users with referral access
+#     if hasattr(user, 'id'):
+#         referal_service.update_deal_info(user)
+#     
+#     return redirect(url_for('referal.profile'))
 
 @referal_bp.route('/profile', methods=['GET'])
-@require_permission('referal.profile.view')
 def profile():
-    """User profile page"""
+    """User profile page - requires referral access"""
+    user = get_user()
+    
+    print(f"🔍 Profile route | User: {user} | Type: {type(user).__name__ if user else 'None'}")
+    if user:
+        print(f"   has_id: {hasattr(user, 'id')} | has_user_id: {hasattr(user, 'user_id')} | username: {user.username if hasattr(user, 'username') else 'N/A'}")
+    
+    if not user:
+        return render_template('access_denied.html',
+                             service_name='Реферальная программа',
+                             required_permissions=['referal.referrals.list', 'referal.referrals.create']), 403
+    
+    # Check if user has any referral access
+    has_referral_access = False
+    if AUTH_CONNECTOR_AVAILABLE:
+        # Получаем все права пользователя для проверки
+        user_perms = request.headers.get('X-User-Service-Permissions', '').split(',')
+        
+        # Администратор с правами на админ-панель также имеет доступ к профилю
+        has_admin_access = user.has_any_permission(['referal.admin.panel', 'referal.admin.manage_users'])
+        
+        # Проверяем разрешения на просмотр профиля или рефералов
+        required_perms = [
+            'referal.profile.view',      # Основное разрешение на просмотр профиля
+            'referal.referrals.list',    # Список рефералов
+            'referal.referrals.view',    # Просмотр рефералов
+            'referal.referrals.create',  # Создание рефералов
+            'referal.referrals.add'      # Альтернативное название для создания
+        ]
+        has_referral_access = user.has_any_permission(required_perms) or has_admin_access
+        
+        print(f"🔐 Profile access check | User: {user.username} | Admin: {has_admin_access} | Referral: {user.has_any_permission(required_perms)} | Perms: {user_perms}")
+        
+        if not has_referral_access:
+            print(f"⚠️ Profile access DENIED")
+    else:
+        # Legacy fallback - if no auth-connector, allow access for backward compatibility
+        has_referral_access = True
+    
+    if not has_referral_access:
+        return render_template('access_denied.html',
+                             service_name='Реферальная программа',
+                             required_permissions=['referal.profile.view', 'referal.referrals.list', 'referal.referrals.view']), 403
+    
+    # Legacy user handling for backward compatibility
+    # Keep the original user object (UserContext from auth-connector) for permission checks
+    # but get db_user for profile data and sync
+    db_user = None
+    if not hasattr(user, 'id') and hasattr(user, 'user_id'):
+        # This is auth-connector user (UserContext), need to get from DB for profile data
+        db_user = User.query.filter_by(login=user.username).first()
+        print(f"👤 Looking up database user for {user.username}: {'Found' if db_user else 'Not found'}")
+        if db_user:
+            print(f"   DB user has auth_user_id: {db_user.auth_user_id if hasattr(db_user, 'auth_user_id') else 'N/A'}")
+            # Синхронизация не требуется - данные пользователя уже в headers от gateway
+    elif user and hasattr(user, 'id'):
+        # This is legacy user from database
+        db_user = user
+        # Синхронизация не требуется - данные пользователя уже в headers от gateway
+    
+    # Check available permissions
+    can_view_referrals = False
+    can_add_referrals = False
+    
+    if AUTH_CONNECTOR_AVAILABLE and user:
+        # Check SPECIFIC referral permissions (not admin.panel!)
+        can_view_referrals = user.has_any_permission([
+            'referal.referrals.list',
+            'referal.referrals.view'
+        ])
+        can_add_referrals = user.has_any_permission([
+            'referal.referrals.create',
+            'referal.referrals.add'
+        ])
+    
+    # Get user balance info if available
+    current_balance = 0
+    pending_withdrawal = 0
+    total_withdrawal = 0
+    
+    if db_user:
+        current_balance = getattr(db_user, 'current_balance', 0)
+        pending_withdrawal = getattr(db_user, 'pending_withdrawal', 0)
+        total_withdrawal = getattr(db_user, 'total_withdrawal', 0)
+    
+    # Show profile page with user information and available actions
+    return render_template('profile.html',
+                         user=db_user if db_user else user,
+                         can_view_referrals=can_view_referrals,
+                         can_add_referrals=can_add_referrals,
+                         current_balance=current_balance,
+                         pending_withdrawal=pending_withdrawal,
+                         total_withdrawal=total_withdrawal)
+
+@referal_bp.route('/limited_profile', methods=['GET'])
+@require_permission('referal.profile.view')
+def limited_profile():
+    """Limited profile page for users without referral access"""
     user = get_user()
     
     if not user:
-        return render_template('profile.html', 
+        return render_template('limited_profile.html', 
                              error="Пользователь не найден. Обратитесь к администратору.")
     
     # Legacy user handling for backward compatibility
@@ -91,18 +221,49 @@ def profile():
         except Exception as e:
             print(f"Warning: Failed to sync user data from auth-service: {e}")
     
-    return render_template('profile.html', user=user)
-
-@referal_bp.route('/add_referal', methods=['GET'])
-@require_permission('referal.referrals.create')
-def add_referal_form():
-    """Show add referral form"""
-    user = get_user()
+    # Check available permissions for this user
+    available_actions = []
     
-    if not user:
-        return redirect(url_for('referal.profile'))
+    if AUTH_CONNECTOR_AVAILABLE and user:
+        # Добавить реферала
+        if user.has_permission('referal.referrals.create'):
+            available_actions.append({
+                'title': 'Добавить реферала',
+                'url': url_for('referal.add_referal_form'),
+                'icon': 'fas fa-user-plus',
+                'description': 'Добавить нового реферала в систему'
+            })
+        
+        # Просмотр своих рефералов
+        if user.has_permission('referal.referrals.list'):
+            available_actions.append({
+                'title': 'Мои рефералы',
+                'url': url_for('referal.my_referrals'),
+                'icon': 'fas fa-users',
+                'description': 'Просмотр списка моих рефералов'
+            })
+        
+        # Административная панель
+        if user.has_permission('referal.admin.panel'):
+            available_actions.append({
+                'title': 'Панель администратора',
+                'url': url_for('admin.admin_panel'),
+                'icon': 'fas fa-cog',
+                'description': 'Управление системой и пользователями'
+            })
+        
+        # Платежи
+        if user.has_permission('referal.payments.view'):
+            available_actions.append({
+                'title': 'Платежи и выплаты',
+                'url': url_for('referal.payments'),
+                'icon': 'fas fa-credit-card',
+                'description': 'Просмотр информации о платежах и балансе'
+            })
     
-    return render_template('add_referal.html', user=user)
+    return render_template('limited_profile.html', 
+                         user=user,
+                         available_actions=available_actions)
 
 @referal_bp.route('/add_referal', methods=['POST'])
 @require_permission('referal.referrals.create')
@@ -113,37 +274,102 @@ def add_referal():
     if not user:
         return jsonify({'success': False, 'message': 'Пользователь не авторизован'})
     
-    # Get form data
-    full_name = request.form.get('full_name')
-    phone = request.form.get('phone')
-    contact_method = request.form.get('contact_method', 'Обычный звонок')
-    
-    if not full_name or not phone:
-        return jsonify({
-            'success': False, 
-            'message': 'Пожалуйста, заполните все обязательные поля'
-        })
-    
-    # Validate and format phone
-    phone_digits = re.sub(r'\D', '', phone)
-    if len(phone_digits) < 9:
-        return jsonify({
-            'success': False,
-            'message': 'Пожалуйста, введите корректный номер телефона'
-        })
-    
-    formatted_phone = f"+998{phone_digits[-9:]}"
-    
     try:
-        # Create referral
+        # Get form data
+        full_name = request.form.get('full_name', '').strip()
+        phone = request.form.get('phone', '').strip()
+        
+        # Validate required fields
+        if not full_name:
+            return jsonify({
+                'success': False, 
+                'message': 'Имя реферала обязательно для заполнения'
+            })
+        
+        if not phone:
+            return jsonify({
+                'success': False,
+                'message': 'Телефон реферала обязателен для заполнения'
+            })
+        
+        # Validate and format phone
+        phone_digits = re.sub(r'\D', '', phone)
+        if len(phone_digits) < 9:
+            return jsonify({
+                'success': False,
+                'message': 'Пожалуйста, введите корректный номер телефона'
+            })
+        
+        formatted_phone = f"+998{phone_digits[-9:]}"
+        
+        # Check if referral with this phone already exists
+        existing_referal = Referal.query.join(ReferalData).filter(
+            ReferalData.phone_number == formatted_phone
+        ).first()
+        if existing_referal:
+            return jsonify({
+                'success': False,
+                'message': f'Реферал с номером {formatted_phone} уже добавлен'
+            })
+        
+        # Check if referral with this name already exists
+        existing_referal = Referal.query.join(ReferalData).filter(
+            ReferalData.full_name == full_name
+        ).first()
+        if existing_referal:
+            return jsonify({
+                'success': False,
+                'message': f'Реферал с именем {full_name} уже добавлен'
+            })
+        
+        # Check if this person is already a MacroContact
+        macro_contact = MacroContact.query.filter_by(phone_number=formatted_phone).first()
+        if macro_contact:
+            return jsonify({
+                'success': False,
+                'message': 'Данный человек не может являться рефералом'
+            })
+        
+        # Get initial status (should be the first status or status with is_start=True)
+        initial_status = Status.query.filter_by(is_start=True).first()
+        if not initial_status:
+            # Fallback to first status if no start status is set
+            initial_status = Status.query.order_by(Status.id).first()
+        
+        # Create new referral with initial status
         new_referal = Referal(
             user_id=user.id,
+            status_id=initial_status.id if initial_status else 1,
+            status_name=initial_status.name if initial_status else 'Не начата'
+        )
+        db.session.add(new_referal)
+        db.session.commit()
+        db.session.flush()  # Get referral ID
+        
+        # Create referral data
+        referal_data = ReferalData(
+            referal_id=new_referal.id,
             full_name=full_name,
-            phone=formatted_phone,
-            contact_method=contact_method
+            phone_number=formatted_phone
         )
         
-        db.session.add(new_referal)
+        # Optional passport fields
+        passport_number = request.form.get('passport_number', '').strip()
+        passport_date = request.form.get('passport_date', '').strip()
+        passport_giver = request.form.get('passport_giver', '').strip()
+        
+        if passport_number:
+            referal_data.passport_number = passport_number
+        if passport_date:
+            from datetime import datetime
+            try:
+                referal_data.passport_date = datetime.strptime(passport_date, '%Y-%m-%d')
+            except ValueError:
+                pass  # Ignore invalid date format
+        if passport_giver:
+            referal_data.passport_giver = passport_giver
+        
+        db.session.add(referal_data)
         db.session.commit()
         
         # Send notification if user has permission
@@ -162,6 +388,8 @@ def add_referal():
     except Exception as e:
         db.session.rollback()
         print(f"Error adding referral: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'message': 'Ошибка при добавлении реферала. Попробуйте еще раз.'
@@ -171,17 +399,170 @@ def add_referal():
 @require_permission('referal.referrals.view')
 def my_referrals():
     """View user's referrals"""
+    # Get auth-connector user first for permissions
+    auth_user = None
+    if AUTH_CONNECTOR_AVAILABLE:
+        try:
+            from auth_connector import get_current_user as get_auth_user
+            auth_user = get_auth_user()
+        except:
+            pass
+    
+    # Get DB user for referrals
     user = get_user()
     
     if not user:
         return redirect(url_for('referal.profile'))
     
+    # Legacy user handling for backward compatibility
+    if not hasattr(user, 'id') and hasattr(user, 'user_id'):
+        # This is auth-connector user, need to get from DB
+        db_user = User.query.filter_by(login=user.username).first()
+        if db_user:
+            user = db_user
+    
+    # Check permissions using auth_user if available  
+    can_add_referrals = True  # Default to True if user passed @require_permission check
+    can_view_referrals = True  # Default to True if user passed @require_permission check
+    
+    if auth_user:
+        can_view_referrals = auth_user.has_any_permission(['referal.referrals.list', 'referal.referrals.view'])
+        can_add_referrals = auth_user.has_any_permission(['referal.referrals.create', 'referal.referrals.add'])
+    
     # Get user's referrals
-    referrals = Referal.query.filter_by(user_id=user.id).all()
+    if hasattr(user, 'id'):
+        referrals = Referal.query.filter_by(user_id=user.id).all()
+        total_user_referals = len(referrals)
+    else:
+        referrals = []
+        total_user_referals = 0
+    
+    # Get all statuses for filter
+    statuses = Status.query.all()
+    
+    # Get selected statuses - by default exclude "Paid" status (300)
+    EXCLUDED_STATUSES = [300]
+    selected_statuses = [s.id for s in Status.query.filter(Status.id.notin_(EXCLUDED_STATUSES)).all()]
     
     return render_template('my_referrals.html', 
                          user=user, 
-                         referrals=referrals)
+                         referals=referrals,  # Changed from referrals to referals
+                         total_user_referals=total_user_referals,
+                         can_add_referrals=can_add_referrals,
+                         can_view_referrals=can_view_referrals,
+                         statuses=statuses,
+                         selected_statuses=selected_statuses,
+                         sort_fields=[],
+                         current_filters={},
+                         current_sort=None)
+
+@referal_bp.route('/request_withdrawal/<int:referal_id>', methods=['POST'])
+@require_permission('referal.payments.request')
+def request_withdrawal(referal_id):
+    """Request withdrawal for a specific referral"""
+    from services import withdrawal_service
+    
+    user = get_user()
+    if not user:
+        return redirect(url_for('referal.my_referrals'))
+    
+    try:
+        withdrawal_service.request_withdrawal(referal_id, user=user)
+        return redirect(url_for('referal.my_referrals'))
+    except Exception as e:
+        print(f"Error requesting withdrawal: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return redirect(url_for('referal.my_referrals'))
+
+@referal_bp.route('/update_referal_documents/<int:referal_id>', methods=['POST'])
+@require_permission('referal.referrals.edit')
+def update_referal_documents(referal_id):
+    """Update referral documents and data"""
+    from datetime import datetime
+    
+    user = get_user()
+    if not user:
+        flash('Пользователь не авторизован', 'error')
+        return redirect(url_for('referal.my_referrals'))
+    
+    # Check if referal belongs to user
+    referal = Referal.query.filter_by(id=referal_id, user_id=user.id).first()
+    if not referal:
+        flash('Реферал не найден', 'error')
+        return redirect(url_for('referal.my_referrals'))
+    
+    try:
+        # If referal has no data, create it
+        if not referal.referal_data:
+            referal.referal_data = ReferalData(referal_id=referal_id)
+            db.session.add(referal.referal_data)
+            db.session.flush()
+        
+        # Get form data
+        full_name = request.form.get('full_name', '').strip()
+        phone_number = request.form.get('phone_number', '').strip()
+        passport_number = request.form.get('passport_number', '').strip()
+        passport_giver = request.form.get('passport_giver', '').strip()
+        passport_adress = request.form.get('passport_adress', '').strip()
+        mail_adress = request.form.get('mail_adress', '').strip()
+        passport_date_str = request.form.get('passport_date', '').strip()
+        
+        # Форматируем номер телефона через utils функцию
+        formatted_phone = None
+        if phone_number:
+            # Если есть запятые, берем только первый номер
+            first_phone = phone_number.split(',')[0].strip()
+            formatted_phone = utils.format_phone_number(first_phone)
+        
+        # Update referal data fields
+        referal.referal_data.full_name = full_name if full_name else None
+        referal.referal_data.phone_number = formatted_phone if formatted_phone else phone_number if phone_number else None
+        referal.referal_data.passport_number = passport_number if passport_number else None
+        referal.referal_data.passport_giver = passport_giver if passport_giver else None
+        referal.referal_data.passport_adress = passport_adress if passport_adress else None
+        referal.referal_data.mail_adress = mail_adress if mail_adress else None
+        
+        # Handle passport_date
+        if passport_date_str:
+            try:
+                passport_date = datetime.strptime(passport_date_str, '%Y-%m-%d')
+                referal.referal_data.passport_date = passport_date
+            except ValueError:
+                try:
+                    passport_date = datetime.strptime(passport_date_str, '%d.%m.%Y')
+                    referal.referal_data.passport_date = passport_date
+                except ValueError:
+                    try:
+                        passport_date = datetime.strptime(passport_date_str, '%d/%m/%Y')
+                        referal.referal_data.passport_date = passport_date
+                    except ValueError:
+                        flash('Неверный формат даты выдачи паспорта. Используйте формат ДД.ММ.ГГГГ', 'error')
+                        return redirect(url_for('referal.my_referrals'))
+        else:
+            referal.referal_data.passport_date = None
+        
+        # Валидация ФИО
+        if full_name and (not re.match(r'^[A-Za-z`\']+(?: [A-Za-z`\']+){2,}$', full_name) or '  ' in full_name):
+            flash('Неверно введено ФИО. Используйте латиницу и минимум 3 слова', 'error')
+            return redirect(url_for('referal.my_referrals'))
+        
+        # Валидация телефона
+        if phone_number and not formatted_phone:
+            flash('Неверный формат телефона. Введите корректный номер телефона', 'error')
+            return redirect(url_for('referal.my_referrals'))
+        
+        db.session.commit()
+        flash('Данные реферала успешно обновлены', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating referal documents: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash(f'Ошибка при обновлении данных: {e}', 'error')
+    
+    return redirect(url_for('referal.my_referrals'))
 
 @referal_bp.route('/payments')
 @require_permission('referal.payments.view')

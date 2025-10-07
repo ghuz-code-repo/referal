@@ -49,6 +49,20 @@ html, body {
     padding: 15px;
 }
 
+/* Стили для пометок о данных из auth-service */
+.auth-data-note {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: var(--text-muted, #666);
+    font-style: italic;
+}
+
+.auth-data-note i {
+    margin-right: 4px;
+    color: var(--primary-color, #007bff);
+}
+
 .profile-info, .profile-form {
     display: flex;
     flex-direction: column;

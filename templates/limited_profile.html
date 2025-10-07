@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль - Реферальная система</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/profile.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .limited-access-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow-medium);
+        }
+        
+        .access-header {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--text-primary);
+        }
+        
+        .access-header h2 {
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+        
+        .access-header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        .available-actions {
+            display: grid;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .action-card {
+            display: flex;
+            align-items: center;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+        
+        .action-card:hover {
+            background: var(--hover-bg);
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-medium);
+        }
+        
+        .action-icon {
+            font-size: 2rem;
+            color: var(--primary-color);
+            margin-right: 1rem;
+            width: 60px;
+            text-align: center;
+        }
+        
+        .action-content h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--text-primary);
+        }
+        
+        .action-content p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .no-actions {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+        
+        .user-info {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .user-info h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--primary-color);
+        }
+        
+        .user-info p {
+            margin: 0.25rem 0;
+            color: var(--text-primary);
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-medium);
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        {% include 'components/header.html' %}
+        
+        <main class="main-content">
+            <div class="limited-access-container">
+                <div class="access-header">
+                    <h2><i class="fas fa-user-circle"></i> Профиль пользователя</h2>
+                    <p>Добро пожаловать в реферальную систему</p>
+                </div>
+                
+                {% if user %}
+                <div class="user-info">
+                    <h3><i class="fas fa-info-circle"></i> Информация о пользователе</h3>
+                    <p><strong>Логин:</strong> {{ user.login if user.login else user.username }}</p>
+                    {% if user.email %}
+                    <p><strong>Email:</strong> {{ user.email }}</p>
+                    {% endif %}
+                    <p><strong>Роль:</strong> Аналитик</p>
+                </div>
+                {% endif %}
+                
+                {% if available_actions and available_actions|length > 0 %}
+                <h3><i class="fas fa-tasks"></i> Доступные функции</h3>
+                <div class="available-actions">
+                    {% for action in available_actions %}
+                    <a href="{{ action.url }}" class="action-card">
+                        <div class="action-icon">
+                            <i class="{{ action.icon }}"></i>
+                        </div>
+                        <div class="action-content">
+                            <h3>{{ action.title }}</h3>
+                            <p>{{ action.description }}</p>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="no-actions">
+                    <i class="fas fa-lock" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem;"></i>
+                    <h3>Ограниченный доступ</h3>
+                    <p>У вас есть доступ к просмотру профиля, но нет доступа к функциям работы с рефералами.</p>
+                    <p>Если вам нужны дополнительные права доступа, обратитесь к администратору.</p>
+                    <br>
+                    <p><strong>Текущие разрешения:</strong> Просмотр профиля</p>
+                    <p style="margin-top: 1rem;">
+                        <a href="{{ url_for('admin.debug_permissions_ui') }}" class="btn btn-primary">
+                            <i class="fas fa-bug"></i> Отладка разрешений
+                        </a>
+                    </p>
+                </div>
+                {% endif %}
+                
+                {% if error %}
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    {{ error }}
+                </div>
+                {% endif %}
+            </div>
+        </main>
+        
+        {% include 'components/footer.html' %}
+    </div>
+
+    <!-- Подключение JavaScript файлов -->
+    <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
+</body>
+</html>

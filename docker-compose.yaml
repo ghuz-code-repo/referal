@@ -17,6 +17,7 @@ services:
     networks:
       - service_network
       - public_network
+      - auth_network
 
 networks:
   service_network:
@@ -25,3 +26,6 @@ networks:
   public_network:
     external: true
     name: public_network
+  auth_network:
+    external: true
+    name: auth_network

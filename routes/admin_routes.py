@@ -1,10 +1,26 @@
 """Маршруты для администрирования"""
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from services import fetch_data_from_mysql
 from .auth_routes import get_current_user
 from models import *
 from services import withdrawal_service
+from permission_utils import (
+    requires_admin_access, 
+    get_allowed_statuses_for_user, 
+    get_default_status_filter,
+    can_change_status_to,
+    can_change_status_from_to,
+    get_user_role_type,
+    get_allowed_status_changes_for_user,
+    has_permission
+)
+from status_permissions import (
+    get_user_status_summary,
+    get_all_status_permissions,
+    format_permission_name,
+    ROLE_PERMISSION_PRESETS
+)
 import utils
 import os
 
@@ -55,34 +71,64 @@ def debug_current_user():
         })
 
 
+@admin_bp.route('/debug/permissions', methods=['GET'])
+def debug_permissions():
+    """Отладочный маршрут для проверки разрешений пользователя"""
+    from permission_utils import get_user_permissions
+    
+    permissions_summary = get_user_status_summary()
+    role_type = get_user_role_type()
+    user_permissions = get_user_permissions()
+    
+    # Получаем все доступные разрешения для справки
+    all_permissions = get_all_status_permissions()
+    
+    return jsonify({
+        'user_role_type': role_type,
+        'raw_permissions': user_permissions,
+        'detailed_summary': permissions_summary,
+        'all_available_permissions': all_permissions,
+        'formatted_permissions': {perm: format_permission_name(perm) for perm in all_permissions},
+        'role_presets': ROLE_PERMISSION_PRESETS
+    })
+
+
+@admin_bp.route('/debug/permissions-ui', methods=['GET'])
+def debug_permissions_ui():
+    """UI для отладки разрешений"""
+    permissions_summary = get_user_status_summary()
+    role_type = get_user_role_type()
+    
+    # Получаем все доступные разрешения для справки
+    all_permissions = get_all_status_permissions()
+    formatted_permissions = {perm: format_permission_name(perm) for perm in all_permissions}
+    
+    return render_template('debug_permissions.html',
+                         role_type=role_type,
+                         permissions_summary=permissions_summary,
+                         all_permissions=all_permissions,
+                         formatted_permissions=formatted_permissions,
+                         role_presets=ROLE_PERMISSION_PRESETS)
+
+
 @admin_bp.route('/admin', methods=['GET'])
 def admin_panel():
     """Административная панель для управления рефералами."""
-    print("=== ADMIN PANEL ACCESS ATTEMPT ===")
-    
-    # Выводим все заголовки для отладки
-    print("Headers received:")
-    for header, value in request.headers:
-        print(f"  {header}: {value}")
     
     user = get_current_user()
-    print(f"User from get_current_user(): {user}")
-    if user:
-        print(f"User role: {user.role}")
-        print(f"User login: {user.login}")
     
     if not user:
-        print("No user found - access denied")
         flash('Доступ запрещен - пользователь не найден', 'error')
         return redirect(url_for('referal.profile'))
         
-    if user.role not in ['admin', 'manager', 'call-center']:
-        print(f"User role {user.role} not in allowed roles ['admin', 'manager', 'call-center']")
+    # Check permissions instead of hardcoded roles
+    if not requires_admin_access():
         flash('Доступ запрещен - недостаточно прав', 'error')
         return redirect(url_for('referal.profile'))
     
-    print(f"Access granted to user {user.login} with role {user.role}")
-    print("=====================================")
+    
+    # Get user role type based on permissions
+    user_role_type = get_user_role_type()
     
     # Получаем параметры из URL
     page = request.args.get('page', 1, type=int)
@@ -102,16 +148,11 @@ def admin_panel():
     
     # УСТАНАВЛИВАЕМ ФИЛЬТРЫ ПО УМОЛЧАНИЮ ТОЛЬКО ПРИ ПРЯМОМ ЗАХОДЕ
     if not status_filter and not any([name_filter, phone_filter, contract_filter, contact_id_filter, user_filter]) and is_direct_access:
-        # Устанавливаем фильтр по умолчанию только при первом заходе на страницу
-        if user.role == 'manager':
-            default_status = '200'
-        elif user.role == 'call-center':
-            default_status = '10'
-        else:  # admin
-            default_status = '1'
-        
-        # Перенаправляем с фильтром по умолчанию
-        return redirect(url_for('admin.admin_panel', status=default_status))
+        # Используем функцию для получения фильтра по умолчанию на основе разрешений
+        default_status = get_default_status_filter()
+        if default_status:
+            # Перенаправляем с фильтром по умолчанию
+            return redirect(url_for('admin.admin_panel', status=default_status))
     
     # Получаем сортировку
     sort_param = request.args.get('sort', '')
@@ -125,49 +166,50 @@ def admin_panel():
     # Базовый запрос
     query = Referal.query
 
-
     selected_statuses = []
     status_ids = []
 
-    ALL_STATUSES = []
-
-    if user.role == 'manager':
-        ALL_STATUSES = [200, 300, 500]
-    elif user.role == 'call-center':
-        ALL_STATUSES = [10, 500, 20]
-    elif user.role == 'admin':
-        ALL_STATUSES = [s.id for s in Status.query.all()]
+    # Получаем разрешенные статусы на основе разрешений пользователя
+    ALL_STATUSES = get_allowed_statuses_for_user()
+    
+    # Получаем доступные статусы для изменения
+    allowed_status_changes = get_allowed_status_changes_for_user()
+    
+    # Для фильтра используем только статусы для просмотра
+    # Для выпадающего списка изменения будем использовать allowed_status_changes отдельно
+    filter_status_ids = ALL_STATUSES
          
     if status_filter:
         try:
             statuses = status_filter.split(',')
             for status in statuses:
                 if status.isdigit():
-                    # Если статус - это число, добавляем его в фильтр
-                    status_ids.append(int(status))
+                    status_id = int(status)
+                    # Проверяем, может ли пользователь видеть этот статус (только статусы для просмотра в фильтре)
+                    if status_id in filter_status_ids:
+                        status_ids.append(status_id)
+                    else:
+                        flash(f'У вас нет прав для просмотра статуса: {status}', 'warning')
                 else:
                     flash(f'Неверный формат статуса: {status}', 'warning')
-            query = query.filter(Referal.status_id.in_(status_ids))
-            selected_statuses = status_ids
+            if status_ids:
+                query = query.filter(Referal.status_id.in_(status_ids))
+                selected_statuses = status_ids
         except ValueError:
             # Если в параметре что-то не то, игнорируем его
             flash('Получен неверный формат статусов в фильтре.', 'warning')
             pass 
     else:
-        # СТАНДАРТНОЕ ПОВЕДЕНИЕ: Показываем все, кроме "Оплачено" (300)
-        # Убедитесь, что у вас есть эти ID в модели Status
-
-        if user.role == 'manager':
-            INCLUDED_STATUSES = [200, 300, 500]
-        elif user.role == 'call-center':
-            INCLUDED_STATUSES = [10, 500]
-        elif user.role == 'admin':
-            INCLUDED_STATUSES = [s.id for s in Status.query.all()]
-            # INCLUDED_STATUSES = [1]
-        query = query.filter(Referal.status_id.in_(INCLUDED_STATUSES))
-        selected_statuses = [s.id for s in Status.query.filter(Status.id.in_(INCLUDED_STATUSES)).all()]
+        # СТАНДАРТНОЕ ПОВЕДЕНИЕ: Показываем статусы по умолчанию для роли пользователя (только для просмотра)
+        INCLUDED_STATUSES = filter_status_ids  # Используем только статусы для просмотра
+        if INCLUDED_STATUSES:
+            query = query.filter(Referal.status_id.in_(INCLUDED_STATUSES))
+            selected_statuses = [s.id for s in Status.query.filter(Status.id.in_(INCLUDED_STATUSES)).all()]
     
-    statuses = [s for s in Status.query.filter(Status.id.in_(ALL_STATUSES)).all()]
+    # Для фильтра используем только статусы для просмотра (filter_status_ids)
+    # Но для шаблона нужны также статусы для изменения, чтобы показать их названия в выпадающем списке
+    template_status_ids = list(set(filter_status_ids + allowed_status_changes))
+    statuses = [s for s in Status.query.filter(Status.id.in_(template_status_ids)).all()]
     
     if name_filter:
         query = query.filter(ReferalData.full_name.ilike(f'%{name_filter}%'))
@@ -244,9 +286,8 @@ def admin_panel():
             referal.macro_contacts = []
             referal.macro_contact = None
     
-    print(f"Found {len(referals)} referals for user {user.login}")
-
-
+    
+    all_statuses_in_db = Status.query.all()
     return render_template('admin.html', 
                           current_user=user,
                           referals=referals,
@@ -262,20 +303,30 @@ def admin_panel():
                           },
                           selected_statuses=selected_statuses,
                           statuses=statuses,
+                          filter_statuses=[s for s in statuses if s.id in filter_status_ids],  # Только для фильтра
                           current_sort=sort_param,
-                          sort_fields=sort_fields)
+                          sort_fields=sort_fields,
+                          user_role_type=user_role_type,
+                          can_change_status_from_to=can_change_status_from_to,
+                          allowed_status_changes=allowed_status_changes)
 
 
 @admin_bp.route('/update_withdrawal_stage/<int:referal_id>', methods=['POST'])
 def update_withdrawal_stage(referal_id):
     """Обновление статуса реферала."""
-    current_user =  get_current_user()
-    if not current_user or current_user.role not in ['admin', 'manager', 'call-center']:
+    current_user = get_current_user()
+    if not current_user or not requires_admin_access():
         flash('Доступ запрещен', 'error')
         return redirect(url_for('referal.profile'))
 
     referal = Referal.query.get_or_404(referal_id)
     withdrawal_stage = int(request.form.get('withdrawal_stage'))
+    
+    # Проверяем, может ли пользователь изменить статус с текущего на указанный
+    if not can_change_status_from_to(referal.status_id, withdrawal_stage):
+        flash('У вас нет прав для изменения статуса с текущего на выбранный', 'error')
+        return redirect(url_for('admin.admin_panel'))
+    
     user = User.query.get(referal.user_id)
     
     from flask import session
@@ -332,16 +383,13 @@ def update_withdrawal_stage(referal_id):
         )
         
     elif withdrawal_stage == 200:
-        print(f"DEBUG: Withdrawal stage set to 200 for referal {referal.id} by user {user.login}")
         payment_email = os.getenv('PAYMENT_MANAGER_EMAIL')
-        print(f"DEBUG: PAYMENT_MANAGER_EMAIL from env: {payment_email}")
 
         utils.send_email(
             os.getenv('PAYMENT_MANAGER_EMAIL'),
             'Запрос на выплату рефереру',
             f'{user.user_data.full_name} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
         )
-        print(f"DEBUG: Sending email to {payment_email} for referal {referal.id} with amount {referal.withdrawal_amount}")
 
 
 
@@ -392,16 +440,36 @@ def update_withdrawal_stage(referal_id):
 
 @admin_bp.route('/force_update', methods=['GET'])
 def force_update():
-    """Принудительное обновление всех рефералов."""
+    """Принудительное обновление всех рефералов. ТОЛЬКО для администраторов!"""
     user = get_current_user()
-    if not user or user.role != 'admin':
-        flash('Доступ запрещен', 'error')
+    
+    # Проверяем что пользователь существует
+    if not user:
+        print("⛔ Force update access DENIED - No user found")
+        flash('Доступ запрещен - пользователь не найден', 'error')
+        return redirect(url_for('referal.profile'))
+    
+    # Проверяем права: только админ системы или админ сервиса
+    user_role = get_user_role_type()
+    has_admin_permission = has_permission('referal.admin.force_update')
+    is_system_admin = user_role == 'admin'
+    
+    if not (is_system_admin or has_admin_permission):
+        username = request.headers.get('X-User-Name', 'Unknown')
+        print(f"⛔ Force update access DENIED | User: {username} | Role: {user_role} | Has permission: {has_admin_permission}")
+        flash('Доступ запрещен - недостаточно прав для принудительной синхронизации', 'error')
         return redirect(url_for('admin.admin_panel'))
+    
+    # Логируем начало принудительной синхронизации
+    username = request.headers.get('X-User-Name', user.login if hasattr(user, 'login') else 'Unknown')
+    print(f"🔄 Force update STARTED by admin | User: {username} | Role: {user_role}")
     
     try:
         fetch_data_from_mysql()
-        flash('Данные успешно обновлены', 'success')
+        print(f"✅ Force update COMPLETED by {username}")
+        flash('Данные успешно обновлены из MySQL', 'success')
     except Exception as e:
+        print(f"❌ Force update FAILED by {username} | Error: {str(e)}")
         flash(f'Ошибка при обновлении данных: {str(e)}', 'error')
     
     return redirect(url_for('admin.admin_panel'))

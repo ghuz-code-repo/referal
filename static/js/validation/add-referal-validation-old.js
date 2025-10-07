@@ -1,14 +1,8 @@
 /**
- * Улучшенная валидация формы добавления реферала
- * Требования:
- * - ФИО: только латиница, минимум 2 слова, каждое с большой буквы
- * - Телефон: формат +998 XX XXX XX XX
- * - Кнопка неактивна пока поля не заполнены правильно
- * - Ошибки показываются красным шрифтом рядом с лейблами
+ * Валидация формы добавления реферала с улучшенными требованиями
  */
-
 function initAddReferalValidation() {
-    console.log('🔧 Initializing enhanced add referal validation...');
+    console.log('🔧 Initializing add referal validation...');
     
     const form = document.querySelector('#add-referal-form') || document.querySelector('.add-referal-form');
     
@@ -24,20 +18,6 @@ function initAddReferalValidation() {
     if (!phoneInput || !nameInput || !submitBtn) {
         console.log('Add referal form elements not found');
         return;
-    }
-    
-    // Функция обновления состояния кнопки
-    function updateSubmitButton() {
-        const isNameValid = validateNameField(nameInput, true); // silent validation
-        const isPhoneValid = validatePhoneField(phoneInput, true); // silent validation
-        
-        if (isNameValid && isPhoneValid) {
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('disabled');
-        } else {
-            submitBtn.disabled = true;
-            submitBtn.classList.add('disabled');
-        }
     }
     
     // Валидация имени в реальном времени
@@ -69,6 +49,20 @@ function initAddReferalValidation() {
         }
     });
     
+    // Функция обновления состояния кнопки
+    function updateSubmitButton() {
+        const isNameValid = validateNameField(nameInput, true); // silent validation
+        const isPhoneValid = validatePhoneField(phoneInput, true); // silent validation
+        
+        if (isNameValid && isPhoneValid) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('disabled');
+        } else {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('disabled');
+        }
+    }
+    
     // Первоначальная проверка состояния кнопки
     updateSubmitButton();
 }
@@ -83,6 +77,13 @@ function validateNameInput(field) {
     clearValidationError(field);
     
     if (value.length > 0) {
+        // Проверяем латиницу
+        if (!/^[a-zA-Z\s\-']+$/.test(value)) {
+            field.classList.add('error');
+            showInlineError('name-error', 'Только латинские буквы');
+            return false;
+        }
+        
         // Проверяем количество слов
         const words = value.split(/\s+/).filter(word => word.length > 0);
         if (words.length < 2) {
@@ -133,12 +134,31 @@ function validateNameField(field, silent = false) {
         return false;
     }
     
+    // Проверяем только латинские буквы, пробелы, дефисы и апострофы
+    if (!/^[a-zA-Z\s\-']+$/.test(value)) {
+        if (!silent) {
+            field.classList.add('error');
+            showInlineError('name-error', 'Только латинские буквы');
+        }
+        return false;
+    }
+    
     // Проверяем минимум 2 слова
     const words = value.split(/\s+/).filter(word => word.length > 0);
     if (words.length < 2) {
         if (!silent) {
             field.classList.add('error');
             showInlineError('name-error', 'Минимум 2 слова');
+        }
+        return false;
+    }
+    
+    // Проверяем, что каждое слово начинается с большой буквы
+    const invalidWords = words.filter(word => !/^[A-Z][a-z]*$/.test(word));
+    if (invalidWords.length > 0) {
+        if (!silent) {
+            field.classList.add('error');
+            showInlineError('name-error', 'Каждое слово с большой буквы');
         }
         return false;
     }
@@ -355,3 +375,50 @@ document.addEventListener('click', function(e) {
         }, 100);
     }
 });
+    
+    if (!nameField) {
+        console.error('Name field not found');
+        return false;
+    }
+    
+    if (!phoneField) {
+        console.error('Phone field not found');
+        return false;
+    }
+    
+    if (!validateNameField(nameField)) {
+        isValid = false;
+    }
+    
+    if (!validatePhoneField(phoneField)) {
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+/**
+ * Показать ошибку валидации
+ */
+function showValidationError(field, message) {
+    clearValidationError(field);
+    
+    field.classList.add('error');
+    
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'validation-error';
+    errorDiv.textContent = message;
+    
+    field.parentElement.appendChild(errorDiv);
+}
+
+/**
+ * Убрать ошибки валидации
+ */
+function clearValidationError(field) {
+    field.classList.remove('error', 'success');
+    const errorDiv = field.parentElement.querySelector('.validation-error');
+    if (errorDiv) {
+        errorDiv.remove();
+    }
+}

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои рефералы - {{ user.login }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- ИСПРАВЛЕНИЕ: Загружаем базовые стили с переменными ПЕРВЫМИ -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    
+    <!-- Theme Manager загружается в head для предотвращения FOUC -->
+    <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
+    
+    <!-- Остальные CSS файлы -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/modals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/inputs.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/macro-crm.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/filters.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/pagination.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/table-filters.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/footer.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/referals.css') }}">
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+</head>
+<body>
+    <div id="particles-js" class="bg-parts"></div>
+    <div class="page-wrapper">
+        {% include 'components/header.html' %}
+        {% include 'components/flash_messages.html' %}
+        
+        <!-- Основной контент -->
+        <main class="main">
+            <div class="container">
+                {% include 'components/referals_table.html' %}
+            </div>
+        </main>
+        
+        {% include 'components/footer.html' %}
+    </div>
+
+<!-- Подключение JavaScript файлов в правильном порядке -->
+<script src="{{ url_for('static', filename='js/components/flash-messages.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/modal-handler.js') }}"></script>
+
+<!-- Validation scripts -->
+<script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/validation/pinfl-validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/validation/email-validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/validation/passport-validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/validation/add-referal-validation.js') }}"></script>
+
+<!-- Date picker component -->
+<script src="{{ url_for('static', filename='js/components/date-picker.js')}}"></script>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+<script>
+// AJAX form submission for add referal
+$(document).ready(function() {
+    $('#add-referal-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        if (!validateAddReferalForm(this)) {
+            return false;
+        }
+        
+        const formData = new FormData(this);
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalText = submitBtn.html();
+        
+        // Disable button and show loading
+        submitBtn.prop('disabled', true);
+        submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Сохранение...');
+        
+        $.ajax({
+            url: $(this).attr('action'),
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    // Show success message
+                    showFlashMessage('success', response.message || 'Реферал успешно добавлен!');
+                    
+                    // Close modal
+                    closeModal(document.getElementById('DocumentFormModal_new'));
+                    
+                    // Reset form
+                    $('#add-referal-form')[0].reset();
+                    
+                    // Reload page to show new referral
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    // Show error message
+                    showFlashMessage('error', response.message || 'Ошибка при добавлении реферала');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                showFlashMessage('error', 'Ошибка при отправке данных. Попробуйте еще раз.');
+            },
+            complete: function() {
+                // Re-enable button
+                submitBtn.prop('disabled', false);
+                submitBtn.html(originalText);
+            }
+        });
+        
+        return false;
+    });
+});
+
+particlesJS('particles-js', {
+    "particles": { "number": { "value": 50, "density": { "enable": true, "value_area": 800 } }, "color": { "value": "#c4a668" }, "shape": { "type": "polygon", "stroke": { "width": 1, "color": "#c4a668" }, "polygon": { "nb_sides": 6 } }, "opacity": { "value": 0.2, "random": true, "anim": { "enable": true, "speed": 0.5, "opacity_min": 0.05, "sync": false } }, "size": { "value": 4, "random": true }, "line_linked": { "enable": true, "distance": 180, "color": "#c4a668", "opacity": 0.15, "width": 1 }, "move": { "enable": true, "speed": 0.8, "direction": "none", "random": true, "straight": false, "out_mode": "out" } }, "interactivity": { "detect_on": "canvas", "events": { "onhover": { "enable": true, "mode": "bubble" } }, "modes": { "bubble": { "distance": 200, "size": 6, "duration": 2, "opacity": 0.6 } } }, "retina_detect": true
+});
+</script>
+</body>
+</html>

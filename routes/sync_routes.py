@@ -4,7 +4,7 @@ Provides endpoints for auth-service to discover and sync permissions
 """
 
 from flask import Blueprint, jsonify, request
-from auth_connector import PermissionRegistry, CommonPermissions
+from auth_connector import PermissionRegistry
 
 sync_bp = Blueprint('sync', __name__)
 
@@ -21,8 +21,15 @@ def register_referal_permissions():
     registry.register("referal.profile.view", "Просмотр профиля", "Просмотр своего реферального профиля", "profile")
     registry.register("referal.profile.documents", "Просмотр документов", "Просмотр документов пользователя", "profile")
     registry.register("referal.profile.documents.download", "Скачивание документов", "Скачивание файлов документов", "profile")
-    registry.register("referal.referrals.add", "Добавление рефералов", "Добавление новых рефералов в систему", "referrals")
+    
+    # Разрешения на работу с рефералами
+    registry.register("referal.referrals.create", "Создание рефералов", "Создание/добавление новых рефералов в систему", "referrals")
+    registry.register("referal.referrals.add", "Добавление рефералов", "Добавление новых рефералов в систему (устаревшее)", "referrals")
+    registry.register("referal.referrals.view", "Просмотр рефералов", "Просмотр своих рефералов", "referrals")
     registry.register("referal.referrals.list", "Список рефералов", "Просмотр списка своих рефералов", "referrals")
+    registry.register("referal.referrals.edit", "Редактирование рефералов", "Редактирование информации о рефералах", "referrals")
+    
+    # Разрешения на платежи
     registry.register("referal.payments.view", "Просмотр платежей", "Просмотр истории платежей и балансов", "payments")
     registry.register("referal.payments.request", "Запрос выплат", "Запрос вывода средств", "payments")
     
@@ -31,6 +38,49 @@ def register_referal_permissions():
     registry.register("referal.admin.change_status", "Изменение статусов", "Изменение статусов вывода средств рефералов", "admin")
     registry.register("referal.admin.reports", "Отчеты", "Просмотр административных отчетов", "admin")
     registry.register("referal.admin.export", "Экспорт данных", "Экспорт данных в Excel", "admin")
+
+    # Детализированные разрешения для статусов
+    # Статус "Ждет проверки" (ID: 0)
+    registry.register("referal.status.pending.view", "Просмотр ожидающих", "Просмотр рефералов в статусе ожидания проверки", "status_pending")
+    registry.register("referal.status.pending.edit", "Редактирование ожидающих", "Редактирование рефералов в статусе ожидания", "status_pending")
+    registry.register("referal.status.pending.move_to", "Перевод В ожидание", "Перевод рефералов в статус ожидания", "status_pending")
+    registry.register("referal.status.pending.move_from", "Перевод ИЗ ожидания", "Перевод рефералов из статуса ожидания", "status_pending")
+    
+    # Статус "Проверка отделом аналитики" (ID: 1)
+    registry.register("referal.status.analytics_review.view", "Просмотр на аналитике", "Просмотр рефералов на проверке в аналитике", "status_analytics")
+    registry.register("referal.status.analytics_review.edit", "Редактирование на аналитике", "Редактирование рефералов на проверке в аналитике", "status_analytics")
+    registry.register("referal.status.analytics_review.move_to", "Перевод НА аналитику", "Перевод рефералов на проверку в аналитику", "status_analytics")
+    registry.register("referal.status.analytics_review.move_from", "Перевод С аналитики", "Перевод рефералов с проверки в аналитике", "status_analytics")
+    
+    # Статус "Проверка колл центром" (ID: 10)
+    registry.register("referal.status.callcenter_review.view", "Просмотр в колл-центре", "Просмотр рефералов на проверке в колл-центре", "status_callcenter")
+    registry.register("referal.status.callcenter_review.edit", "Редактирование в колл-центре", "Редактирование рефералов в колл-центре", "status_callcenter")
+    registry.register("referal.status.callcenter_review.move_to", "Перевод В колл-центр", "Перевод рефералов на проверку в колл-центр", "status_callcenter")
+    registry.register("referal.status.callcenter_review.move_from", "Перевод ИЗ колл-центра", "Перевод рефералов с проверки в колл-центре", "status_callcenter")
+    
+    # Статус "Проверка Коммерческим Директором" (ID: 20)
+    registry.register("referal.status.director_review.view", "Просмотр у директора", "Просмотр рефералов на проверке у директора", "status_director")
+    registry.register("referal.status.director_review.edit", "Редактирование у директора", "Редактирование рефералов у директора", "status_director")
+    registry.register("referal.status.director_review.move_to", "Перевод К директору", "Перевод рефералов на проверку к директору", "status_director")
+    registry.register("referal.status.director_review.move_from", "Перевод ОТ директора", "Перевод рефералов от директора", "status_director")
+    
+    # Статус "Акцептовано к оплате" (ID: 200)
+    registry.register("referal.status.accepted.view", "Просмотр принятых", "Просмотр рефералов принятых к оплате", "status_accepted")
+    registry.register("referal.status.accepted.edit", "Редактирование принятых", "Редактирование рефералов принятых к оплате", "status_accepted")
+    registry.register("referal.status.accepted.move_to", "Принятие к оплате", "Перевод рефералов в статус принято к оплате", "status_accepted")
+    registry.register("referal.status.accepted.move_from", "Перевод ИЗ принятых", "Перевод рефералов из статуса принято к оплате", "status_accepted")
+    
+    # Статус "Оплачено" (ID: 300)
+    registry.register("referal.status.paid.view", "Просмотр оплаченных", "Просмотр оплаченных рефералов", "status_paid")
+    registry.register("referal.status.paid.edit", "Редактирование оплаченных", "Редактирование оплаченных рефералов", "status_paid")
+    registry.register("referal.status.paid.move_to", "Перевод В оплачено", "Перевод рефералов в статус оплачено", "status_paid")
+    registry.register("referal.status.paid.move_from", "Перевод ИЗ оплаченных", "Перевод рефералов из статуса оплачено", "status_paid")
+    
+    # Статус "Отклонено" (ID: 500) - дополнительный
+    registry.register("referal.status.rejected.view", "Просмотр отклоненных", "Просмотр отклоненных рефералов", "status_rejected")
+    registry.register("referal.status.rejected.edit", "Редактирование отклоненных", "Редактирование отклоненных рефералов", "status_rejected")
+    registry.register("referal.status.rejected.move_to", "Отклонение", "Перевод рефералов в статус отклонено", "status_rejected")
+    registry.register("referal.status.rejected.move_from", "Перевод ИЗ отклоненных", "Перевод рефералов из статуса отклонено", "status_rejected")
 
 # Register permissions on import
 register_referal_permissions()

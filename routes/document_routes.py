@@ -146,16 +146,56 @@ def get_referal_act(referal_id):
             flash('Deal not found', 'error')
             return redirect(url_for('referal.profile'))
     
-        real_deal = MacroDeal()
+        # Находим подходящую сделку (приоритет - проведенная, иначе любая с валидным платежом)
+        real_deal = None
         for deal in deals:
             if deal.deal_status_name == "Сделка проведена":
                 real_deal = deal
                 break
-        appartment_info = get_property_details(real_deal.agreement_number)
+        
+        # Если нет проведенной сделки, берем первую с валидным платежом
+        if not real_deal:
+            for deal in deals:
+                if deal.has_valid_payment():
+                    real_deal = deal
+                    break
+        
+        # Если все еще нет сделки, берем первую
+        if not real_deal:
+            real_deal = deals[0]
+        
         # Определяем путь к шаблону
         template_path = os.path.join(current_app.root_path, 'documents', f"{os.getenv('ACT_DOC_NAME')}.docx")
 
-        agreement_date = appartment_info['agreement_date'].date()
+        # Проверяем тип agreement_date и конвертируем если нужно
+        # Теперь используем данные из локальной базы (MacroDeal)
+        agreement_date_raw = real_deal.agreement_date
+        if isinstance(agreement_date_raw, str):
+            if agreement_date_raw:
+                # Пытаемся распарсить строку в datetime (пробуем разные форматы)
+                try:
+                    # Пробуем ISO формат
+                    agreement_date = datetime.strptime(agreement_date_raw, '%Y-%m-%d').date()
+                except ValueError:
+                    try:
+                        # Пробуем формат с временем
+                        agreement_date = datetime.strptime(agreement_date_raw, '%Y-%m-%d %H:%M:%S').date()
+                    except ValueError:
+                        # Если не получилось, используем текущую дату
+                        print(f"Warning: Could not parse agreement_date '{agreement_date_raw}', using current date")
+                        agreement_date = datetime.now().date()
+            else:
+                # Пустая строка - используем текущую дату
+                print(f"Warning: Empty agreement_date, using current date")
+                agreement_date = datetime.now().date()
+        elif hasattr(agreement_date_raw, 'date'):
+            # Это datetime/pandas Timestamp объект
+            agreement_date = agreement_date_raw.date()
+        else:
+            # Неизвестный тип - используем текущую дату
+            print(f"Warning: Unknown agreement_date type {type(agreement_date_raw)}, using current date")
+            agreement_date = datetime.now().date()
+            
         print(f"Agreement date: {agreement_date}")
         # Загружаем шаблон
         doc = Document(template_path)
@@ -163,6 +203,14 @@ def get_referal_act(referal_id):
         current_date = datetime.now()
         print(f"Current date: {month_name_genitive(current_date.month)}")
         print(f"Current date: {month_name_genitive(int(agreement_date.month))}")
+        # Форматируем дату паспорта (может быть date, datetime или str)
+        referal_passport_date_str = ''
+        if referal_data.passport_date:
+            if isinstance(referal_data.passport_date, str):
+                referal_passport_date_str = referal_data.passport_date
+            elif hasattr(referal_data.passport_date, 'strftime'):
+                referal_passport_date_str = referal_data.passport_date.strftime('%d.%m.%Y')
+        
         # Форматируем дату для замены
         replacements = {
             'day': current_date.day,
@@ -172,7 +220,7 @@ def get_referal_act(referal_id):
             'full_name': user_data.full_name or '',
             'referal_name': referal_data.full_name or '',
             'referal_passport_number': referal_data.passport_number or '',
-            'referal_passport_date': referal_data.passport_date.strftime('%d.%m.%Y') if referal_data.passport_date else '',
+            'referal_passport_date': referal_passport_date_str,
             'referal_passport_giver': referal_data.passport_giver or '',
             'contract_number': referal_data.contract_number or '',
             
@@ -180,12 +228,13 @@ def get_referal_act(referal_id):
             'contract_month': month_name_genitive(int(agreement_date.month)),
             'contract_year': agreement_date.year,
             
-            'project_name': appartment_info['project_name'],
-            'house_address': appartment_info['house_address'],
-            'house_number': appartment_info['house_number'],
-            'appartment_number': appartment_info['apartment_number'],
+            # Используем данные из локальной базы (MacroDeal)
+            'project_name': real_deal.project_name or '',
+            'house_address': real_deal.house_address or '',
+            'house_number': real_deal.house_number or '',
+            'appartment_number': real_deal.apartment_number or '',
             'appartment_area': real_deal.deal_metr,
-            'contract_price': appartment_info['agreement_price'],
+            'contract_price': real_deal.agreement_price or 0,
             'withdrawal_amount': str(math.ceil(referal.withdrawal_amount/(1-float(os.getenv('NDS_PERCENT'))/100)) or 0),
             
             'referer_name': user_data.full_name or '',

@@ -17,6 +17,12 @@ from models import MacroContact, MacroDeal, db, User, Referal, Status
 # Импортируем все Blueprint'ы из папки routes
 from routes import auth_bp, referal_bp, admin_bp, document_bp, user_bp, sync_bp
 from routes.user_documents_routes import user_documents_bp, api_user_documents_bp
+from routes.user_documents_api import user_documents_api_bp
+from test_profile_features import test_profile_bp
+from test_headers import test_headers_bp
+from test_email_quick import test_email_bp
+from debug_headers import debug_headers_bp
+from minimal_test import minimal_test_bp
 
 # Импортируем тестовый blueprint
 from test_template import test_bp
@@ -35,6 +41,8 @@ from dotenv import load_dotenv
 import os
 from flask_apscheduler import APScheduler
 from prefix_middleware import PrefixMiddleware
+import requests
+import json
 
 import services
 import utils as utils
@@ -43,13 +51,17 @@ from header_utils import decode_header_full_name
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-# Инициализация приложения Flask
+# Инициализация приложения Flask - восстанавливаем встроенные статические файлы
 app = Flask(__name__, 
            static_url_path='/static',
            static_folder='static')
 
 # Configure app to work behind a proxy
+# First apply ProxyFix
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+# Then apply PrefixMiddleware to strip /referal prefix
+app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix='/referal')
 
 # Fix the SERVER_NAME issue properly - update the config instead of modifying it directly
 app.config.update(
@@ -73,6 +85,57 @@ def clean_none_filter(value):
         return ''
     return value
 
+def get_user_documents_from_auth_service(user_id):
+    """Получение документов пользователя из auth-service через API"""
+    try:
+        auth_service_url = app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
+        url = f"{auth_service_url}/api/users/{user_id}/documents"
+        
+        print(f"🔍 Запрашиваю документы пользователя: {url}")
+        
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            documents = data.get('documents', [])
+            print(f"📄 Получено {len(documents)} документов для пользователя {user_id}")
+            
+            # Преобразуем документы в удобный формат
+            result = {}
+            for doc in documents:
+                doc_type = doc.get('document_type', '').lower()
+                fields = doc.get('fields', {})
+                
+                if doc_type == 'passport':
+                    result.update({
+                        'passport_number': fields.get('passport_number'),
+                        'passport_giver': fields.get('passport_giver'),
+                        'passport_date': fields.get('passport_date'),
+                        'passport_address': fields.get('passport_address')
+                    })
+                elif doc_type == 'pinfl':
+                    result['pinfl'] = fields.get('pinfl')
+                elif doc_type == 'bank_details':
+                    result.update({
+                        'bank_name': fields.get('bank_name'),
+                        'bank_card': fields.get('card_number'),
+                        'bank_account': fields.get('trans_schet'),
+                        'bank_mfo': fields.get('mfo')
+                    })
+            
+            print(f"📋 Обработанные документы: {result}")
+            return result
+            
+        else:
+            print(f"❌ Ошибка получения документов: {response.status_code}")
+            return {}
+            
+    except requests.RequestException as e:
+        print(f"❌ Сетевая ошибка при получении документов: {e}")
+        return {}
+    except Exception as e:
+        print(f"❌ Общая ошибка при получении документов: {e}")
+        return {}
+
 # Добавляем context processor для получения данных пользователя из auth-service
 @app.context_processor
 def inject_auth_user_data():
@@ -81,34 +144,62 @@ def inject_auth_user_data():
         """Получить данные пользователя из заголовков auth-service"""
         from flask import request
         
-        # Отладочная информация
-        print(f"DEBUG get_auth_user_data: called")
+        # ОТЛАДКА: логируем все заголовки
+        print("=" * 50)
+        print("🔍 ВЫЗОВ get_auth_user_data() !!!")
+        print("=" * 50)
+        user_headers = {}
+        for name, value in request.headers:
+            if name.startswith('X-User-'):
+                user_headers[name] = value
+        print(f"📧 ALL USER HEADERS: {user_headers}")
         
         full_name = decode_header_full_name(request)
         username = request.headers.get('X-User-Name')
         avatar_path = request.headers.get('X-User-Avatar')
+        email = request.headers.get('X-User-Email')
+        user_id = request.headers.get('X-User-ID')
+        permissions = request.headers.get('X-User-Permissions', '').split(',') if request.headers.get('X-User-Permissions') else []
         
-        # DEBUG: печатаем все заголовки с X-User
-        debug_headers = {k: v for k, v in request.headers.items() if 'X-User' in k}
-        print(f"DEBUG get_auth_user_data: all X-User headers: {debug_headers}")
+        # Получаем документы через API
+        documents_data = {}
+        if user_id:
+            documents_data = get_user_documents_from_auth_service(user_id)
         
-        print(f"DEBUG get_auth_user_data: full_name='{full_name}', username='{username}', avatar_path='{avatar_path}'")
+        print(f"📧 EMAIL HEADER: '{email}'")
+        print(f"👤 USERNAME: '{username}'")
+        print(f"📄 DOCUMENTS FROM API: {documents_data}")
         
         # Если нет username вообще, возвращаем None
         if not username:
-            print(f"DEBUG get_auth_user_data: returning None because username is empty")
+            print("❌ NO USERNAME FOUND, returning None")
             return None
         
         # Если full_name пустое или None, используем username как fallback
         if not full_name or full_name.strip() == '':
-            print(f"DEBUG get_auth_user_data: using username '{username}' as fallback")
             result = {
                 'full_name': username,
                 'short_name': username,
                 'username': username,
-                'avatar_path': avatar_path
+                'avatar_path': avatar_path,
+                'email': email,
+                'user_id': user_id,
+                'permissions': permissions,
+                # Документы из API
+                'passport_number': documents_data.get('passport_number'),
+                'passport_giver': documents_data.get('passport_giver'),
+                'passport_date': documents_data.get('passport_date'),
+                'passport_address': documents_data.get('passport_address'),
+                'pinfl': documents_data.get('pinfl'),
+                'phone': request.headers.get('X-User-Phone'),  # Телефон остается из заголовков
+                # Банковские данные
+                'bank_name': documents_data.get('bank_name'),
+                'bank_account': documents_data.get('bank_account'),
+                'bank_card': documents_data.get('bank_card'),
+                'bank_mfo': documents_data.get('bank_mfo'),
             }
-            print(f"DEBUG get_auth_user_data: returning fallback {result}")
+            print(f"✅ RETURNING (username fallback): {result}")
+            print("=" * 50)
             return result
         
         # Форматируем full_name в short_name (Фамилия И.О.)
@@ -132,21 +223,40 @@ def inject_auth_user_data():
             'full_name': full_name,
             'short_name': short_name,
             'username': username,
-            'avatar_path': avatar_path
+            'avatar_path': avatar_path,
+            'email': email,
+            'user_id': user_id,
+            'permissions': permissions,
+            # Документы из API
+            'passport_number': documents_data.get('passport_number'),
+            'passport_giver': documents_data.get('passport_giver'),
+            'passport_date': documents_data.get('passport_date'),
+            'passport_address': documents_data.get('passport_address'),
+            'pinfl': documents_data.get('pinfl'),
+            'phone': request.headers.get('X-User-Phone'),  # Телефон остается из заголовков
+            # Банковские данные
+            'bank_name': documents_data.get('bank_name'),
+            'bank_account': documents_data.get('bank_account'),
+            'bank_card': documents_data.get('bank_card'),
+            'bank_mfo': documents_data.get('bank_mfo'),
         }
-        print(f"DEBUG get_auth_user_data: returning formatted {result}")
+        print(f"✅ RETURNING (full name): {result}")
+        print("=" * 50)
         return result
 
     def check_permission(permission_name):
         """Проверить разрешение пользователя"""
         try:
-            if AuthClient:
-                # Импортируем auth_connector только если он доступен
-                from auth_connector import check_user_permission
-                return check_user_permission(permission_name)
-            return False
-        except ImportError:
-            print(f"WARNING: auth_connector not available for permission check: {permission_name}")
+            # Получаем текущего пользователя из flask.g
+            from flask import g
+            user = getattr(g, 'user', None)
+            
+            if user and hasattr(user, 'has_permission'):
+                result = user.has_permission(permission_name)
+                print(f"🔑 check_permission('{permission_name}') -> {result} | User: {getattr(user, 'username', 'unknown')}")
+                return result
+            
+            print(f"🔑 check_permission('{permission_name}') -> False | No user or no has_permission method")
             return False
         except Exception as e:
             print(f"ERROR check_permission: {e}")
@@ -188,20 +298,83 @@ scheduler = APScheduler()
 scheduler.init_app(app)
 scheduler.start()
 
+@app.route('/')
+def home():
+    """Корневой маршрут - умное перенаправление на основе разрешений."""
+    print("DEBUG HOME: function called")
+    
+    # AUTH-CONNECTOR INTEGRATION - получаем пользователя
+    try:
+        from auth_connector import get_current_user as get_auth_user
+        from routes.auth_routes import get_current_user
+        
+        auth_user = get_auth_user()
+        if auth_user:
+            print(f"DEBUG HOME: Auth-connector user found: {auth_user.username}")
+            
+            # Admin panel access for admin roles
+            has_admin_panel = auth_user.has_permission('referal.admin.panel')
+            has_manage_users = auth_user.has_any_permission(['referal.admin.manage_users', 'referal.users.manage'])
+            print(f"DEBUG HOME: has_admin_panel={has_admin_panel}, has_manage_users={has_manage_users}")
+            
+            if has_admin_panel or has_manage_users:
+                print("DEBUG HOME: Redirecting to admin panel")
+                return redirect(url_for('admin.admin_panel'))
+            
+            # Check if user has access to referral functionality
+            required_perms = [
+                'referal.referrals.list',
+                'referal.referrals.view',
+                'referal.referrals.create',
+                'referal.referrals.add'  # Альтернативное название для создания
+            ]
+            has_referral_access = auth_user.has_any_permission(required_perms)
+            
+            if has_referral_access:
+                return redirect(url_for('referal.my_referrals'))
+            else:
+                # User has no access to referral functionality
+                from flask import render_template
+                return render_template('access_denied.html',
+                                     service_name='Реферальная программа',
+                                     required_permissions=['referal.admin.panel', 'referal.referrals.list', 'referal.referrals.create']), 403
+            
+    except ImportError:
+        # Legacy fallback
+        try:
+            from routes.auth_routes import get_current_user
+            user = get_current_user()
+            if user and hasattr(user, 'role') and user.role in ['admin', 'manager', 'call-center']:
+                return redirect(url_for('admin.admin_panel'))
+        except Exception as e:
+            pass
+    
+    return redirect(url_for('referal.profile'))
+
 # Register all blueprints WITHOUT URL prefixes
 app.register_blueprint(auth_bp)
-app.register_blueprint(referal_bp)  # Убрали url_prefix='/referal'
+app.register_blueprint(user_bp)  # БЕЗ префикса - nginx уже обрезает /referal
+app.register_blueprint(referal_bp)  # БЕЗ префикса - nginx уже обрезает /referal  
 app.register_blueprint(admin_bp)
 app.register_blueprint(document_bp)
-app.register_blueprint(user_bp)
 app.register_blueprint(user_documents_bp)  # Новый blueprint для документов
-app.register_blueprint(api_user_documents_bp)  # API blueprint для документов
+app.register_blueprint(user_documents_api_bp)  # API blueprint для документов
+app.register_blueprint(test_profile_bp)  # Тестовый blueprint для профиля
+app.register_blueprint(test_headers_bp)  # Тестовый blueprint для заголовков
+app.register_blueprint(test_email_bp)  # Быстрый тест email
+app.register_blueprint(debug_headers_bp)  # Отладка всех заголовков
+app.register_blueprint(minimal_test_bp)  # Минимальный тест заголовков
+
+# Добавляем тестовый роут для проверки данных профиля
+@app.route('/test_profile_data')
+def test_profile_data_route():
+    """Тестовая страница для проверки данных профиля"""
+    from test_profile_data import test_profile_data
+    return test_profile_data()
 app.register_blueprint(sync_bp, url_prefix='/api/sync')
 app.register_blueprint(test_bp)  # Добавляем тестовый blueprint
 
-# Add prefix middleware after registering blueprint but before initializing scheduler
-# This will strip the /referal prefix when running behind proxy
-app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix='/referal')
+# Note: PrefixMiddleware is already applied earlier in the code, right after ProxyFix
 
 # Add scheduled tasks
 @scheduler.task('cron', id='update_deals', hour=10, minute=30)
@@ -229,9 +402,11 @@ def before_request():
     # Skip auth for static files and sync endpoints
     if request.path.startswith('/static') or request.path.startswith('/api/sync'):
         return
-        
-    # Additional initialization if needed
-    pass
+    
+    # Логируем минимальную информацию о пользователе для каждого запроса
+    username = request.headers.get('X-User-Name', 'Anonymous')
+    user_id = request.headers.get('X-User-ID', 'N/A')
+    print(f"[{request.method}] {request.path} | User: {username} (ID: {user_id})")
 
 if __name__ == '__main__':
     print("Starting referal application...")
@@ -239,5 +414,10 @@ if __name__ == '__main__':
     # Show configuration
     print(f"Database URI: {app.config.get('SQLALCHEMY_DATABASE_URI', 'Not configured')}")
     print(f"Auth Service URL: {os.getenv('AUTH_SERVICE_URL', 'Not configured')}")
+    
+    # Отключаем логи статических файлов (CSS, JS)
+    import logging
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
     
     app.run(debug=True, host='0.0.0.0', port=80)
