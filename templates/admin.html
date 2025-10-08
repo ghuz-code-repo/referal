@@ -361,7 +361,7 @@
                                         <td  class="referal-table-td">{{ referal.referal_data.phone_number if referal.referal_data else 'Не указано' }}</td>
                                         <td  class="referal-table-td">{{ referal.referal_data.contract_number if referal.referal_data else 'Не найден' }}</td>
                                         <td  class="referal-table-td">
-                                            <span class="user-login-link" data-user-id="{{ referal.user.id if referal.user else '' }}" title="Просмотр информации о пользователе">
+                                            <span class="user-login-link" data-user-id="{{ referal.user.auth_user_id if referal.user and referal.user.auth_user_id else referal.user.id if referal.user else '' }}" title="Просмотр информации о пользователе">
                                                 {{ referal.user.login if referal.user else 'Не найден' }}
                                             </span>
                                         </td>

@@ -256,3 +256,68 @@
 [data-theme="dark"] .more-documents-info {
     background-color: var(--bg-dark-light);
 }
+
+/* Стили для отображения данных в формате info-grid */
+.info-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 1rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-item.wide {
+    grid-column: 1 / -1;
+}
+
+.info-item label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-item span {
+    font-size: 1rem;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+/* Стили для плейсхолдеров */
+.placeholder-text {
+    color: var(--text-muted) !important;
+    font-style: italic;
+    opacity: 0.7;
+}
+
+/* Темная тема для плейсхолдеров */
+[data-theme="dark"] .placeholder-text {
+    color: var(--text-muted-dark) !important;
+    opacity: 0.6;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 600px) {
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .info-item.wide {
+        grid-column: 1;
+    }
+}
+
+/* Темная тема для info-grid */
+[data-theme="dark"] .info-item label {
+    color: var(--text-secondary-dark);
+}
+
+[data-theme="dark"] .info-item span {
+    color: var(--text-primary-dark);
+}

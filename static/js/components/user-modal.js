@@ -61,14 +61,23 @@ document.addEventListener('DOMContentLoaded', function() {
      * Загрузка документов пользователя
      */
     function loadUserDocuments(userId) {
-        const container = document.getElementById(`userDocuments_${userId}`);
-        if (!container) return;
-
-        // Показываем индикатор загрузки
-        container.innerHTML = '<div class="loading-message"><i class="fas fa-spinner fa-spin"></i> Загрузка документов...</div>';
-
-        // Загружаем документы через API
-        fetch(`/api/users/${userId}/documents`)
+        // Находим контейнеры
+        const documentsContainer = document.getElementById(`userDocuments_${userId}`);
+        
+        // Проверяем, является ли userId auth_user_id (длинная строка) или обычным ID (короткое число)
+        const isAuthUserId = userId && userId.length > 10; // auth_user_id длинные, обычные ID короткие
+        
+        if (!isAuthUserId) {
+            // Для пользователей без auth_user_id показываем плейсхолдеры
+            console.log('User has no auth_user_id, showing placeholders:', userId);
+            if (documentsContainer) {
+                displayUserDocumentsFromAuthService(documentsContainer, null);
+            }
+            return;
+        }
+        
+        // Получаем документы из auth-service только для пользователей с auth_user_id
+        fetch(`/api/users/${userId}/documents/for-service/referal`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -76,11 +85,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(data => {
-                displayUserDocuments(container, data.documents);
+                console.log('Auth service documents data:', data);
+                
+                if (documentsContainer) {
+                    // ВСЕГДА отображаем поля, даже если документов нет
+                    displayUserDocumentsFromAuthService(documentsContainer, data.documents_for_service || null);
+                }
             })
             .catch(error => {
-                console.error('Ошибка загрузки документов:', error);
-                container.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-triangle"></i> Ошибка загрузки документов</div>';
+                console.error('Error loading documents from auth-service:', error);
+                
+                // В случае ошибки все равно показываем поля с плейсхолдерами
+                if (documentsContainer) {
+                    // Показываем поля с плейсхолдерами
+                    displayUserDocumentsFromAuthService(documentsContainer, null);
+                }
             });
     }
 
@@ -146,6 +165,158 @@ document.addEventListener('DOMContentLoaded', function() {
                 downloadAttachment(docId, attId);
             });
         });
+    }
+
+    /**
+     * Отображение документов пользователя из auth-service (новый формат)
+     */
+    function displayUserDocumentsFromAuthService(container, documentsForService) {
+        // Инициализируем значения по умолчанию с плейсхолдерами
+        let passportNumber = 'Не указан';
+        let passportGiver = 'Не указан';
+        let passportDate = 'Не указана';
+        let passportAddress = 'Не указан';
+        let pinfl = 'Не указан';
+        
+        // Если есть документы, извлекаем данные
+        if (documentsForService && Object.keys(documentsForService).length > 0) {
+            Object.entries(documentsForService).forEach(([groupKey, groupData]) => {
+                const doc = groupData.document;
+                const fields = doc.fields || {};
+                
+                switch (doc.document_type) {
+                    case 'passport':
+                        passportNumber = fields.passport_number || 'Не указан';
+                        passportGiver = fields.passport_giver || 'Не указан';
+                        passportDate = fields.passport_date || 'Не указана';
+                        passportAddress = fields.passport_address || 'Не указан';
+                        break;
+                    case 'passport_ru':
+                        passportNumber = `${fields.series || ''} ${fields.number || ''}`.trim() || 'Не указан';
+                        passportGiver = fields.issued_by || 'Не указан';
+                        passportDate = fields.issued_date || 'Не указана';
+                        passportAddress = fields.address || 'Не указан';
+                        break;
+                    case 'pinfl':
+                        pinfl = fields.pinfl || 'Не указан';
+                        break;
+                }
+            });
+        }
+
+        // ВСЕГДА отображаем поля, независимо от наличия данных
+        let html = `
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>ПИНФЛ:</label>
+                    <span class="${pinfl === 'Не указан' ? 'placeholder-text' : ''}">${pinfl}</span>
+                </div>
+                <div class="info-item">
+                    <label>Паспорт:</label>
+                    <span class="${passportNumber === 'Не указан' ? 'placeholder-text' : ''}">${passportNumber}</span>
+                </div>
+                <div class="info-item">
+                    <label>Дата выдачи:</label>
+                    <span class="${passportDate === 'Не указана' ? 'placeholder-text' : ''}">${passportDate}</span>
+                </div>
+                <div class="info-item wide">
+                    <label>Кем выдан:</label>
+                    <span class="${passportGiver === 'Не указан' ? 'placeholder-text' : ''}">${passportGiver}</span>
+                </div>
+                <div class="info-item wide">
+                    <label>Адрес:</label>
+                    <span class="${passportAddress === 'Не указан' ? 'placeholder-text' : ''}">${passportAddress}</span>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+        // Также заполняем банковские данные - нужно найти userId из ID контейнера
+        const userId = container.id.replace('userDocuments_', '');
+        displayBankDataFromAuthService(documentsForService, userId);
+    }
+
+    /**
+     * Отображение банковских данных из auth-service
+     */
+    function displayBankDataFromAuthService(documentsForService, userId) {
+        console.log('displayBankDataFromAuthService called with userId:', userId);
+        console.log('documentsForService:', documentsForService);
+        
+        // Инициализируем значения по умолчанию с плейсхолдерами
+        let bankCard = 'Не указан';
+        let bankName = 'Не указан'; 
+        let bankAccount = 'Не указан';
+        let bankMfo = 'Не указан';
+        
+        // Если есть документы, извлекаем банковские данные
+        if (documentsForService && Object.keys(documentsForService).length > 0) {
+            Object.entries(documentsForService).forEach(([groupKey, groupData]) => {
+                const doc = groupData.document;
+                const fields = doc.fields || {};
+                
+                console.log('Processing document:', doc.document_type, fields);
+                
+                // Обрабатываем банковские данные из группы financial с типом bank_details
+                if (doc.document_type === 'bank_details') {
+                    bankCard = fields.card_number || 'Не указан';
+                    bankName = fields.bank_name || 'Не указан';
+                    bankAccount = fields.trans_schet || 'Не указан';
+                    bankMfo = fields.mfo || 'Не указан';
+                    console.log('Found bank_details:', { bankCard, bankName, bankAccount, bankMfo });
+                }
+                
+                // Также обрабатываем отдельные типы bank_account и bank_card (если они есть)
+                if (doc.document_type === 'bank_account') {
+                    bankName = fields.bank_name || 'Не указан';
+                    bankAccount = fields.account_number || 'Не указан';
+                    bankMfo = fields.mfo || 'Не указан';
+                    console.log('Found bank_account:', { bankName, bankAccount, bankMfo });
+                }
+                
+                if (doc.document_type === 'bank_card') {
+                    bankCard = fields.card_number || 'Не указан';
+                    // Если bank_name не был установлен из bank_account, берем его из bank_card
+                    if (bankName === 'Не указан') {
+                        bankName = fields.bank_name || 'Не указан';
+                    }
+                    console.log('Found bank_card:', { bankCard, bankName });
+                }
+            });
+        }
+
+        // Ищем контейнер для банковских данных
+        const bankContainer = document.getElementById(`bankData_${userId}`);
+        console.log('Looking for bankContainer with ID:', `bankData_${userId}`, 'Found:', !!bankContainer);
+        
+        if (bankContainer) {
+            // ВСЕГДА отображаем банковские поля, независимо от наличия данных
+            let html = `
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Карта:</label>
+                        <span class="${bankCard === 'Не указан' ? 'placeholder-text' : ''}">${bankCard}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Банк:</label>
+                        <span class="${bankName === 'Не указан' ? 'placeholder-text' : ''}">${bankName}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Транзитный счет:</label>
+                        <span class="${bankAccount === 'Не указан' ? 'placeholder-text' : ''}">${bankAccount}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>МФО:</label>
+                        <span class="${bankMfo === 'Не указан' ? 'placeholder-text' : ''}">${bankMfo}</span>
+                    </div>
+                </div>
+            `;
+            bankContainer.innerHTML = html;
+            console.log('Bank data updated in container:', bankContainer);
+        } else {
+            console.error('Bank container not found for userId:', userId);
+        }
     }
 
     /**

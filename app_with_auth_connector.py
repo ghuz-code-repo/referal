@@ -18,14 +18,14 @@ from models import MacroContact, MacroDeal, db, User, Referal, Status
 from routes import auth_bp, referal_bp, admin_bp, document_bp, user_bp, sync_bp
 from routes.user_documents_routes import user_documents_bp, api_user_documents_bp
 from routes.user_documents_api import user_documents_api_bp
-from test_profile_features import test_profile_bp
-from test_headers import test_headers_bp
-from test_email_quick import test_email_bp
-from debug_headers import debug_headers_bp
-from minimal_test import minimal_test_bp
+# from test_profile_features import test_profile_bp
+# from test_headers import test_headers_bp
+# from test_email_quick import test_email_bp
+# from debug_headers import debug_headers_bp
+# from minimal_test import minimal_test_bp
 
 # Импортируем тестовый blueprint
-from test_template import test_bp
+# from test_template import test_bp
 
 # AUTH-CONNECTOR INTEGRATION
 try:
@@ -86,24 +86,32 @@ def clean_none_filter(value):
     return value
 
 def get_user_documents_from_auth_service(user_id):
-    """Получение документов пользователя из auth-service через API"""
+    """Получение документов пользователя из auth-service через API для сервиса referal
+    Новая логика:
+    1) Получаем все документы пользователя для сервиса 'referal' 
+    2) Из каждой группы берем документ, который используется для данного сервиса
+    3) Если несколько документов в группе используются для сервиса - берем последний добавленный
+    """
     try:
         auth_service_url = app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
-        url = f"{auth_service_url}/api/users/{user_id}/documents"
+        url = f"{auth_service_url}/api/users/{user_id}/documents/for-service/referal"
         
-        print(f"🔍 Запрашиваю документы пользователя: {url}")
+        print(f"🔍 Запрашиваю документы пользователя для сервиса referal: {url}")
         
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            documents = data.get('documents', [])
-            print(f"📄 Получено {len(documents)} документов для пользователя {user_id}")
+            documents_for_service = data.get('documents_for_service', {})
+            print(f"📄 Получено {len(documents_for_service)} групп документов для пользователя {user_id}")
             
             # Преобразуем документы в удобный формат
             result = {}
-            for doc in documents:
-                doc_type = doc.get('document_type', '').lower()
-                fields = doc.get('fields', {})
+            
+            # Обрабатываем группу identity (паспорт, ПИНФЛ и т.д.)
+            if 'identity' in documents_for_service:
+                identity_doc = documents_for_service['identity']['document']
+                doc_type = identity_doc.get('document_type', '').lower()
+                fields = identity_doc.get('fields', {})
                 
                 if doc_type == 'passport':
                     result.update({
@@ -112,17 +120,35 @@ def get_user_documents_from_auth_service(user_id):
                         'passport_date': fields.get('passport_date'),
                         'passport_address': fields.get('passport_address')
                     })
+                elif doc_type == 'passport_ru':
+                    result.update({
+                        'passport_number': f"{fields.get('series', '')} {fields.get('number', '')}".strip(),
+                        'passport_giver': fields.get('issued_by'),
+                        'passport_date': fields.get('issued_date'),
+                        'passport_address': fields.get('address', '')  # Может отсутствовать в РФ паспорте
+                    })
                 elif doc_type == 'pinfl':
                     result['pinfl'] = fields.get('pinfl')
-                elif doc_type == 'bank_details':
+                
+                print(f"🆔 Документ удостоверения личности: {doc_type} - {fields}")
+            
+            # Обрабатываем группу financial (банковские данные)
+            if 'financial' in documents_for_service:
+                financial_doc = documents_for_service['financial']['document']
+                doc_type = financial_doc.get('document_type', '').lower()
+                fields = financial_doc.get('fields', {})
+                
+                if doc_type == 'bank_details':
                     result.update({
                         'bank_name': fields.get('bank_name'),
                         'bank_card': fields.get('card_number'),
                         'bank_account': fields.get('trans_schet'),
                         'bank_mfo': fields.get('mfo')
                     })
+                
+                print(f"💳 Финансовый документ: {doc_type} - {fields}")
             
-            print(f"📋 Обработанные документы: {result}")
+            print(f"📋 Итоговые обработанные документы: {result}")
             return result
             
         else:
@@ -359,11 +385,11 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(document_bp)
 app.register_blueprint(user_documents_bp)  # Новый blueprint для документов
 app.register_blueprint(user_documents_api_bp)  # API blueprint для документов
-app.register_blueprint(test_profile_bp)  # Тестовый blueprint для профиля
-app.register_blueprint(test_headers_bp)  # Тестовый blueprint для заголовков
-app.register_blueprint(test_email_bp)  # Быстрый тест email
-app.register_blueprint(debug_headers_bp)  # Отладка всех заголовков
-app.register_blueprint(minimal_test_bp)  # Минимальный тест заголовков
+# app.register_blueprint(test_profile_bp)  # Тестовый blueprint для профиля
+# app.register_blueprint(test_headers_bp)  # Тестовый blueprint для заголовков
+# app.register_blueprint(test_email_bp)  # Быстрый тест email
+# app.register_blueprint(debug_headers_bp)  # Отладка всех заголовков
+# app.register_blueprint(minimal_test_bp)  # Минимальный тест заголовков
 
 # Добавляем тестовый роут для проверки данных профиля
 @app.route('/test_profile_data')
@@ -372,7 +398,7 @@ def test_profile_data_route():
     from test_profile_data import test_profile_data
     return test_profile_data()
 app.register_blueprint(sync_bp, url_prefix='/api/sync')
-app.register_blueprint(test_bp)  # Добавляем тестовый blueprint
+# app.register_blueprint(test_bp)  # Добавляем тестовый blueprint
 
 # Note: PrefixMiddleware is already applied earlier in the code, right after ProxyFix
 

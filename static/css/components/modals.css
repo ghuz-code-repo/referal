@@ -771,3 +771,144 @@
         padding: 5px 8px;
     }
 }
+
+/* Стили для документов из auth-service */
+.auth-service-docs .user-document-card {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: background-color var(--transition-normal);
+}
+
+.auth-service-docs .document-header {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.auth-service-docs .document-icon {
+    margin-right: 12px;
+    margin-top: 2px;
+    color: var(--primary-color);
+    font-size: 20px;
+}
+
+.auth-service-docs .document-info {
+    flex: 1;
+}
+
+.auth-service-docs .document-title {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.auth-service-docs .document-date {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+
+.auth-service-docs .document-status {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.auth-service-docs .status-draft {
+    color: var(--warning-color);
+    font-weight: 500;
+}
+
+.auth-service-docs .status-verified {
+    color: var(--success-color);
+    font-weight: 500;
+}
+
+.auth-service-docs .document-fields {
+    margin-top: 12px;
+}
+
+.auth-service-docs .document-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.auth-service-docs .document-field:last-child {
+    border-bottom: none;
+}
+
+.auth-service-docs .field-label {
+    font-weight: 500;
+    color: var(--text-secondary);
+    min-width: 120px;
+    font-size: 13px;
+}
+
+.auth-service-docs .field-value {
+    color: var(--text-primary);
+    font-weight: 400;
+    text-align: right;
+    flex: 1;
+    font-size: 13px;
+    word-break: break-word;
+}
+
+.dark-theme .auth-service-docs .user-document-card {
+    background: var(--surface-color);
+    border-color: var(--border-dark);
+}
+
+.dark-theme .auth-service-docs .document-field {
+    border-bottom-color: var(--border-dark);
+}
+
+/* Стили для контейнера загрузки документов */
+.documents-container {
+    min-height: 100px;
+    padding: 16px;
+}
+
+.loading-message {
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 20px;
+}
+
+.loading-message i {
+    margin-right: 8px;
+    color: var(--primary-color);
+}
+
+.error-message {
+    text-align: center;
+    color: var(--error-color);
+    padding: 20px;
+    background: var(--error-background, rgba(220, 53, 69, 0.1));
+    border-radius: 8px;
+    border: 1px solid var(--error-color);
+}
+
+.error-message i {
+    margin-right: 8px;
+}
+
+.no-documents-message {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 20px;
+    background: var(--card-background);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.no-documents-message i {
+    margin-right: 8px;
+    color: var(--text-secondary);
+}
