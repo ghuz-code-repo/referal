@@ -6,7 +6,6 @@ import threading
 import time
 import os
 import re
-import smtplib
 from typing import List, Optional, Tuple
 
 from flask import current_app, logging
@@ -260,53 +259,59 @@ def send_sms(phone_number, user_full_name):
 
 def _send_email_sync(recipient_email, subject, body):
     """
-    Внутренняя функция для синхронной отправки email сообщения.
+    Внутренняя функция для синхронной отправки email сообщения через Notification Service.
     Предназначена для вызова из send_email_async.
     """
-    from email.mime.text import MIMEText
-
-
+    from notification_client import get_notification_client
+    
     try:
-        with smtplib.SMTP(os.getenv('EMAIL_SERVER'), os.getenv('EMAIL_SERVER_PORT')) as server:
-            msg = MIMEText(body)
-            msg['Subject'] = subject
-            msg['From'] = os.getenv('SEND_FROM_EMAIL') 
-            msg['To'] = recipient_email
-            server.starttls()
-            server.login(os.getenv('SEND_FROM_EMAIL') , os.getenv('SEND_FROM_EMAIL_PASSWORD'))
-            server.sendmail(os.getenv('SEND_FROM_EMAIL'), recipient_email, msg.as_string().encode('utf-8').strip())
-            print("Email sent to recipient")
-        with smtplib.SMTP(os.getenv('EMAIL_SERVER'), os.getenv('EMAIL_SERVER_PORT')) as server:
-            msg = MIMEText(f'Письмо отправлено {recipient_email} с темой {subject}\nтело:\n{body}')
-            msg['Subject'] = f'Ответсвенное лицой реферальной программы {recipient_email} получило письмо'
-            msg['From'] = os.getenv('SEND_FROM_EMAIL') 
-            msg['To'] = os.getenv('MAIN_ADMIN_EMAIL')
-            server.starttls()
-            server.login(os.getenv('SEND_FROM_EMAIL') , os.getenv('SEND_FROM_EMAIL_PASSWORD'))
-            server.sendmail(os.getenv('SEND_FROM_EMAIL'), os.getenv('MAIN_ADMIN_EMAIL'), msg.as_string().encode('utf-8').strip())
-            print("Email sent to admin")
-        print(f"Email sent successfully {recipient_email} {subject}")
+        # Получаем клиент notification service
+        notification_client = get_notification_client()
+        
+        # Отправляем основное письмо получателю
+        success = notification_client.send_email(
+            recipient=recipient_email,
+            subject=subject,
+            body=body
+        )
+        
+        if success:
+            print(f"Email queued for sending to {recipient_email}")
+            
+            # Отправляем уведомление администратору об успешной отправке
+            admin_email = os.getenv('MAIN_ADMIN_EMAIL')
+            if admin_email:
+                admin_subject = f'Ответственное лицо реферальной программы {recipient_email} получило письмо'
+                admin_body = f'Письмо отправлено {recipient_email} с темой {subject}\nтело:\n{body}'
+                notification_client.send_email(
+                    recipient=admin_email,
+                    subject=admin_subject,
+                    body=admin_body
+                )
+                print("Admin notification queued")
+            
+            print(f"Email sent successfully via Notification Service: {recipient_email} {subject}")
+        else:
+            raise Exception("Notification service returned failure status")
+            
     except Exception as e:
+        print(f"Failed to send email via Notification Service: {e}")
+        
+        # Отправляем уведомление администратору об ошибке
         try:
-            with smtplib.SMTP(os.getenv('EMAIL_SERVER'), os.getenv('EMAIL_SERVER_PORT')) as server:
-                msg = MIMEText(f'Письмо не было отправлено {recipient_email} с темой {subject}\nтело:\n{body}\nОшибка {e}')
-                msg['Subject'] = f'Ответсвенное лицой реферальной программы {recipient_email} НЕ получило письмо'
-                msg['From'] = os.getenv('SEND_FROM_EMAIL') 
-                msg['To'] = os.getenv('MAIN_ADMIN_EMAIL')
-                server.starttls()
-                server.login(os.getenv('SEND_FROM_EMAIL') , os.getenv('SEND_FROM_EMAIL_PASSWORD'))
-                server.sendmail(os.getenv('SEND_FROM_EMAIL'), os.getenv('MAIN_ADMIN_EMAIL'), msg.as_string().encode('utf-8').strip())
-                print("Email sent successfully to admin")
-        except Exception as e:
-            print(f"Failed to send even admin email: {e}")
-        # Убрана рекурсивная попытка, т.к. это плохая практика в асинхронных задачах
-        # и может привести к бесконечному циклу.
-        # Вместо этого можно добавить более умную логику повторных попыток
-        # с задержками, если это необходимо.
-        # print(f"Retrying email send in 10 seconds...")
-        # time.sleep(10)
-        # _send_email_sync(recipient_email, subject, body) # Это может быть бесконечная рекурсия
-        # Также можно использовать current_app.logger.error, если контекст доступен
+            admin_email = os.getenv('MAIN_ADMIN_EMAIL')
+            if admin_email:
+                notification_client = get_notification_client()
+                admin_subject = f'Ответственное лицо реферальной программы {recipient_email} НЕ получило письмо'
+                admin_body = f'Письмо не было отправлено {recipient_email} с темой {subject}\nтело:\n{body}\nОшибка {e}'
+                notification_client.send_email(
+                    recipient=admin_email,
+                    subject=admin_subject,
+                    body=admin_body
+                )
+                print("Error notification sent to admin")
+        except Exception as admin_error:
+            print(f"Failed to send error notification to admin: {admin_error}")
         
 def send_email(recipient_email, subject, body):
     """

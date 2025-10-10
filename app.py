@@ -23,10 +23,14 @@ from prefix_middleware import PrefixMiddleware
 import services
 import utils as utils
 from header_utils import decode_header_full_name
+from notification_client import init_notification_client
 
 
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
+
+# Инициализация клиента notification service
+init_notification_client()
 
 # Инициализация приложения Flask
 app = Flask(__name__, 
