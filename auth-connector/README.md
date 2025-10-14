@@ -10,6 +10,7 @@ Universal authentication and authorization connector for microservices integrati
 - 🚀 **Framework agnostic** - Works with Flask, FastAPI, Django
 - 📦 **Easy integration** - Drop-in middleware and decorators
 - 🎯 **Caching** - Built-in permission caching for performance
+- 🔍 **Service Discovery** - Automatic registration with gateway and nginx routing
 
 ## Quick Start
 
@@ -30,7 +31,13 @@ pip install -e ".[fastapi]"
 
 ```python
 from flask import Flask
-from auth_connector import AuthMiddleware, AuthClient, require_permission, get_current_user
+from auth_connector import (
+    AuthMiddleware, 
+    AuthClient, 
+    require_permission, 
+    get_current_user,
+    init_service_discovery_flask
+)
 
 app = Flask(__name__)
 
@@ -43,11 +50,22 @@ auth_client = AuthClient(
 # Setup middleware
 auth_middleware = AuthMiddleware(app, auth_client)
 
+# Setup service discovery (automatic registration with gateway)
+init_service_discovery_flask(
+    app,
+    service_key="referal",
+    internal_url="http://referal:80"
+)
+
 @app.route('/protected')
 @require_permission('referal.users.view')
 def protected_route():
     user = get_current_user()
     return f"Hello {user.full_name}!"
+
+@app.route('/health')
+def health():
+    return {"status": "healthy"}
 
 @app.route('/admin-only')  
 @require_permission('referal.admin.manage_users')
@@ -258,6 +276,120 @@ referal.dashboard.view
 referal.analytics.access
 ```
 
+## Service Discovery
+
+The auth-connector now includes automatic service discovery that registers your service with the gateway and configures nginx routing automatically.
+
+### How it Works
+
+1. **Service Registration** - On startup, your service registers with the auth-service registry
+2. **Nginx Configuration** - Auth-service generates nginx config for your service with prefix stripping
+3. **Automatic Routing** - Requests to `/your-service/*` are automatically routed to your container
+4. **Health Monitoring** - Periodic heartbeats ensure service availability
+5. **Graceful Shutdown** - Automatic deregistration on service stop
+
+### Flask Integration
+
+```python
+from flask import Flask
+from auth_connector import init_service_discovery_flask
+
+app = Flask(__name__)
+
+# This single line handles everything:
+# - Registration with gateway
+# - Automatic heartbeat
+# - Nginx config generation
+# - Graceful deregistration
+init_service_discovery_flask(
+    app,
+    service_key="my-service",           # Service key from admin panel
+    internal_url="http://my-service:80" # Docker internal URL
+)
+
+@app.route('/health')
+def health():
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=80)
+```
+
+### FastAPI Integration
+
+```python
+from fastapi import FastAPI
+from auth_connector import init_service_discovery_fastapi
+
+app = FastAPI()
+
+init_service_discovery_fastapi(
+    app,
+    service_key="my-service",
+    internal_url="http://my-service:8000"
+)
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+```
+
+### Manual Control
+
+For more control, use the `ServiceDiscoveryClient` directly:
+
+```python
+from auth_connector import ServiceDiscoveryClient
+
+client = ServiceDiscoveryClient(
+    service_key="my-service",
+    internal_url="http://my-service:80",
+    registry_url="http://auth-service:8080/api/registry",
+    health_check_path="/health",
+    heartbeat_interval=30,  # seconds
+    metadata={"version": "1.0.0", "environment": "production"}
+)
+
+# Register manually
+if client.register():
+    client.start_heartbeat()
+
+# Later, when shutting down
+client.deregister()
+```
+
+### Service Requirements
+
+1. **Create Service in Admin Panel** - Service must be created with a unique `service_key`
+2. **Health Check Endpoint** - Service should have a `/health` endpoint (configurable)
+3. **Docker Network** - Service must be in the same Docker network as auth-service
+4. **Docker Compose** - Add your service to the docker-compose.yaml
+
+### Prefix Stripping
+
+The gateway automatically strips the service prefix from requests:
+
+```
+External: GET /my-service/api/users
+↓ (nginx strips prefix)
+Internal: GET /api/users
+```
+
+Your service never sees the `/my-service` prefix - it's completely transparent!
+
+### Example Docker Compose
+
+```yaml
+services:
+  my-service:
+    build: ./my-service
+    networks:
+      - gateway_network
+    environment:
+      - SERVICE_KEY=my-service
+      - REGISTRY_URL=http://auth-service:8080/api/registry
+```
+
 ## Development
 
 ### Running Tests
@@ -270,11 +402,14 @@ pytest tests/
 ### Integration with Service
 
 1. Install auth-connector in your service
-2. Create permission registry with your permissions
-3. Add endpoint for permission sync
-4. Initialize auth middleware
-5. Decorate routes with permission requirements
-6. Test with auth gateway
+2. Create service in admin panel with unique key
+3. Create permission registry with your permissions
+4. Add health check endpoint
+5. Initialize service discovery
+6. Initialize auth middleware
+7. Decorate routes with permission requirements
+8. Add service to docker-compose.yaml
+9. Test with auth gateway
 
 ## License
 
