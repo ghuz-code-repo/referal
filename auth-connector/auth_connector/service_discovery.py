@@ -241,17 +241,29 @@ def init_service_discovery_flask(app, service_key: str, internal_url: str, **kwa
         if __name__ == "__main__":
             app.run(host="0.0.0.0", port=5000)
     """
+    print(f"[DEBUG] Creating ServiceDiscoveryClient for '{service_key}'")
     client = ServiceDiscoveryClient(service_key, internal_url, **kwargs)
     
-    # Flask 3.0+ compatible: use before_request with flag
-    _registered = {'done': False}
+    # Register immediately on initialization
+    import threading
+    def register_async():
+        import time
+        print(f"[DEBUG] Background thread started for '{service_key}', waiting 2s...")
+        time.sleep(2)  # Wait for Flask to fully start
+        print(f"[DEBUG] Calling client.register() for '{service_key}'...")
+        if client.register():
+            print(f"[DEBUG] Registration successful, starting heartbeat for '{service_key}'...")
+            client.start_heartbeat()
+            logger.info(f"✓ Service '{service_key}' registered at startup")
+        else:
+            print(f"[DEBUG] Registration failed for '{service_key}'")
+            logger.error(f"✗ Failed to register service '{service_key}' at startup")
     
-    @app.before_request
-    def register_service():
-        if not _registered['done']:
-            if client.register():
-                client.start_heartbeat()
-            _registered['done'] = True
+    # Start registration in background thread
+    print(f"[DEBUG] Starting background thread for '{service_key}'...")
+    thread = threading.Thread(target=register_async, daemon=True)
+    thread.start()
+    print(f"[DEBUG] Background thread started: {thread.is_alive()}")
     
     return client
 
