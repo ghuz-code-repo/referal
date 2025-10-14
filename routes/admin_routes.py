@@ -206,10 +206,12 @@ def admin_panel():
             query = query.filter(Referal.status_id.in_(INCLUDED_STATUSES))
             selected_statuses = [s.id for s in Status.query.filter(Status.id.in_(INCLUDED_STATUSES)).all()]
     
-    # Для фильтра используем только статусы для просмотра (filter_status_ids)
-    # Но для шаблона нужны также статусы для изменения, чтобы показать их названия в выпадающем списке
-    template_status_ids = list(set(filter_status_ids + allowed_status_changes))
-    statuses = [s for s in Status.query.filter(Status.id.in_(template_status_ids)).all()]
+    # Для фильтра используем ТОЛЬКО статусы для просмотра (filter_status_ids)
+    # Статусы для изменения (allowed_status_changes) будут использоваться отдельно в выпадающем списке изменения статуса
+    statuses = [s for s in Status.query.filter(Status.id.in_(filter_status_ids)).all()]
+    
+    # Для выпадающего списка изменения статуса получим отдельный список
+    change_statuses = [s for s in Status.query.filter(Status.id.in_(allowed_status_changes)).all()]
     
     if name_filter:
         query = query.filter(ReferalData.full_name.ilike(f'%{name_filter}%'))
@@ -302,8 +304,9 @@ def admin_panel():
                               'per_page': per_page
                           },
                           selected_statuses=selected_statuses,
-                          statuses=statuses,
-                          filter_statuses=[s for s in statuses if s.id in filter_status_ids],  # Только для фильтра
+                          statuses=statuses,  # Только статусы для просмотра
+                          filter_statuses=statuses,  # Для фильтра - те же статусы для просмотра
+                          change_statuses=change_statuses,  # Отдельно - статусы для изменения (выпадающий список)
                           current_sort=sort_param,
                           sort_fields=sort_fields,
                           user_role_type=user_role_type,

@@ -2,9 +2,9 @@ from setuptools import setup, find_packages
 
 setup(
     name="auth-connector",
-    version="1.0.0",
+    version="1.1.0",
     author="Analytics Team",
-    description="Universal authentication module for microservices",
+    description="Universal authentication and service discovery module for microservices",
     packages=find_packages(),
     install_requires=[
         "requests>=2.28.0",

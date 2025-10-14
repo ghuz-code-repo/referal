@@ -29,18 +29,18 @@ from routes.user_documents_api import user_documents_api_bp
 
 # AUTH-CONNECTOR INTEGRATION
 try:
-    from auth_connector import AuthMiddleware, AuthClient
+    from auth_connector import AuthMiddleware, AuthClient, init_service_discovery_flask
 except ImportError:
     print("Warning: auth-connector not installed. Install with: pip install -e ../auth-connector")
     AuthMiddleware = None
     AuthClient = None
+    init_service_discovery_flask = None
 
 import pandas as pd
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
 import os
 from flask_apscheduler import APScheduler
-from prefix_middleware import PrefixMiddleware
 import requests
 import json
 
@@ -51,28 +51,47 @@ from header_utils import decode_header_full_name
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-# Инициализация приложения Flask - восстанавливаем встроенные статические файлы
+# Инициализация приложения Flask
 app = Flask(__name__, 
            static_url_path='/static',
            static_folder='static')
 
 # Configure app to work behind a proxy
-# First apply ProxyFix
+# x_prefix=1 allows Flask to read X-Forwarded-Prefix header and adjust url_for() accordingly
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-
-# Then apply PrefixMiddleware to strip /referal prefix
-app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix='/referal')
 
 # Fix the SERVER_NAME issue properly - update the config instead of modifying it directly
 app.config.update(
     SERVER_NAME=None,
+    APPLICATION_ROOT='/referal',  # Set the application root prefix
     SQLALCHEMY_DATABASE_URI=os.getenv('SQLALCHEMY_DATABASE_URI'),
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     SECRET_KEY=os.getenv('SECRET_KEY', 'default-secret-key'),
-    APPLICATION_ROOT='/referal',
     PREFERRED_URL_SCHEME='http',
-    AUTH_SERVICE_URL=os.getenv('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
+    AUTH_SERVICE_URL=os.getenv('AUTH_SERVICE_URL', 'http://auth-service:8080')
 )
+
+# Middleware to handle prefix from APPLICATION_ROOT and X-Forwarded-Prefix
+class PrefixMiddleware:
+    def __init__(self, app, prefix=''):
+        self.app = app
+        self.prefix = prefix
+    
+    def __call__(self, environ, start_response):
+        # Get prefix from X-Forwarded-Prefix header or use configured prefix
+        forwarded_prefix = environ.get('HTTP_X_FORWARDED_PREFIX', self.prefix)
+        
+        if forwarded_prefix:
+            # Set SCRIPT_NAME to the prefix so url_for() includes it
+            script_name = environ.get('SCRIPT_NAME', '')
+            if not script_name.startswith(forwarded_prefix):
+                environ['SCRIPT_NAME'] = forwarded_prefix + script_name
+        
+        print(f"DEBUG WSGI: SCRIPT_NAME='{environ.get('SCRIPT_NAME', '')}', PATH_INFO='{environ.get('PATH_INFO', '')}', X-Forwarded-Prefix='{forwarded_prefix}'")
+        return self.app(environ, start_response)
+
+# Apply PrefixMiddleware AFTER ProxyFix so it sees the processed headers
+app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix='/referal')
 
 # Инициализация базы данных
 db.init_app(app)
@@ -341,11 +360,23 @@ def home():
             # Admin panel access for admin roles
             has_admin_panel = auth_user.has_permission('referal.admin.panel')
             has_manage_users = auth_user.has_any_permission(['referal.admin.manage_users', 'referal.users.manage'])
+            
+            # LEGACY FALLBACK: Check service roles from headers if no permissions found
+            if not (has_admin_panel or has_manage_users):
+                service_roles_header = request.headers.get('X-User-Service-Roles', '')
+                service_roles = [role.strip() for role in service_roles_header.split(',') if role.strip()]
+                print(f"DEBUG HOME: No permissions found, checking legacy service roles: {service_roles}")
+                if any(role in ['admin', 'manager'] for role in service_roles):
+                    has_admin_panel = True
+                    print(f"DEBUG HOME: Admin access granted via legacy service role")
+            
             print(f"DEBUG HOME: has_admin_panel={has_admin_panel}, has_manage_users={has_manage_users}")
             
             if has_admin_panel or has_manage_users:
-                print("DEBUG HOME: Redirecting to admin panel")
-                return redirect(url_for('admin.admin_panel'))
+                admin_url = url_for('admin.admin_panel')
+                print(f"DEBUG HOME: Redirecting to admin panel, generated URL: {admin_url}")
+                print(f"DEBUG HOME: request.script_root={request.script_root}, request.url_root={request.url_root}")
+                return redirect(admin_url)
             
             # Check if user has access to referral functionality
             required_perms = [
@@ -400,7 +431,35 @@ def test_profile_data_route():
 app.register_blueprint(sync_bp, url_prefix='/api/sync')
 # app.register_blueprint(test_bp)  # Добавляем тестовый blueprint
 
-# Note: PrefixMiddleware is already applied earlier in the code, right after ProxyFix
+# Health check endpoint for service discovery
+@app.route('/health')
+def health_check():
+    """Health check endpoint for service discovery"""
+    from flask import jsonify
+    return jsonify({
+        "status": "healthy",
+        "service": "referal",
+        "version": "1.0.0"
+    })
+
+# SERVICE DISCOVERY INTEGRATION
+# Initialize service discovery for automatic nginx registration
+if init_service_discovery_flask:
+    try:
+        service_discovery_client = init_service_discovery_flask(
+            app,
+            service_key="referal",
+            internal_url="http://referal:80",
+            registry_url=os.getenv('AUTH_SERVICE_URL', 'http://auth-service:8080') + '/api/registry',
+            heartbeat_interval=30
+        )
+        print("✅ Service discovery initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Service discovery initialization failed: {e}")
+else:
+    print("⚠️ Service discovery not available")
+
+# Note: PrefixMiddleware is NO LONGER NEEDED - nginx strips prefix automatically via service discovery
 
 # Add scheduled tasks
 @scheduler.task('cron', id='update_deals', hour=10, minute=30)

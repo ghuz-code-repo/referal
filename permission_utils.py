@@ -21,11 +21,129 @@ def get_user_permissions():
     
     # Try service-specific permissions first
     permissions_str = request.headers.get('X-User-Service-Permissions', '')
+    
     if not permissions_str:
         # Fallback to legacy header if needed
         permissions_str = request.headers.get('X-User-Permissions', '')
     
-    permissions = permissions_str.split(',') if permissions_str else []
+    permissions = [p.strip() for p in permissions_str.split(',') if p.strip()] if permissions_str else []
+    
+    # FALLBACK: If no permissions but user has role, grant role-specific permissions
+    if not permissions:
+        service_roles_str = request.headers.get('X-User-Service-Roles', '')
+        service_roles = [role.strip() for role in service_roles_str.split(',') if role.strip()]
+        
+        # Системный админ или админ сервиса получает все разрешения
+        is_admin = request.headers.get('X-User-Admin', '').lower() == 'true'
+        is_service_admin = 'admin' in service_roles
+        
+        from status_permissions import ALL_STATUS_PERMISSIONS
+        
+        if is_admin or is_service_admin:
+            # Admin gets ALL permissions
+            all_perms = set()
+            for status_id in ALL_STATUS_PERMISSIONS:
+                status_perms = ALL_STATUS_PERMISSIONS[status_id]
+                all_perms.update([
+                    status_perms['view'],
+                    status_perms['edit'],
+                    status_perms['move_to'],
+                    status_perms['move_from']
+                ])
+            all_perms.update([
+                'referal.admin.panel',
+                'referal.admin.manage_users',
+                'referal.users.view',
+                'referal.users.create',
+                'referal.users.edit',
+                'referal.users.delete',
+                'referal.referrals.list',
+                'referal.referrals.view',
+                'referal.referrals.create',
+                'referal.referrals.edit',
+                'referal.referrals.delete'
+            ])
+            permissions = list(all_perms)
+            print(f"🔓 LEGACY FALLBACK: Granted {len(permissions)} admin permissions")
+            
+        elif 'manager' in service_roles:
+            # Manager gets permissions for specific statuses: 200, 300, 500
+            manager_perms = set()
+            for status_id in [200, 300, 500]:
+                if status_id in ALL_STATUS_PERMISSIONS:
+                    status_perms = ALL_STATUS_PERMISSIONS[status_id]
+                    manager_perms.update([
+                        status_perms['view'],
+                        status_perms['edit'],
+                        status_perms['move_to'],
+                        status_perms['move_from']
+                    ])
+            manager_perms.update([
+                'referal.admin.panel',
+                'referal.referrals.list',
+                'referal.referrals.view',
+                'referal.referrals.edit'
+            ])
+            permissions = list(manager_perms)
+            print(f"🔓 LEGACY FALLBACK: Granted {len(permissions)} manager permissions for statuses [200, 300, 500]")
+            
+        elif 'call-center' in service_roles:
+            # Call-center permissions:
+            # - Can VIEW and EDIT statuses: 10 (На проверке колл-центром), 500 (Отклонено)
+            # - Can MOVE TO status: 20 (Проверка Коммерческим Директором) - but NOT view it
+            # - Can MOVE FROM statuses: 10, 500
+            cc_perms = set()
+            
+            # Статусы которые можно ПРОСМАТРИВАТЬ и РЕДАКТИРОВАТЬ: 10, 500
+            for status_id in [10, 500]:
+                if status_id in ALL_STATUS_PERMISSIONS:
+                    status_perms = ALL_STATUS_PERMISSIONS[status_id]
+                    cc_perms.update([
+                        status_perms['view'],
+                        status_perms['edit'],
+                        status_perms['move_from']
+                    ])
+            
+            # Статус 20 - можно только ПЕРЕВОДИТЬ туда, но НЕ просматривать
+            if 20 in ALL_STATUS_PERMISSIONS:
+                status_perms = ALL_STATUS_PERMISSIONS[20]
+                cc_perms.add(status_perms['move_to'])
+            
+            # Статус 500 - можно также переводить туда
+            if 500 in ALL_STATUS_PERMISSIONS:
+                status_perms = ALL_STATUS_PERMISSIONS[500]
+                cc_perms.add(status_perms['move_to'])
+            
+            cc_perms.update([
+                'referal.admin.panel',
+                'referal.referrals.list',
+                'referal.referrals.view',
+                'referal.referrals.edit'
+            ])
+            permissions = list(cc_perms)
+            print(f"🔓 LEGACY FALLBACK: Granted {len(permissions)} call-center permissions (view: [10, 500], move_to: [20, 500])")
+            
+        elif 'analytics' in service_roles or 'analytic' in service_roles:
+            # Analytics gets permissions for specific statuses: 0, 1, 20
+            analytics_perms = set()
+            for status_id in [0, 1, 20]:
+                if status_id in ALL_STATUS_PERMISSIONS:
+                    status_perms = ALL_STATUS_PERMISSIONS[status_id]
+                    analytics_perms.update([
+                        status_perms['view'],
+                        status_perms['edit'],
+                        status_perms['move_to'],
+                        status_perms['move_from']
+                    ])
+            analytics_perms.update([
+                'referal.admin.panel',
+                'referal.referrals.list',
+                'referal.referrals.view',
+                'referal.referrals.edit'
+            ])
+            permissions = list(analytics_perms)
+            print(f"🔓 LEGACY FALLBACK: Granted {len(permissions)} analytics permissions for statuses [0, 1, 20]")
+    
     return permissions
 
 
