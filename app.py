@@ -93,6 +93,12 @@ if os.getenv('BEHIND_PROXY', 'false').lower() == 'true':
     app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix='/referal')
 
 
+@app.route('/health')
+def health():
+    """Health check endpoint for Docker health checks."""
+    return {'status': 'ok', 'service': 'referal-service'}, 200
+
+
 @app.route('/')
 def home():
     """Корневой маршрут - умное перенаправление на основе разрешений."""

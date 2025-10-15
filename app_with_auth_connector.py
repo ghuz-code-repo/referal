@@ -68,7 +68,7 @@ app.config.update(
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     SECRET_KEY=os.getenv('SECRET_KEY', 'default-secret-key'),
     PREFERRED_URL_SCHEME='http',
-    AUTH_SERVICE_URL=os.getenv('AUTH_SERVICE_URL', 'http://auth-service:8080')
+    AUTH_SERVICE_URL=os.getenv('AUTH_SERVICE_URL', 'http://auth-service:80')
 )
 
 # Middleware to handle prefix from APPLICATION_ROOT and X-Forwarded-Prefix
@@ -313,7 +313,7 @@ def inject_auth_user_data():
 if AuthClient and AuthMiddleware:
     # Создаем клиент для auth-service
     auth_client = AuthClient(
-        auth_service_url=os.getenv('AUTH_SERVICE_URL', 'http://gateway:8080'),
+        auth_service_url=os.getenv('AUTH_SERVICE_URL', 'http://gateway:80'),
         service_key='referal',
         timeout=10
     )
@@ -450,7 +450,7 @@ if init_service_discovery_flask:
             app,
             service_key="referal",
             internal_url="http://referal:80",
-            registry_url=os.getenv('AUTH_SERVICE_URL', 'http://auth-service:8080') + '/api/registry',
+            registry_url=os.getenv('AUTH_SERVICE_URL', 'http://auth-service:80') + '/api/registry',
             heartbeat_interval=30
         )
         print("✅ Service discovery initialized successfully")

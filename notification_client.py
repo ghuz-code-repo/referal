@@ -21,7 +21,7 @@ class NotificationClient:
         Args:
             base_url: URL notification service. Если не указан, берется из переменной окружения
         """
-        self.base_url = base_url or os.getenv('NOTIFICATION_SERVICE_URL', 'http://notification-service:8082')
+        self.base_url = base_url or os.getenv('NOTIFICATION_SERVICE_URL', 'http://notification-service:80')
         self.base_url = self.base_url.rstrip('/')
         self.timeout = int(os.getenv('NOTIFICATION_SERVICE_TIMEOUT', '30'))
         logger.info(f"Notification client initialized with URL: {self.base_url}")
