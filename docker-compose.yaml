@@ -15,9 +15,7 @@ services:
     env_file:
       - .env
     networks:
-      - service_network
-      - public_network
-      - auth_network
+      - service_network     # Только внутренняя сеть сервисов
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:80/health', timeout=5)"]
       interval: 30s
@@ -29,9 +27,3 @@ networks:
   service_network:
     external: true
     name: service_network
-  public_network:
-    external: true
-    name: public_network
-  auth_network:
-    external: true
-    name: auth_network
