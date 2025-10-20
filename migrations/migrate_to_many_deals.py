@@ -39,27 +39,39 @@ def migrate():
         # Список колонок для добавления
         columns_to_add = [
             # Для таблицы referal
-            ("referal", "created_at", "DATETIME"),
-            ("referal", "days_window", "INTEGER DEFAULT 45"),
+            ("referal", "created_at", "TIMESTAMP"),
+            ("referal", "days_window", "INTEGER", "DEFAULT 45"),
             # Для таблицы macro_contact
-            ("macro_contact", "first_interaction_date", "DATETIME"),
-            ("macro_contact", "last_interaction_date", "DATETIME"),
-            ("macro_contact", "date_modified", "DATETIME"),
-            ("macro_contact", "last_deal_date", "DATE"),
+            ("macro_contact", "first_interaction_date", "TIMESTAMP", None),
+            ("macro_contact", "last_interaction_date", "TIMESTAMP", None),
+            ("macro_contact", "date_modified", "TIMESTAMP", None),
+            ("macro_contact", "last_deal_date", "DATE", None),
             # Для таблицы macro_deal  
-            ("macro_deal", "payment_calculated", "BOOLEAN DEFAULT 0"),
-            ("macro_deal", "withdrawal_amount", "INTEGER DEFAULT 0"),
+            ("macro_deal", "payment_calculated", "BOOLEAN", "DEFAULT FALSE"),
+            ("macro_deal", "withdrawal_amount", "INTEGER", "DEFAULT 0"),
         ]
         
-        for table_name, column_name, column_type in columns_to_add:
+        # Используем SQLAlchemy Inspector для проверки колонок (работает с любой БД)
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        
+        for column_info in columns_to_add:
+            table_name = column_info[0]
+            column_name = column_info[1]
+            column_type = column_info[2]
+            column_default = column_info[3] if len(column_info) > 3 else None
+            
             try:
-                # Проверяем существует ли колонка
-                result = db.session.execute(text(f"PRAGMA table_info({table_name})"))
-                existing_columns = [row[1] for row in result]
+                # Проверяем существует ли колонка через inspector (универсально для всех БД)
+                existing_columns = [col['name'] for col in inspector.get_columns(table_name)]
                 
                 if column_name not in existing_columns:
                     print(f"  Добавляем колонку {table_name}.{column_name}...")
-                    db.session.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"))
+                    # PostgreSQL требует отдельных ALTER TABLE для каждой колонки
+                    alter_query = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+                    if column_default:
+                        alter_query += f" {column_default}"
+                    db.session.execute(text(alter_query))
                     db.session.commit()
                     print(f"  ✅ Колонка {table_name}.{column_name} добавлена")
                 else:

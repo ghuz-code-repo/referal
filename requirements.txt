@@ -9,6 +9,7 @@ flask_login
 flask_sqlalchemy
 requests
 pymysql
+psycopg2-binary
 schedule
 python-docx
 openpyxl

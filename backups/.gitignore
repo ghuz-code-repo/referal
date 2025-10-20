@@ -1,0 +1,9 @@
+# Ignore all backup files
+*.db
+*.sql
+*.sql.gz
+*.dump
+*.backup
+
+# But keep the directory
+!.gitkeep

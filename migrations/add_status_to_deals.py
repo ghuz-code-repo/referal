@@ -23,14 +23,24 @@ def migrate():
         # Шаг 1: Добавляем колонку status_id
         print("\n[1/3] Добавление колонки status_id...")
         try:
-            db.session.execute(text("""
-                ALTER TABLE referal_deal
-                ADD COLUMN status_id INTEGER DEFAULT 0
-            """))
-            db.session.commit()
-            print("✅ Колонка status_id добавлена")
+            # Проверяем существование колонки через inspector (универсально для всех БД)
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            existing_columns = [col['name'] for col in inspector.get_columns('referal_deal')]
+            
+            if 'status_id' not in existing_columns:
+                db.session.execute(text("""
+                    ALTER TABLE referal_deal
+                    ADD COLUMN status_id INTEGER DEFAULT 0
+                """))
+                db.session.commit()
+                print("✅ Колонка status_id добавлена")
+            else:
+                print("⚠️ Колонка status_id уже существует, пропускаем")
         except Exception as e:
-            if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
+            # PostgreSQL использует другой текст ошибки
+            error_str = str(e).lower()
+            if "already exists" in error_str or "duplicate" in error_str or "column" in error_str and "status_id" in error_str:
                 print("⚠️ Колонка status_id уже существует, пропускаем")
                 db.session.rollback()
             else:
