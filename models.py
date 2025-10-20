@@ -349,6 +349,9 @@ class ReferalDeal(db.Model):
     deal_status = db.Column(db.String(50), default='pending')
     # Статус обработки договора: pending, sent_for_review, approved, rejected, paid
     
+    rejection_reason = db.Column(db.Text, nullable=True)
+    # Причина отказа (обязательно при status_id = 500)
+    
     # Relationships для удобного доступа
     referal = db.relationship('Referal', backref=db.backref('referal_deals', lazy='dynamic'))
     deal = db.relationship('MacroDeal', backref=db.backref('referal_links', lazy='dynamic'))

@@ -614,6 +614,14 @@
                                                         {% endfor %}
                                                     </select>
                                                 </form>
+                                                
+                                                <!-- Причина отказа (если статус = Отказано) -->
+                                                {% if deal.status_id == 500 and deal.rejection_reason %}
+                                                <div class="rejection-reason" style="margin-top: 5px; padding: 5px; background: #fff3cd; border-left: 3px solid #ffc107; font-size: 0.85em;">
+                                                    <strong>Причина отказа:</strong><br>
+                                                    {{ deal.rejection_reason }}
+                                                </div>
+                                                {% endif %}
                                             </div>
                                         </td>
                                         <td>
@@ -976,75 +984,106 @@ document.addEventListener('DOMContentLoaded', function() {
         dealStatusSelects.forEach(select => {
             select.addEventListener('change', function() {
                 const dealId = this.getAttribute('data-deal-id');
-                const newStatusId = this.value;
+                const newStatusId = parseInt(this.value);
                 const currentStatus = this.getAttribute('data-current-status');
                 
                 // Если выбран текущий статус, ничего не делаем
-                if (!newStatusId || newStatusId === currentStatus) {
+                if (!newStatusId || newStatusId.toString() === currentStatus) {
                     return;
                 }
                 
-                // Подтверждение изменения
-                if (!confirm(`Изменить статус договора?`)) {
-                    this.value = currentStatus; // Возвращаем текущий статус
-                    return;
-                }
-                
-                // Блокируем select
-                this.disabled = true;
-                const originalHTML = this.innerHTML;
-                this.innerHTML = '<option>Обновление...</option>';
-                
-                // Отправляем запрос на обновление статуса
-                fetch(`/referal/admin/deal/${dealId}/update_status`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        status_id: parseInt(newStatusId)
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Обновляем бейдж статуса
-                        const row = document.querySelector(`tr[data-deal-id="${dealId}"]`);
-                        if (row) {
-                            const statusBadge = row.querySelector('.deal-status-badge');
-                            if (statusBadge) {
-                                statusBadge.className = 'deal-status-badge status-' + data.new_status_id;
-                                statusBadge.textContent = data.new_status_name;
-                            }
-                        }
-                        
-                        // Показываем уведомление
-                        showNotification('success', data.message);
-                        
-                        // Перезагружаем страницу чтобы обновить список опций
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
-                    } else {
-                        showNotification('error', data.message || 'Ошибка при обновлении статуса');
-                        
-                        // Восстанавливаем select
-                        this.disabled = false;
-                        this.innerHTML = originalHTML;
-                        this.value = currentStatus; // Возвращаем текущий статус
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showNotification('error', 'Произошла ошибка при обновлении статуса');
+                // Если выбран статус "Отказано" (500), запрашиваем комментарий
+                if (newStatusId === 500) {
+                    const rejectionReason = prompt('Укажите причину отказа (обязательно):');
                     
-                    // Восстанавливаем select
-                    this.disabled = false;
-                    this.innerHTML = originalHTML;
-                    this.value = currentStatus; // Возвращаем текущий статус
-                });
+                    // Если пользователь отменил или оставил пустым
+                    if (!rejectionReason || rejectionReason.trim() === '') {
+                        alert('Для отказа необходимо указать причину');
+                        this.value = currentStatus; // Возвращаем текущий статус
+                        return;
+                    }
+                    
+                    // Отправляем запрос с причиной отказа
+                    updateDealStatus.call(this, dealId, newStatusId, currentStatus, rejectionReason.trim());
+                } else {
+                    // Для других статусов - обычное подтверждение
+                    if (!confirm(`Изменить статус договора?`)) {
+                        this.value = currentStatus; // Возвращаем текущий статус
+                        return;
+                    }
+                    
+                    // Отправляем запрос без причины отказа
+                    updateDealStatus.call(this, dealId, newStatusId, currentStatus, null);
+                }
             });
         });
+        
+        // Функция обновления статуса договора
+        function updateDealStatus(dealId, newStatusId, currentStatus, rejectionReason) {
+            const selectElement = this;
+            
+            // Блокируем select
+            selectElement.disabled = true;
+            const originalHTML = selectElement.innerHTML;
+            selectElement.innerHTML = '<option>Обновление...</option>';
+            
+            // Формируем тело запроса
+            const requestBody = {
+                status_id: newStatusId
+            };
+            
+            // Добавляем причину отказа, если она есть
+            if (rejectionReason) {
+                requestBody.rejection_reason = rejectionReason;
+            }
+            
+            // Отправляем запрос на обновление статуса
+            fetch(`/referal/admin/deal/${dealId}/update_status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Обновляем бейдж статуса
+                    const row = document.querySelector(`tr[data-deal-id="${dealId}"]`);
+                    if (row) {
+                        const statusBadge = row.querySelector('.deal-status-badge');
+                        if (statusBadge) {
+                            statusBadge.className = 'deal-status-badge status-' + data.new_status_id;
+                            statusBadge.textContent = data.new_status_name;
+                        }
+                    }
+                    
+                    // Показываем уведомление
+                    showNotification('success', data.message);
+                    
+                    // Перезагружаем страницу чтобы обновить список опций
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showNotification('error', data.message || 'Ошибка при обновлении статуса');
+                    
+                    // Восстанавливаем select
+                    selectElement.disabled = false;
+                    selectElement.innerHTML = originalHTML;
+                    selectElement.value = currentStatus; // Возвращаем текущий статус
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('error', 'Произошла ошибка при обновлении статуса');
+                    
+                // Восстанавливаем select
+                selectElement.disabled = false;
+                selectElement.innerHTML = originalHTML;
+                selectElement.value = currentStatus; // Возвращаем текущий статус
+            });
+        }
     });
     </script>
 

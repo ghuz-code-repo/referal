@@ -438,9 +438,17 @@ def update_deal_status(deal_id):
         # Получаем новый статус из запроса
         data = request.get_json()
         new_status_id = data.get('status_id')
+        rejection_reason = data.get('rejection_reason', '').strip()
         
         if not new_status_id:
             return jsonify({'success': False, 'message': 'Не указан новый статус'}), 400
+        
+        # Проверяем обязательность комментария при отказе (status_id = 500)
+        if new_status_id == 500 and not rejection_reason:
+            return jsonify({
+                'success': False,
+                'message': 'При отказе необходимо указать причину в поле "Комментарий об отказе"'
+            }), 400
         
         # Находим договор
         referal_deal = ReferalDeal.query.get(deal_id)
@@ -457,6 +465,12 @@ def update_deal_status(deal_id):
         
         # Обновляем статус
         referal_deal.status_id = new_status_id
+        
+        # Сохраняем или очищаем причину отказа
+        if new_status_id == 500:
+            referal_deal.rejection_reason = rejection_reason
+        else:
+            referal_deal.rejection_reason = None  # Очищаем при смене на другой статус
         
         # Обновляем deal_status для обратной совместимости
         status_mapping = {
