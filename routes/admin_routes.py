@@ -440,7 +440,10 @@ def update_deal_status(deal_id):
         new_status_id = data.get('status_id')
         rejection_reason = data.get('rejection_reason', '').strip()
         
-        if not new_status_id:
+        print(f"DEBUG update_deal_status: deal_id={deal_id}, new_status_id={new_status_id}, type={type(new_status_id)}")
+        
+        # ВАЖНО: Проверяем is None, т.к. статус 0 это валидное значение!
+        if new_status_id is None:
             return jsonify({'success': False, 'message': 'Не указан новый статус'}), 400
         
         # Проверяем обязательность комментария при отказе (status_id = 500)
@@ -494,6 +497,84 @@ def update_deal_status(deal_id):
     except Exception as e:
         db.session.rollback()
         print(f"Error updating deal status: {str(e)}")
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+@admin_bp.route('/admin/referal/<int:referal_id>/add_deal', methods=['POST'])
+def add_deal_to_referal(referal_id):
+    """Вручную добавляет договор к рефералу по номеру договора"""
+    try:
+        user = get_current_user()
+        if not user or not requires_admin_access():
+            return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+        
+        # Получаем номер договора из запроса
+        data = request.get_json()
+        agreement_number = data.get('agreement_number', '').strip()
+        
+        if not agreement_number:
+            return jsonify({'success': False, 'message': 'Не указан номер договора'}), 400
+        
+        # Находим реферала
+        referal = Referal.query.get(referal_id)
+        if not referal:
+            return jsonify({'success': False, 'message': 'Реферал не найден'}), 404
+        
+        # Находим договор по номеру
+        deal = MacroDeal.query.filter_by(agreement_number=agreement_number).first()
+        if not deal:
+            return jsonify({
+                'success': False, 
+                'message': f'Договор с номером "{agreement_number}" не найден в базе данных'
+            }), 404
+        
+        # Проверяем не добавлен ли уже этот договор
+        existing_link = ReferalDeal.query.filter_by(
+            referal_id=referal_id,
+            deal_id=deal.id
+        ).first()
+        
+        if existing_link:
+            return jsonify({
+                'success': False,
+                'message': f'Договор "{agreement_number}" уже привязан к этому рефералу'
+            }), 400
+        
+        # Создаем связь
+        referal_deal = ReferalDeal(
+            referal_id=referal_id,
+            deal_id=deal.id,
+            status_id=0,  # Начальный статус "Ждет проверки"
+            is_within_window=False,  # Ручное добавление - помечаем что вне окна
+            withdrawal_amount=0,
+            payment_processed=False,
+            deal_status='pending',
+            days_from_referal_creation=None  # Не рассчитываем для ручного добавления
+        )
+        
+        db.session.add(referal_deal)
+        db.session.commit()
+        
+        print(f"✅ Admin manually added deal {agreement_number} to referal {referal_id} | User: {user.login}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Договор "{agreement_number}" успешно привязан к рефералу',
+            'deal_id': deal.id,
+            'referal_deal_id': referal_deal.id,
+            'deal_info': {
+                'agreement_number': deal.agreement_number,
+                'contacts_buy_id': deal.contacts_buy_id,
+                'total_payments': deal.total_payments,
+                'project_name': deal.project_name
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error adding deal to referal: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
 
 

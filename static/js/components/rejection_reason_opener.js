@@ -23,38 +23,51 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    document.getElementById('submitRejectionReason').onclick = function() {
-        const reason = document.getElementById('rejectionReasonInput').value.trim();
-        if (!reason) {
-            document.getElementById('rejectionReasonInput').focus();
-            return;
-        }
-        if (pendingForm) {
-            // Добавляем скрытое поле с причиной отказа
-            let hidden = pendingForm.querySelector('input[name="rejection_reason"]');
-            if (!hidden) {
-                hidden = document.createElement('input');
-                hidden.type = 'hidden';
-                hidden.name = 'rejection_reason';
-                pendingForm.appendChild(hidden);
+    // Проверяем существование элементов модального окна перед установкой обработчиков
+    const submitButton = document.getElementById('submitRejectionReason');
+    const closeButton = document.getElementById('closeRejectionModal');
+    const modal = document.getElementById('rejectionReasonModal');
+
+    if (submitButton) {
+        submitButton.onclick = function() {
+            const reasonInput = document.getElementById('rejectionReasonInput');
+            if (!reasonInput) return;
+            
+            const reason = reasonInput.value.trim();
+            if (!reason) {
+                reasonInput.focus();
+                return;
             }
-            hidden.value = reason;
-            document.getElementById('rejectionReasonModal').style.display = 'none';
-            pendingForm.submit();
-            pendingForm = null;
-        }
-    };
+            if (pendingForm) {
+                // Добавляем скрытое поле с причиной отказа
+                let hidden = pendingForm.querySelector('input[name="rejection_reason"]');
+                if (!hidden) {
+                    hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = 'rejection_reason';
+                    pendingForm.appendChild(hidden);
+                }
+                hidden.value = reason;
+                if (modal) modal.style.display = 'none';
+                pendingForm.submit();
+                pendingForm = null;
+            }
+        };
+    }
 
-    document.getElementById('closeRejectionModal').onclick = function() {
-        document.getElementById('rejectionReasonModal').style.display = 'none';
-        pendingForm = null;
-    };
-
-    window.onclick = function(event) {
-        const modal = document.getElementById('rejectionReasonModal');
-        if (event.target === modal) {
-            modal.style.display = 'none';
+    if (closeButton) {
+        closeButton.onclick = function() {
+            if (modal) modal.style.display = 'none';
             pendingForm = null;
-        }
-    };
+        };
+    }
+
+    if (modal) {
+        window.onclick = function(event) {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+                pendingForm = null;
+            }
+        };
+    }
 });

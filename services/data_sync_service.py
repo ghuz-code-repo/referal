@@ -248,10 +248,11 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                     }
                 
                 # Fetch contacts data with date_modified for tracking interactions
+                # NOTE: date_created не существует в MySQL, используем date_modified для обеих дат
                 query_contacts = """
                     SELECT id, contacts_buy_name, contacts_buy_phones, 
                            COALESCE(contacts_buy_emails, '') as contacts_buy_emails,
-                           date_modified, date_created
+                           date_modified, date_modified as date_created
                     FROM estate_deals_contacts
                     WHERE date_modified >= %s
                     AND contacts_buy_phones IS NOT NULL 
@@ -270,16 +271,20 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                 
                 print(f"{task_name}: Starting batch processing with batch size {batch_size}")
                 
+                total_processed_so_far = 0
                 while True:
-                    print(f"{task_name}: Fetching next batch...")
                     rows_from_mysql = cursor.fetchmany(batch_size)
                     if not rows_from_mysql:
-                        print(f"{task_name}: No more rows to process")
+                        print(f"✅ {task_name}: All batches processed!")
                         break
                     
                     batch_number += 1
                     current_mysql_batch_size = len(rows_from_mysql)
-                    print(f"{task_name}: Processing batch {batch_number} with {current_mysql_batch_size} rows")
+                    total_processed_so_far += current_mysql_batch_size
+                    
+                    # Показываем прогресс в процентах
+                    progress_pct = (total_processed_so_far / total_records_to_process) * 100 if total_records_to_process > 0 else 0
+                    print(f"📊 CONTACTS Batch {batch_number} | Fetched: {current_mysql_batch_size} rows | Total: {total_processed_so_far}/{total_records_to_process} ({progress_pct:.1f}%)")
                     
                     staged_for_commit_in_batch = 0
                     skipped_unformattable_phone_in_batch = 0
@@ -427,12 +432,10 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                     # Bulk insert contacts
                     if contacts_to_add:
                         try:
-                            print(f"{task_name}: Adding {len(contacts_to_add)} contacts to session...")
                             db.session.add_all(contacts_to_add)
-                            print(f"{task_name}: Committing batch...")
                             db.session.commit()
                             loaded_records += len(contacts_to_add)
-                            print(f"{task_name}: Successfully committed {len(contacts_to_add)} contacts to database")
+                            print(f"💾 CONTACTS Batch {batch_number} | Committed: {len(contacts_to_add)} new contacts | Total loaded: {loaded_records}")
                         except Exception as e_batch:
                             db.session.rollback()
                             error_msg = f"{task_name}: Error committing batch of {len(contacts_to_add)} contacts: {str(e_batch)}"
@@ -604,15 +607,21 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
 
                 batch_size = int(os.getenv('DB_FETCH_DEALS_BATCH_SIZE', 1000))
                 batch_number = 0
+                total_deals_processed = 0
                 
                 while True:
                     rows = cursor.fetchmany(batch_size)
                     if not rows:
+                        print(f"✅ {task_name}: All batches processed!")
                         break
                     
                     batch_number += 1
                     current_batch_size = len(rows)
-                    print(f"{task_name}: Processing batch {batch_number} with {current_batch_size} rows")
+                    total_deals_processed += current_batch_size
+                    
+                    # Показываем прогресс
+                    progress_pct = (total_deals_processed / total_deals_to_process) * 100 if total_deals_to_process > 0 else 0
+                    print(f"📊 DEALS Batch {batch_number} | Fetched: {current_batch_size} rows | Total: {total_deals_processed}/{total_deals_to_process} ({progress_pct:.1f}%)")
                     
                     deals_in_batch_to_add = []
                     deals_updated_count = 0
@@ -672,18 +681,13 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                     # Commit all changes (updates + inserts)
                     try:
                         db.session.commit() 
-                        total_processed_in_batch = len(deals_in_batch_to_add) + deals_updated_count
-                        print(f"{task_name}: Successfully committed {len(deals_in_batch_to_add)} new deals and updated {deals_updated_count} existing deals")
+                        total_in_batch = len(deals_in_batch_to_add) + deals_updated_count
+                        print(f"💾 DEALS Batch {batch_number} | Committed: {len(deals_in_batch_to_add)} new + {deals_updated_count} updated | Total loaded: {loaded_deals}")
                     except Exception as e:
                         db.session.rollback()
-                        error_msg = f"{task_name}: Error committing batch of {len(deals_in_batch_to_add)} deals: {str(e)}"
+                        error_msg = f"{task_name}: Error committing batch: {str(e)}"
                         print(error_msg)
                         errors.append(error_msg)
-                    
-                    # Progress update
-                    if total_deals_to_process > 0:
-                        percentage = (loaded_deals / total_deals_to_process) * 100
-                        print(f"{task_name}: Progress - {loaded_deals} deals loaded ({percentage:.1f}%)")
             
             # Final verification
             final_count = MacroDeal.query.count()

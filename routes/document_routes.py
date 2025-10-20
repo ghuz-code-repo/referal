@@ -164,6 +164,11 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             real_deal = deal
             withdrawal_amount = referal_deal.withdrawal_amount
             
+            # Проверяем что withdrawal_amount не None
+            if withdrawal_amount is None:
+                flash('Сумма выплаты не рассчитана для данного договора. Обратитесь к администратору.', 'error')
+                return redirect(url_for('referal.profile'))
+            
         else:
             # Старая логика: генерация для первого найденного договора (для обратной совместимости)
             referal = Referal.query.get_or_404(referal_id)
@@ -209,6 +214,11 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
                 real_deal = deals[0]
             
             withdrawal_amount = referal.withdrawal_amount
+            
+            # Проверяем что withdrawal_amount не None
+            if withdrawal_amount is None:
+                flash('Сумма выплаты не рассчитана для данного реферала. Обратитесь к администратору.', 'error')
+                return redirect(url_for('referal.profile'))
         
         # Определяем путь к шаблону
         template_path = os.path.join(current_app.root_path, 'documents', f"{os.getenv('ACT_DOC_NAME')}.docx")
@@ -281,7 +291,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             'appartment_number': real_deal.apartment_number or '',
             'appartment_area': real_deal.deal_metr,
             'contract_price': real_deal.agreement_price or '',
-            'withdrawal_amount': str(math.ceil(withdrawal_amount/(1-float(os.getenv('NDS_PERCENT'))/100)) or 0),
+            'withdrawal_amount': str(math.ceil((withdrawal_amount or 0)/(1-float(os.getenv('NDS_PERCENT'))/100))),
             
             'referer_name': user_data.full_name or '',
             'passport_address': user_data.passport_adress or '',

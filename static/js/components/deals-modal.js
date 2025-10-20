@@ -426,3 +426,25 @@ function showError(message) {
         </tr>
     `;
 }
+
+/**
+ * Открывает модал добавления договора из меню реферала
+ */
+function openAddDealModalFromMenu() {
+    if (!currentReferalId) {
+        console.error('❌ currentReferalId не определён');
+        return;
+    }
+    
+    // Получаем имя реферала из заголовка
+    const referalNameElement = document.getElementById('deals-referal-name-header');
+    const referalName = referalNameElement ? referalNameElement.textContent : 'Неизвестно';
+    
+    console.log('🔧 Открываем добавление договора для реферала:', currentReferalId, referalName);
+    
+    // Закрываем меню реферала
+    closeDealsModal();
+    
+    // Открываем модал добавления договора
+    openAddDealModal(currentReferalId, referalName);
+}

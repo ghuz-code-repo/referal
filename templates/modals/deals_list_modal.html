@@ -54,7 +54,12 @@
                 
                 <!-- Правая панель: Договоры реферала -->
                 <div class="deals-list-panel">
-                    <h3><i class="fas fa-file-contract"></i> Договоры реферала (<span id="deals-referal-name-header"></span>)</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;"><i class="fas fa-file-contract"></i> Договоры реферала (<span id="deals-referal-name-header"></span>)</h3>
+                        <button type="button" class="btn-primary" onclick="openAddDealModalFromMenu()" style="padding: 8px 15px; font-size: 14px;">
+                            <i class="fas fa-plus"></i> Добавить договор
+                        </button>
+                    </div>
                     
                     <div class="deals-summary-compact">
                         <div class="summary-item-compact">

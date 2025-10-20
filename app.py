@@ -115,6 +115,60 @@ def health():
     return {'status': 'ok', 'service': 'referal-service'}, 200
 
 
+@app.route('/debug/check-my-permissions')
+def debug_check_permissions():
+    """🔍 DEBUG: Показывает все заголовки и разрешения текущего пользователя"""
+    from permission_utils import get_user_permissions, get_user_role_type
+    from status_permissions import can_move_to_status, can_move_from_status, can_change_status_detailed
+    import json
+    
+    # Собираем все заголовки
+    headers = {}
+    for key, value in request.headers.items():
+        if 'X-User' in key or 'Authorization' in key:
+            headers[key] = value
+    
+    # Получаем разрешения
+    permissions = get_user_permissions()
+    role_type = get_user_role_type()
+    
+    # Проверяем конкретные разрешения для статуса 0
+    can_move_to_0 = can_move_to_status(0)
+    
+    # Проверяем move_from для разных статусов
+    move_from_checks = {}
+    for status_id in [1, 10, 20, 200, 300, 500]:
+        move_from_checks[status_id] = can_move_from_status(status_id)
+    
+    # Проверяем конкретные переходы
+    transition_checks = {}
+    for from_status in [1, 10, 20, 200, 300, 500]:
+        to_status = 0
+        can_change = can_change_status_detailed(from_status, to_status)
+        transition_checks[f"{from_status} -> {to_status}"] = can_change
+    
+    result = {
+        "headers": headers,
+        "permissions_count": len(permissions),
+        "permissions": sorted(list(permissions)),
+        "role_type": role_type,
+        "checks": {
+            "can_move_to_status_0": can_move_to_0,
+            "can_move_from_statuses": move_from_checks,
+            "status_transitions": transition_checks
+        },
+        "specific_permissions": {
+            "pending.move_to": "referal.status.pending.move_to" in permissions,
+            "pending.move_from": "referal.status.pending.move_from" in permissions,
+            "accepted.move_from": "referal.status.accepted.move_from" in permissions,
+            "paid.move_from": "referal.status.paid.move_from" in permissions,
+            "analytics.move_from": "referal.status.analytics_review.move_from" in permissions,
+        }
+    }
+    
+    return json.dumps(result, indent=2, ensure_ascii=False), 200, {'Content-Type': 'application/json; charset=utf-8'}
+
+
 @app.route('/')
 def home():
     """Корневой маршрут - умное перенаправление на основе разрешений."""

@@ -988,7 +988,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const currentStatus = this.getAttribute('data-current-status');
                 
                 // Если выбран текущий статус, ничего не делаем
-                if (!newStatusId || newStatusId.toString() === currentStatus) {
+                // ВАЖНО: используем isNaN вместо !newStatusId, т.к. статус 0 это валидное значение!
+                if (isNaN(newStatusId) || newStatusId.toString() === currentStatus) {
                     return;
                 }
                 
@@ -1087,7 +1088,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     </script>
 
+        });
+    </script>
+
     <script src="{{ url_for('static', filename='js/components/rejection_reason_opener.js') }}"></script>
+
+    <!-- Модальное окно для добавления договора -->
+    {% include 'modals/add_deal_modal.html' %}
+</script>
+
+</body>
+</html>
+
 </script>
 
 </body>
