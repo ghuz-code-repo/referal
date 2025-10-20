@@ -3,8 +3,80 @@
 from datetime import datetime
 import logging
 import os
+import threading
 from models import *
 import utils
+from notification_client import get_notification_client
+
+
+def send_deal_available_notification(user, referal, deal, withdrawal_amount):
+    """
+    Отправляет уведомление пользователю о том, что новый договор готов к отправке на проверку
+    """
+    def _send_async():
+        try:
+            # Получаем email пользователя
+            user_email = None
+            
+            # Пытаемся получить email из auth-service через API
+            if user.auth_user_id:
+                try:
+                    import requests
+                    auth_service_url = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:80')
+                    response = requests.get(
+                        f"{auth_service_url}/api/users/{user.auth_user_id}",
+                        timeout=5
+                    )
+                    if response.status_code == 200:
+                        user_data = response.json()
+                        user_email = user_data.get('email')
+                except Exception as e:
+                    print(f"⚠️ Could not fetch email from auth-service: {e}")
+            
+            if not user_email:
+                print(f"⚠️ No email found for user {user.login}, skipping notification")
+                return
+            
+            notification_client = get_notification_client()
+            
+            subject = "Новый договор готов к отправке на проверку"
+            body = f"""
+Здравствуйте, {user.login}!
+
+Хорошие новости! По вашему рефералу "{referal.referal_data.full_name if referal.referal_data else 'Без имени'}" появился новый договор, готовый к отправке на проверку.
+
+Детали договора:
+- Номер договора: {deal.agreement_number}
+- Сумма выплаты: {withdrawal_amount:,} сум
+
+Вы можете отправить этот договор на проверку в личном кабинете реферальной программы:
+{os.getenv('APP_BASE_URL', 'http://localhost')}/referal/my_referrals
+
+После отправки на проверку договор будет рассмотрен нашими специалистами, и вы получите выплату.
+
+---
+С уважением,
+Команда реферальной программы
+"""
+            
+            success = notification_client.send_email(
+                recipient=user_email,
+                subject=subject,
+                body=body
+            )
+            
+            if success:
+                print(f"📧 Deal available notification sent to {user_email} about deal {deal.agreement_number}")
+            else:
+                print(f"⚠️ Failed to send notification to {user_email}")
+                
+        except Exception as e:
+            print(f"❌ Error sending deal available notification: {e}")
+    
+    # Запускаем отправку в отдельном потоке
+    thread = threading.Thread(target=_send_async)
+    thread.daemon = True
+    thread.start()
 
 
 def create_new_referal(full_name, phone_number, user):
@@ -197,3 +269,327 @@ def update_deal_info(user):
     # Сохранение изменений в базе данных
     db.session.commit()
     logging.debug(f"Final user balance: {user.current_balance}")
+
+
+# ========================================
+# NEW FUNCTIONS FOR MULTIPLE DEALS LOGIC
+# ========================================
+
+def check_contact_history_before_adding(phone_number, full_name, days_threshold=45):
+    """
+    Проверяет, были ли взаимодействия клиента с CRM в течение N дней до текущей даты.
+    
+    Args:
+        phone_number: Номер телефона клиента
+        full_name: Полное имя клиента
+        days_threshold: Количество дней для проверки (по умолчанию 45)
+    
+    Returns:
+        dict: {
+            'can_add': bool,  # Можно ли добавить реферала
+            'reason': str,    # Причина отказа (если can_add=False)
+            'contact': MacroContact or None,  # Найденный контакт
+            'deals': list[MacroDeal],  # Найденные договора
+            'first_interaction': datetime or None  # Дата первого взаимодействия
+        }
+    """
+    from datetime import timedelta
+    
+    # Форматируем телефон
+    formatted_phone = utils.format_phone_number(phone_number)
+    if not formatted_phone:
+        formatted_phone = phone_number
+    
+    # Определяем граничную дату
+    threshold_date = datetime.now() - timedelta(days=days_threshold)
+    
+    print(f"DEBUG check_contact_history: Checking for phone={formatted_phone}, name={full_name}, threshold={threshold_date}")
+    
+    # Ищем контакт в MacroContact
+    contact = MacroContact.query.filter_by(phone_number=formatted_phone).first()
+    
+    # Если контакта нет, также ищем по имени
+    if not contact and full_name:
+        contact = MacroContact.query.filter_by(full_name=full_name.strip()).first()
+        if contact:
+            print(f"DEBUG check_contact_history: Found contact by name match: {contact.full_name}")
+    
+    if not contact:
+        # Контакт не найден в CRM - можно добавлять
+        print(f"DEBUG check_contact_history: Contact not found in CRM - OK to add")
+        return {
+            'can_add': True,
+            'reason': 'Contact not found in CRM',
+            'contact': None,
+            'deals': [],
+            'first_interaction': None
+        }
+    
+    # Контакт найден - проверяем дату ПОСЛЕДНЕЙ СДЕЛКИ (не date_modified!)
+    # Используем last_deal_date - дата последней сделки клиента
+    last_interaction = contact.last_deal_date
+    
+    # Конвертируем date в datetime для сравнения с threshold_date
+    if last_interaction:
+        from datetime import datetime
+        last_interaction = datetime.combine(last_interaction, datetime.min.time())
+    
+    if not last_interaction:
+        # Нет данных о сделках - разрешаем добавление
+        print(f"DEBUG check_contact_history: No deal date found for contact - OK to add")
+        return {
+            'can_add': True,
+            'reason': 'No deal date found',
+            'contact': contact,
+            'deals': [],
+            'first_interaction': None
+        }
+    
+    # Проверяем, было ли взаимодействие в пределах threshold_date
+    if last_interaction >= threshold_date:
+        # Последняя сделка была недавно - ЗАПРЕЩАЕМ добавление
+        days_ago = (datetime.now() - last_interaction).days
+        
+        # Ищем все договора этого контакта
+        deals = MacroDeal.query.filter_by(contacts_buy_id=contact.contacts_id).all()
+        
+        print(f"DEBUG check_contact_history: Contact had recent deal ({days_ago} days ago) - CANNOT add")
+        return {
+            'can_add': False,
+            'reason': f'У клиента была сделка {days_ago} дней назад (в пределах {days_threshold} дней)',
+            'contact': contact,
+            'deals': deals,
+            'first_interaction': last_interaction
+        }
+    
+    # Последняя сделка была давно - разрешаем
+    print(f"DEBUG check_contact_history: Last deal was outside threshold - OK to add")
+    return {
+        'can_add': True,
+        'reason': 'Last interaction was outside threshold window',
+        'contact': contact,
+        'deals': [],
+        'first_interaction': last_interaction
+    }
+
+
+def create_new_referal_with_validation(full_name, phone_number, user, days_threshold=45):
+    """
+    Создает нового реферала с проверкой истории взаимодействий.
+    
+    Args:
+        full_name: Полное имя реферала
+        phone_number: Номер телефона реферала
+        user: Пользователь, создающий реферала
+        days_threshold: Порог проверки в днях (по умолчанию 45)
+    
+    Returns:
+        tuple: (referal or None, error_message or None)
+    """
+    # Проверяем историю контакта
+    check_result = check_contact_history_before_adding(phone_number, full_name, days_threshold)
+    
+    if not check_result['can_add']:
+        # ЗАПРЕЩЕНО добавление
+        return None, check_result['reason']
+    
+    # Разрешено - создаем реферала
+    formatted_phone = utils.format_phone_number(phone_number)
+    if not formatted_phone:
+        formatted_phone = phone_number
+    
+    contact = check_result['contact']
+    contact_id = contact.contacts_id if contact else None
+    
+    new_referal = Referal(
+        user_id=user.id,
+        contact_id=contact_id,
+        created_at=datetime.utcnow(),  # ВАЖНО: фиксируем дату создания
+        days_window=days_threshold,
+        referal_data=ReferalData(
+            full_name=full_name,
+            phone_number=formatted_phone,
+        ),
+    )
+    
+    print(f"DEBUG create_new_referal_with_validation: Created referal for {full_name} with window {days_threshold} days")
+    
+    return new_referal, None
+
+
+def calculate_withdrawal_for_deal(deal):
+    """
+    Рассчитывает сумму выплаты для конкретного договора на основе площади.
+    
+    Args:
+        deal: Объект MacroDeal
+    
+    Returns:
+        int: Сумма выплаты в сумах
+    """
+    if not deal.deal_metr:
+        return 0
+    
+    metr = deal.deal_metr
+    
+    if 20.0 <= metr < 40.0:
+        return int(os.getenv('REFERAL_WITHDRAWAL_FOR_40M', 0))
+    elif 40.0 <= metr < 60.0:
+        return int(os.getenv('REFERAL_WITHDRAWAL_FOR_60M', 0))
+    elif 60.0 <= metr < 80.0:
+        return int(os.getenv('REFERAL_WITHDRAWAL_FOR_80M', 0))
+    elif metr >= 80.0:
+        return int(os.getenv('REFERAL_WITHDRAWAL_FOR_81M', 0))
+    
+    return 0
+
+
+def find_and_link_deals_for_referal(referal):
+    """
+    Находит все договора в пределах 45-дневного окна и привязывает их к рефералу.
+    
+    Логика:
+    1. Берем дату создания реферала (referal.created_at)
+    2. Ищем все договора контакта с датой от (created_at - 45 дней) до (created_at + 45 дней)
+    3. Создаем связи ReferalDeal для каждого найденного договора
+    4. Считаем выплату для каждого договора отдельно
+    
+    Args:
+        referal: Объект Referal
+    
+    Returns:
+        list: Список созданных связей ReferalDeal
+    """
+    from datetime import timedelta
+    
+    if not referal.contact_id:
+        print(f"DEBUG find_and_link_deals: Referal {referal.id} has no contact_id, skipping")
+        return []
+    
+    # Определяем временное окно
+    referal_created = referal.created_at
+    window_days = referal.days_window or 45
+    
+    window_start = referal_created - timedelta(days=window_days)
+    window_end = referal_created + timedelta(days=window_days)
+    
+    print(f"DEBUG find_and_link_deals: Searching deals for referal {referal.id} in window: {window_start} to {window_end}")
+    
+    # Находим все договора контакта
+    all_deals = MacroDeal.query.filter_by(contacts_buy_id=referal.contact_id).all()
+    
+    print(f"DEBUG find_and_link_deals: Found {len(all_deals)} total deals for contact_id={referal.contact_id}")
+    
+    linked_deals = []
+    
+    for deal in all_deals:
+        # Проверяем наличие оплат
+        if not deal.has_valid_payment():
+            print(f"DEBUG find_and_link_deals: Deal {deal.agreement_number} has insufficient payment, skipping")
+            continue
+        
+        # Проверяем дату договора
+        if not deal.agreement_date:
+            print(f"DEBUG find_and_link_deals: Deal {deal.agreement_number} has no agreement_date, skipping")
+            continue
+        
+        # Конвертируем date в datetime для сравнения
+        deal_datetime = datetime.combine(deal.agreement_date, datetime.min.time())
+        
+        # Проверяем попадание в окно
+        is_within_window = window_start <= deal_datetime <= window_end
+        
+        if not is_within_window:
+            days_diff = (deal_datetime - referal_created).days
+            print(f"DEBUG find_and_link_deals: Deal {deal.agreement_number} is outside window (diff: {days_diff} days), skipping")
+            continue
+        
+        # Проверяем, не привязан ли уже этот договор к этому рефералу
+        existing_link = ReferalDeal.query.filter_by(
+            referal_id=referal.id,
+            deal_id=deal.id
+        ).first()
+        
+        if existing_link:
+            print(f"DEBUG find_and_link_deals: Deal {deal.agreement_number} already linked to referal {referal.id}")
+            linked_deals.append(existing_link)
+            continue
+        
+        # Создаем новую связь
+        days_diff = (deal_datetime - referal_created).days
+        
+        # Рассчитываем сумму выплаты для этого договора
+        withdrawal_amount = calculate_withdrawal_for_deal(deal)
+        
+        referal_deal_link = ReferalDeal(
+            referal_id=referal.id,
+            deal_id=deal.id,
+            linked_at=datetime.utcnow(),
+            is_within_window=True,
+            days_from_referal_creation=days_diff,
+            withdrawal_amount=withdrawal_amount,
+            payment_processed=False
+        )
+        
+        db.session.add(referal_deal_link)
+        linked_deals.append(referal_deal_link)
+        
+        print(f"✅ Linked deal {deal.agreement_number} to referal {referal.id}, withdrawal: {withdrawal_amount}, days_diff: {days_diff}")
+        
+        # Отправляем уведомление пользователю, если договор готов к отправке (status_id=0 и withdrawal_amount>0)
+        if withdrawal_amount > 0:
+            try:
+                # Получаем пользователя через реферала
+                user = referal.user
+                if user:
+                    print(f"📧 Sending deal available notification for deal {deal.agreement_number} to user {user.login}")
+                    send_deal_available_notification(user, referal, deal, withdrawal_amount)
+                else:
+                    print(f"⚠️ No user found for referal {referal.id}, skipping notification")
+            except Exception as notif_error:
+                print(f"⚠️ Failed to send notification: {notif_error}")
+    
+    db.session.commit()
+    
+    print(f"DEBUG find_and_link_deals: Total linked {len(linked_deals)} deals for referal {referal.id}")
+    
+    return linked_deals
+
+
+def update_balance_for_referal(referal, user):
+    """
+    Обновляет баланс пользователя на основе ВСЕХ привязанных договоров.
+    Обрабатывает только те договора, для которых payment_processed=False.
+    
+    Args:
+        referal: Объект Referal
+        user: Объект User
+    
+    Returns:
+        int: Общая сумма добавленная к балансу
+    """
+    # Получаем все связи referal-deal
+    referal_deals = ReferalDeal.query.filter_by(
+        referal_id=referal.id,
+        payment_processed=False
+    ).all()
+    
+    if not referal_deals:
+        print(f"DEBUG update_balance_for_referal: No unprocessed deals for referal {referal.id}")
+        return 0
+    
+    total_added = 0
+    
+    for rd in referal_deals:
+        if rd.withdrawal_amount > 0:
+            user.current_balance += rd.withdrawal_amount
+            rd.payment_processed = True
+            total_added += rd.withdrawal_amount
+            
+            print(f"DEBUG update_balance_for_referal: Added {rd.withdrawal_amount} to user balance for deal {rd.deal_id}")
+    
+    db.session.commit()
+    
+    print(f"✅ Total added to user {user.id} balance: {total_added} (processed {len(referal_deals)} deals)")
+    
+    return total_added

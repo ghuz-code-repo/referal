@@ -1,6 +1,7 @@
 """Маршруты для администрирования"""
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from sqlalchemy import or_
 from services import fetch_data_from_mysql
 from .auth_routes import get_current_user
 from models import *
@@ -113,7 +114,7 @@ def debug_permissions_ui():
 
 @admin_bp.route('/admin', methods=['GET'])
 def admin_panel():
-    """Административная панель для управления рефералами."""
+    """Административная панель для управления рефералами и договорами."""
     
     user = get_current_user()
     
@@ -130,6 +131,9 @@ def admin_panel():
     # Get user role type based on permissions
     user_role_type = get_user_role_type()
     
+    # Получаем режим просмотра: 'referals' (по умолчанию) или 'deals'
+    view_mode = request.args.get('view_mode', 'deals')  # По умолчанию показываем договоры
+    
     # Получаем параметры из URL
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -141,6 +145,7 @@ def admin_panel():
     contract_filter = request.args.get('contract', '')
     contact_id_filter = request.args.get('contact_id', '')
     user_filter = request.args.get('user', '')
+    amount_filter = request.args.get('amount', '').strip()
     
     # Проверяем наличие заголовка Referer для определения "чистого" захода
     referer = request.headers.get('Referer', '')
@@ -288,12 +293,120 @@ def admin_panel():
             referal.macro_contacts = []
             referal.macro_contact = None
     
+    # Если режим просмотра - договоры, получаем список всех договоров
+    deals_pagination = None
+    deals = []
+    if view_mode == 'deals':
+        from models import ReferalDeal, MacroDeal
+        from sqlalchemy.orm import joinedload
+        
+        print(f"=== DEALS VIEW MODE ACTIVATED ===")
+        print(f"User: {user.login}, Role: {user.role}")
+        print(f"Filter status IDs: {filter_status_ids}")
+        print(f"Status filter param: {status_filter}")
+        print(f"Status IDs list: {status_ids}")
+        
+        # Базовый запрос для договоров с загрузкой связанных данных
+        deals_query = ReferalDeal.query\
+            .options(
+                joinedload(ReferalDeal.status),
+                joinedload(ReferalDeal.deal),
+                joinedload(ReferalDeal.referal).joinedload(Referal.referal_data),
+                joinedload(ReferalDeal.referal).joinedload(Referal.user)
+            )\
+            .join(Referal, ReferalDeal.referal_id == Referal.id)\
+            .join(MacroDeal, ReferalDeal.deal_id == MacroDeal.id)
+        
+        print(f"Base query created")
+        
+        # Фильтруем только реальные договоры (с номером договора)
+        deals_query = deals_query.filter(
+            MacroDeal.agreement_number.isnot(None),
+            MacroDeal.agreement_number != ''
+        )
+        
+        # Фильтруем: либо есть оплата >= 3млн, либо есть рассчитанная выплата
+        deals_query = deals_query.filter(
+            or_(
+                MacroDeal.total_payments >= 3000000,
+                ReferalDeal.withdrawal_amount > 0
+            )
+        )
+        
+        # Только реальные договора: "Сделка проведена" и "Сделка в работе"
+        valid_statuses = ['Сделка проведена', 'Сделка в работе']
+        deals_query = deals_query.filter(
+            MacroDeal.deal_status_name.in_(valid_statuses)
+        )
+        
+        # Фильтры для режима договоров
+        if status_filter:
+            if status_ids:
+                deals_query = deals_query.filter(ReferalDeal.status_id.in_(status_ids))
+                print(f"Applied status filter with IDs: {status_ids}")
+        # ИЗМЕНЕНИЕ: Убираем фильтрацию по умолчанию для договоров
+        # Пользователь может сам выбрать нужные статусы через фильтр
+        # else:
+        #     # Показываем договоры с разрешенными статусами
+        #     if filter_status_ids:
+        #         deals_query = deals_query.filter(ReferalDeal.status_id.in_(filter_status_ids))
+        #         print(f"Applied default status filter with IDs: {filter_status_ids}")
+        
+        if name_filter:
+            deals_query = deals_query.join(ReferalData, Referal.id == ReferalData.referal_id).filter(
+                ReferalData.full_name.ilike(f'%{name_filter}%')
+            )
+            print(f"Applied name filter: {name_filter}")
+        
+        if contract_filter:
+            deals_query = deals_query.filter(MacroDeal.agreement_number.ilike(f'%{contract_filter}%'))
+            print(f"Applied contract filter: {contract_filter}")
+        
+        if user_filter:
+            deals_query = deals_query.join(User, Referal.user_id == User.id).filter(
+                User.login.ilike(f'%{user_filter}%')
+            )
+            print(f"Applied user filter: {user_filter}")
+        
+        if amount_filter:
+            try:
+                min_amount = float(amount_filter)
+                deals_query = deals_query.filter(ReferalDeal.withdrawal_amount >= min_amount)
+                print(f"Applied amount filter: >= {min_amount}")
+            except ValueError:
+                print(f"Invalid amount filter value: {amount_filter}")
+        
+        # Сортировка по умолчанию - по ID договора (новые сверху)
+        deals_query = deals_query.order_by(ReferalDeal.id.desc())
+        
+        print(f"Query SQL: {str(deals_query)}")
+        
+        # Пагинация для договоров
+        try:
+            deals_pagination = deals_query.paginate(
+                page=page,
+                per_page=per_page,
+                error_out=False
+            )
+            deals = deals_pagination.items
+            print(f"Query executed successfully. Total deals: {deals_pagination.total}, Current page deals: {len(deals)}")
+            for deal in deals[:5]:  # Показываем первые 5 для отладки
+                print(f"Deal ID: {deal.id}, Referal: {deal.referal_id}, Status: {deal.status_id}")
+        except Exception as e:
+            print(f"ERROR executing deals query: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+    
     
     all_statuses_in_db = Status.query.all()
     return render_template('admin.html', 
                           current_user=user,
                           referals=referals,
                           pagination=pagination,
+                          view_mode=view_mode,
+                          deals=deals,
+                          deals_pagination=deals_pagination,
+                          all_statuses_in_db=all_statuses_in_db,  # Добавляем все статусы для фильтра
                           current_filters={
                               'status': status_filter,
                               'name': name_filter,
@@ -312,6 +425,62 @@ def admin_panel():
                           user_role_type=user_role_type,
                           can_change_status_from_to=can_change_status_from_to,
                           allowed_status_changes=allowed_status_changes)
+
+
+@admin_bp.route('/admin/deal/<int:deal_id>/update_status', methods=['POST'])
+def update_deal_status(deal_id):
+    """Обновляет статус договора (только для админов)"""
+    try:
+        user = get_current_user()
+        if not user or not requires_admin_access():
+            return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+        
+        # Получаем новый статус из запроса
+        data = request.get_json()
+        new_status_id = data.get('status_id')
+        
+        if not new_status_id:
+            return jsonify({'success': False, 'message': 'Не указан новый статус'}), 400
+        
+        # Находим договор
+        referal_deal = ReferalDeal.query.get(deal_id)
+        if not referal_deal:
+            return jsonify({'success': False, 'message': 'Договор не найден'}), 404
+        
+        # Проверяем права на изменение статуса
+        old_status = referal_deal.status_id
+        if not can_change_status_from_to(old_status, new_status_id):
+            return jsonify({
+                'success': False,
+                'message': f'Недостаточно прав для изменения статуса с {old_status} на {new_status_id}'
+            }), 403
+        
+        # Обновляем статус
+        referal_deal.status_id = new_status_id
+        
+        # Обновляем deal_status для обратной совместимости
+        status_mapping = {
+            0: 'pending',
+            100: 'sent_for_review',
+            200: 'approved',
+            300: 'paid',
+            500: 'rejected'
+        }
+        referal_deal.deal_status = status_mapping.get(new_status_id, 'pending')
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Статус договора обновлен: {referal_deal.status_name}',
+            'new_status_id': new_status_id,
+            'new_status_name': referal_deal.status_name
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating deal status: {str(e)}")
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
 
 
 @admin_bp.route('/update_withdrawal_stage/<int:referal_id>', methods=['POST'])

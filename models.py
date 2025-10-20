@@ -80,6 +80,10 @@ class Referal(db.Model):
     referal_data = db.relationship('ReferalData', backref='referal', lazy=True, uselist=False)
     deals = db.relationship('MacroDeal', backref='referal', lazy=True)
     
+    # NEW: Поля для отслеживания 45-дневного окна
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    days_window = db.Column(db.Integer, nullable=False, default=45)
+    
     #Status
     status_id = db.Column(db.Integer, db.ForeignKey('status.id'), nullable=False, default=0)
     status_name = db.Column(db.String(50), nullable=True, default='Не начата')
@@ -102,6 +106,118 @@ class Referal(db.Model):
         if self.contact_id:
             return MacroContact.query.filter_by(contacts_id=self.contact_id).first()
         return None
+    
+    def get_deals_summary(self):
+        """Возвращает список всех договоров с их данными для UI"""
+        deals_info = []
+        for referal_deal in self.referal_deals.all():
+            deal = referal_deal.deal
+            if deal:
+                # Проверяем что это реальный договор:
+                # 1. Есть номер договора
+                # 2. ЛИБО есть оплата >= 3млн, ЛИБО уже рассчитана сумма выплаты
+                # 3. Статус НЕ "Сделка отменена", "Не понравилось" или "Не определен"
+                has_agreement_number = deal.agreement_number and deal.agreement_number.strip()
+                has_payment = deal.total_payments and deal.total_payments >= 3000000
+                has_withdrawal = referal_deal.withdrawal_amount and referal_deal.withdrawal_amount > 0
+                
+                # Только реальные договора: "Сделка проведена" и "Сделка в работе"
+                valid_statuses = ['Сделка проведена', 'Сделка в работе']
+                is_valid_status = deal.deal_status_name in valid_statuses
+                
+                # Показываем если есть номер И (есть оплата ИЛИ есть рассчитанная выплата) И статус валидный
+                if has_agreement_number and (has_payment or has_withdrawal) and is_valid_status:
+                    deals_info.append({
+                        'referal_deal_id': referal_deal.id,
+                        'deal_id': deal.id,
+                        'agreement_number': deal.agreement_number,
+                        'deal_status_name': deal.deal_status_name,
+                        'withdrawal_amount': referal_deal.withdrawal_amount,
+                        'deal_status': referal_deal.deal_status,
+                        'payment_processed': referal_deal.payment_processed,
+                        'is_within_window': referal_deal.is_within_window,
+                        'days_from_creation': referal_deal.days_from_referal_creation,
+                        'linked_at': referal_deal.linked_at,
+                        'project_name': deal.project_name,
+                        'apartment_number': deal.apartment_number,
+                        'agreement_date': deal.agreement_date,
+                        'status_id': referal_deal.status_id,
+                        'status_name': referal_deal.status_name
+                    })
+        return deals_info
+    
+    def get_total_withdrawal_amount(self):
+        """Возвращает общую сумму к выводу по всем реальным договорам"""
+        total = 0
+        for referal_deal in self.referal_deals.all():
+            deal = referal_deal.deal
+            if deal and referal_deal.withdrawal_amount:
+                # Считаем только договоры с номером И (есть оплата >= 3млн ИЛИ есть рассчитанная выплата) И валидным статусом
+                has_agreement_number = deal.agreement_number and deal.agreement_number.strip()
+                has_payment = deal.total_payments and deal.total_payments >= 3000000
+                has_withdrawal = referal_deal.withdrawal_amount > 0
+                
+                # Только реальные договора: "Сделка проведена" и "Сделка в работе"
+                valid_statuses = ['Сделка проведена', 'Сделка в работе']
+                is_valid_status = deal.deal_status_name in valid_statuses
+                
+                if has_agreement_number and (has_payment or has_withdrawal) and is_valid_status:
+                    total += referal_deal.withdrawal_amount
+        return total
+    
+    def get_deals_count(self):
+        """Возвращает количество реальных связанных договоров"""
+        count = 0
+        for referal_deal in self.referal_deals.all():
+            deal = referal_deal.deal
+            if deal:
+                has_agreement_number = deal.agreement_number and deal.agreement_number.strip()
+                has_payment = deal.total_payments and deal.total_payments >= 3000000
+                has_withdrawal = referal_deal.withdrawal_amount and referal_deal.withdrawal_amount > 0
+                
+                # Только реальные договора: "Сделка проведена" и "Сделка в работе"
+                valid_statuses = ['Сделка проведена', 'Сделка в работе']
+                is_valid_status = deal.deal_status_name in valid_statuses
+                
+                if has_agreement_number and (has_payment or has_withdrawal) and is_valid_status:
+                    count += 1
+        return count
+    
+    def get_pending_deals_count(self):
+        """Возвращает количество реальных договоров ожидающих отправки"""
+        count = 0
+        for referal_deal in self.referal_deals.filter_by(deal_status='pending').all():
+            deal = referal_deal.deal
+            if deal:
+                has_agreement_number = deal.agreement_number and deal.agreement_number.strip()
+                has_payment = deal.total_payments and deal.total_payments >= 3000000
+                has_withdrawal = referal_deal.withdrawal_amount and referal_deal.withdrawal_amount > 0
+                
+                # Только реальные договора: "Сделка проведена" и "Сделка в работе"
+                valid_statuses = ['Сделка проведена', 'Сделка в работе']
+                is_valid_status = deal.deal_status_name in valid_statuses
+                
+                if has_agreement_number and (has_payment or has_withdrawal) and is_valid_status:
+                    count += 1
+        return count
+    
+    def get_approved_deals_count(self):
+        """Возвращает количество реальных одобренных договоров"""
+        count = 0
+        for referal_deal in self.referal_deals.filter_by(deal_status='approved').all():
+            deal = referal_deal.deal
+            if deal:
+                has_agreement_number = deal.agreement_number and deal.agreement_number.strip()
+                has_payment = deal.total_payments and deal.total_payments >= 3000000
+                has_withdrawal = referal_deal.withdrawal_amount and referal_deal.withdrawal_amount > 0
+                
+                # Только реальные договора: "Сделка проведена" и "Сделка в работе"
+                valid_statuses = ['Сделка проведена', 'Сделка в работе']
+                is_valid_status = deal.deal_status_name in valid_statuses
+                
+                if has_agreement_number and (has_payment or has_withdrawal) and is_valid_status:
+                    count += 1
+        return count
 
     def __repr__(self):
         return f'<Referal {self.full_name}>'
@@ -130,7 +246,11 @@ class MacroDeal(db.Model):
     contacts_buy_id = db.Column(db.Integer, nullable=False)
     deal_metr = db.Column(db.Float, nullable=True)  # площадь сделки
     total_payments = db.Column(db.Float, nullable=True, default=0)  # общая сумма оплат
-    referal_id = db.Column(db.Integer, db.ForeignKey('referal.id'), nullable=False, default=-1)
+    referal_id = db.Column(db.Integer, db.ForeignKey('referal.id'), nullable=True)  # CHANGED: nullable=True
+    
+    # NEW: Поля для отслеживания выплат по конкретному договору
+    payment_calculated = db.Column(db.Boolean, default=False)
+    withdrawal_amount = db.Column(db.Integer, default=0)
     
     # Поля недвижимости для генерации актов
     project_name = db.Column(db.String(200), nullable=True)  # название проекта
@@ -166,6 +286,12 @@ class MacroContact(db.Model):
     # Добавляем поле номер договора
     agreement_number = db.Column(db.String(100), nullable=True)
     
+    # NEW: Поля для отслеживания взаимодействий с CRM
+    first_interaction_date = db.Column(db.DateTime, nullable=True)
+    last_interaction_date = db.Column(db.DateTime, nullable=True)
+    date_modified = db.Column(db.DateTime, nullable=True)  # Из синхронизации MacroCRM
+    last_deal_date = db.Column(db.Date, nullable=True)  # Дата последней сделки/заявки клиента
+    
     def __repr__(self):
         return f'<MacroContact {self.full_name}>'
 
@@ -183,5 +309,66 @@ class Status(db.Model):
     name = db.Column(db.String(50), nullable=False)
     is_final = db.Column(db.Boolean, default=False)
     is_start = db.Column(db.Boolean, default=False)
+
+
+class ReferalDeal(db.Model):
+    """Связь между рефералом и сделкой (Many-to-Many) с метаданными"""
+    __tablename__ = 'referal_deal'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    referal_id = db.Column(db.Integer, db.ForeignKey('referal.id'), nullable=False)
+    deal_id = db.Column(db.Integer, db.ForeignKey('macro_deal.id'), nullable=False)
+    
+    # НОВОЕ: Статус договора (теперь статус на уровне договора, а не реферала)
+    status_id = db.Column(db.Integer, db.ForeignKey('status.id'), nullable=True, default=0)
+    # 0 - Заполнить данные
+    # 100 - На проверке у call-center
+    # 200 - Готов к выплате
+    # 300 - Выплачен
+    # 500 - Отклонен
+    
+    # Метаданные связи
+    linked_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    # Когда договор был привязан к рефералу
+    
+    is_within_window = db.Column(db.Boolean, default=True)
+    # Попадает ли в 45-дневное окно
+    
+    withdrawal_amount = db.Column(db.Integer, default=0)
+    # Сумма выплаты за эту конкретную связь
+    
+    payment_processed = db.Column(db.Boolean, default=False)
+    # Была ли обработана выплата
+    
+    # Связи
+    status = db.relationship('Status', foreign_keys=[status_id])
+    
+    days_from_referal_creation = db.Column(db.Integer, nullable=True)
+    # Сколько дней прошло от создания реферала до создания договора
+    
+    deal_status = db.Column(db.String(50), default='pending')
+    # Статус обработки договора: pending, sent_for_review, approved, rejected, paid
+    
+    # Relationships для удобного доступа
+    referal = db.relationship('Referal', backref=db.backref('referal_deals', lazy='dynamic'))
+    deal = db.relationship('MacroDeal', backref=db.backref('referal_links', lazy='dynamic'))
+    
+    @property
+    def status_name(self):
+        """Возвращает название статуса договора"""
+        if self.status:
+            return self.status.name
+        return 'Не указан'
+    
+    def __repr__(self):
+        return f'<ReferalDeal referal_id={self.referal_id} deal_id={self.deal_id} status={self.status_id}>'
+    
+    # Уникальность: один договор не может быть привязан к одному рефералу дважды
+    __table_args__ = (
+        db.UniqueConstraint('referal_id', 'deal_id', name='unique_referal_deal'),
+    )
+    
+    def __repr__(self):
+        return f'<ReferalDeal referal_id={self.referal_id} deal_id={self.deal_id} amount={self.withdrawal_amount}>'
 
 

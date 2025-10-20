@@ -1,0 +1,818 @@
+/* Стили для модального окна управления договорами */
+
+.deals-modal {
+    z-index: 1000;
+}
+
+.deals-modal-content {
+    max-width: 1400px;
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--card-bg);
+    color: var(--text-primary);
+}
+
+/* Двухпанельная структура */
+.deals-panels-container {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 24px;
+    margin-top: 20px;
+}
+
+/* Левая панель - информация о реферале */
+.referal-info-panel {
+    background: var(--background-secondary, #f8f9fa);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    height: fit-content;
+}
+
+.dark-theme .referal-info-panel {
+    background: var(--background-tertiary, #2a2a2a);
+}
+
+.referal-info-panel h3 {
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.referal-info-panel h3 i {
+    color: var(--primary-color);
+}
+
+/* Поля информации */
+.referal-info-section,
+.passport-info-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.info-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.info-field label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Стили для input полей в модалке */
+.referal-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--input-bg, #ffffff);
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+}
+
+.dark-theme .referal-input {
+    background: var(--background-primary, #1a1a1a);
+    border-color: var(--border-color, #404040);
+}
+
+.referal-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(196, 166, 104, 0.1);
+}
+
+.referal-input::placeholder {
+    color: var(--text-tertiary, #999);
+}
+
+/* Заголовок секции паспортных данных */
+.passport-section-title {
+    margin-top: 20px;
+}
+
+/* Кнопка сохранения */
+.save-referal-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: var(--primary-color);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 15px;
+    width: 100%;
+}
+
+.save-referal-btn:hover:not(:disabled) {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(196, 166, 104, 0.3);
+}
+
+.save-referal-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Правая панель - список договоров */
+.deals-list-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.deals-list-panel h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.deals-list-panel h3 i {
+    color: var(--primary-color);
+}
+
+/* Компактная сводка */
+.deals-summary-compact {
+    display: flex;
+    gap: 20px;
+    padding: 16px;
+    background: var(--background-secondary, #f8f9fa);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.dark-theme .deals-summary-compact {
+    background: var(--background-tertiary, #2a2a2a);
+}
+
+.summary-item-compact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.summary-item-compact i {
+    color: var(--primary-color);
+}
+
+.summary-item-compact strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Контейнер таблицы */
+.deals-table-container {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--card-bg);
+}
+
+/* Компактная таблица */
+.deals-table-compact {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.deals-table-compact thead {
+    background: var(--background-secondary, #f8f9fa);
+}
+
+.dark-theme .deals-table-compact thead {
+    background: var(--background-tertiary, #2a2a2a);
+}
+
+.deals-table-compact th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.deals-table-compact tbody tr {
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
+}
+
+.deals-table-compact tbody tr:hover {
+    background: var(--background-secondary, #f8f9fa);
+}
+
+.dark-theme .deals-table-compact tbody tr:hover {
+    background: var(--background-tertiary, #2a2a2a);
+}
+
+.deals-table-compact tbody tr:last-child {
+    border-bottom: none;
+}
+
+.deals-table-compact td {
+    padding: 14px 16px;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.deals-table-compact .deal-number {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+/* Информация о реферале */
+.referal-info-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.referal-info-section h3 {
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+#referal-info-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-value {
+    font-size: 16px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* Секция с таблицей договоров */
+.deals-table-section {
+    margin-bottom: 24px;
+}
+
+.deals-table-section .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.deals-table-section h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.add-deal-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.add-deal-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Таблица договоров */
+.table-responsive {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.deals-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card-bg);
+}
+
+.deals-table thead {
+    background: var(--header-bg);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.deals-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.deals-table tbody tr {
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
+}
+
+.deals-table tbody tr:hover {
+    background: var(--hover-bg);
+}
+
+.deals-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.deals-table td {
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+/* Статус договора */
+.deal-status {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.deal-status.active {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.dark-theme .deal-status.active {
+    background: rgba(25, 118, 210, 0.2);
+    color: #64b5f6;
+}
+
+.deal-status.completed {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+
+.dark-theme .deal-status.completed {
+    background: rgba(56, 142, 60, 0.2);
+    color: #81c784;
+}
+
+.deal-status.cancelled {
+    background: #ffebee;
+    color: #d32f2f;
+}
+
+.dark-theme .deal-status.cancelled {
+    background: rgba(211, 47, 47, 0.2);
+    color: #e57373;
+}
+
+/* Чекбоксы */
+.deal-checkbox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.deal-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+/* Кнопки действий */
+.deal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.btn-icon:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-download {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-download:hover {
+    background: var(--primary-hover);
+}
+
+.dark-theme .btn-download {
+    background: var(--primary-color);
+    color: white;
+}
+
+.dark-theme .btn-download:hover {
+    background: var(--primary-hover);
+}
+
+/* Итоги */
+.deals-summary {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    justify-content: space-around;
+    gap: 24px;
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.summary-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summary-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+/* Индикатор загрузки */
+.loading-spinner {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+}
+
+.loading-spinner i {
+    font-size: 32px;
+    margin-bottom: 12px;
+}
+
+/* Форма добавления договора */
+#addDealModal .form-group {
+    margin-bottom: 20px;
+}
+
+#addDealModal label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+#addDealModal .form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease;
+}
+
+#addDealModal .form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.1);
+}
+
+#addDealModal .form-text {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .deals-modal-content {
+        width: 98%;
+        max-height: 95vh;
+    }
+
+    #referal-info-content {
+        grid-template-columns: 1fr;
+    }
+
+    .deals-table-section .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .deals-summary {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .deals-table {
+        font-size: 12px;
+    }
+
+    .deals-table th,
+    .deals-table td {
+        padding: 8px;
+    }
+
+    .deal-actions {
+        flex-direction: column;
+    }
+    
+    .deals-panels-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .referal-info-panel {
+        order: 2;
+    }
+    
+    .deals-list-panel {
+        order: 1;
+    }
+}
+
+@media (max-width: 1200px) {
+    .deals-panels-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .referal-info-panel {
+        order: 2;
+    }
+    
+    .deals-list-panel {
+        order: 1;
+    }
+}
+
+/* Дополнительные стили для модальной body */
+.deals-modal .modal-body {
+    padding: 20px;
+    max-height: calc(90vh - 150px);
+    overflow-y: auto;
+}
+
+/* Стили для таблицы договоров (старые, для совместимости) */
+.deals-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card-bg, white);
+}
+
+.deals-table th {
+    background: var(--primary-color, #c4a668);
+    color: white;
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.deals-table td {
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border-color, #eee);
+    color: var(--text-primary);
+}
+
+.deals-table tbody tr:hover {
+    background: var(--background-secondary, #f9f9f9);
+}
+
+.dark-theme .deals-table tbody tr:hover {
+    background: var(--background-tertiary, #2a2a2a);
+}
+
+/* Бейджи статусов договоров */
+.deal-status-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Статус 0 - Заполнить данные */
+.deal-status-badge.status-0 {
+    background: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+}
+
+.dark-theme .deal-status-badge.status-0 {
+    background: #2a2a2a;
+    color: #adb5bd;
+    border-color: #404040;
+}
+
+/* Статус 100 - На проверке */
+.deal-status-badge.status-100 {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.dark-theme .deal-status-badge.status-100 {
+    background: #664d03;
+    color: #fff3cd;
+}
+
+/* Статус 200 - Готов к выплате */
+.deal-status-badge.status-200 {
+    background: #cfe2ff;
+    color: #084298;
+}
+
+.dark-theme .deal-status-badge.status-200 {
+    background: #052c65;
+    color: #cfe2ff;
+}
+
+/* Статус 300 - Выплачен */
+.deal-status-badge.status-300 {
+    background: #d1e7dd;
+    color: #0a3622;
+    border: 2px solid #0f5132;
+}
+
+.dark-theme .deal-status-badge.status-300 {
+    background: #0a3622;
+    color: #d1e7dd;
+    border-color: #198754;
+}
+
+/* Статус 500 - Отклонен */
+.deal-status-badge.status-500 {
+    background: #f8d7da;
+    color: #842029;
+}
+
+.dark-theme .deal-status-badge.status-500 {
+    background: #842029;
+    color: #f8d7da;
+}
+
+/* Старые классы для совместимости */
+.deal-status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.deal-status-sent_for_review {
+    background: #cfe2ff;
+    color: #084298;
+}
+
+.deal-status-approved {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.deal-status-rejected {
+    background: #f8d7da;
+    color: #842029;
+}
+
+.deal-status-paid {
+    background: #d1e7dd;
+    color: #0a3622;
+    border: 2px solid #0f5132;
+}
+
+/* Действия с договорами */
+.deal-actions {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.deal-action-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-download {
+    background: var(--primary-color, #c4a668);
+    color: white;
+}
+
+.btn-download:hover {
+    background: var(--primary-hover, #b39658);
+}
+
+.btn-send {
+    background: #0d6efd;
+    color: white;
+}
+
+.btn-send:hover {
+    background: #0b5ed7;
+}
+
+.btn-send:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Сообщение об отсутствии договоров */
+.no-deals-message {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary, #666);
+}
+
+.no-deals-message i {
+    font-size: 48px;
+    margin-bottom: 15px;
+    color: var(--text-tertiary, #ccc);
+}
+
+/* Контейнер таблицы с прокруткой */
+.deals-table-container {
+    overflow-x: auto;
+    max-height: 400px;
+    overflow-y: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.deals-table-compact thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+

@@ -61,6 +61,11 @@ def fetch_data_from_mysql():
         
         print(f"✅ Updated {updated_users} users with {updated_referals} referals")
     
+    # Update last deal dates for all contacts
+    print("\n=== UPDATING LAST DEAL DATES ===")
+    with app.app_context():
+        _update_last_deal_dates_for_contacts()
+    
     # Final verification of both tables
     with app.app_context():
         final_contacts_count = MacroContact.query.count()
@@ -242,10 +247,11 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                         "errors_list": ["No contacts found with valid modification date and non-empty phones"]
                     }
                 
-                # Fetch contacts data - убираем поле номер договора, оно не нужно
+                # Fetch contacts data with date_modified for tracking interactions
                 query_contacts = """
                     SELECT id, contacts_buy_name, contacts_buy_phones, 
-                           COALESCE(contacts_buy_emails, '') as contacts_buy_emails
+                           COALESCE(contacts_buy_emails, '') as contacts_buy_emails,
+                           date_modified, date_created
                     FROM estate_deals_contacts
                     WHERE date_modified >= %s
                     AND contacts_buy_phones IS NOT NULL 
@@ -289,7 +295,7 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                     # Expand contacts with multiple phone numbers
                     expanded_contacts = []
                     for mysql_row in rows_from_mysql:
-                        contact_id, full_name, phone_number_raw, email_raw = mysql_row
+                        contact_id, full_name, phone_number_raw, email_raw, date_modified, date_created = mysql_row
                         
                         if not phone_number_raw or phone_number_raw.strip() == '':
                             continue
@@ -318,7 +324,9 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                                         'passport_giver': None,
                                         'passport_date': None,
                                         'passport_address': None,
-                                        'email': processed_email
+                                        'email': processed_email,
+                                        'date_modified': date_modified,
+                                        'date_created': date_created
                                     })
                                 else:
                                     unformattable_phone_details_list.append({'id': contact_id, 'raw_phone': phone})
@@ -336,7 +344,9 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                                     'passport_giver': None,
                                     'passport_date': None,
                                     'passport_address': None,
-                                    'email': processed_email
+                                    'email': processed_email,
+                                    'date_modified': date_modified,
+                                    'date_created': date_created
                                 })
                             else:
                                 unformattable_phone_details_list.append({'id': contact_id, 'raw_phone': phone_number_raw})
@@ -379,11 +389,16 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                                 existing_contact.passport_number = contact_data.get('passport_number')
                                 existing_contact.passport_giver = contact_data.get('passport_giver')
                                 existing_contact.passport_date = contact_data.get('passport_date')
+                                # Обновляем даты взаимодействий
+                                existing_contact.date_modified = contact_data.get('date_modified')
+                                existing_contact.last_interaction_date = contact_data.get('date_modified')
+                                if not existing_contact.first_interaction_date:
+                                    existing_contact.first_interaction_date = contact_data.get('date_created')
                                 # Добавляем в processed phones после обновления
                                 global_processed_phones.add(formatted_phone_number)
                                 staged_for_commit_in_batch += 1
                             else:
-                                # Create new contact record with all fields
+                                # Create new contact record with all fields including interaction dates
                                 new_contact = MacroContact(
                                     contacts_id=contact_id_from_mysql,
                                     full_name=full_name_from_mysql,
@@ -392,7 +407,10 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
                                     passport_giver=contact_data.get('passport_giver'),
                                     passport_date=contact_data.get('passport_date'),
                                     passport_address=contact_data.get('passport_address'),
-                                    email=contact_data.get('email')
+                                    email=contact_data.get('email'),
+                                    date_modified=contact_data.get('date_modified'),
+                                    first_interaction_date=contact_data.get('date_created'),
+                                    last_interaction_date=contact_data.get('date_modified')
                                 )
                                 contacts_to_add.append(new_contact)
                                 # print(f"DEBUG: Creating new contact with email: {contact_data.get('email')}")
@@ -713,3 +731,58 @@ def fetch_and_process_contacts(days_back=30):
             'success': False,
             'error': str(e)
         }
+
+
+def _update_last_deal_dates_for_contacts():
+    """
+    Обновляет поле last_deal_date для всех контактов на основе их последних сделок.
+    Используется для проверки 45-дневного окна при добавлении рефералов.
+    """
+    from models import MacroContact, MacroDeal
+    from datetime import datetime
+    
+    print("Starting update of last_deal_date for all contacts...")
+    
+    # Получаем все контакты
+    all_contacts = MacroContact.query.all()
+    updated_count = 0
+    
+    for contact in all_contacts:
+        # Находим все сделки этого контакта
+        deals = MacroDeal.query.filter_by(contacts_buy_id=contact.contacts_id).all()
+        
+        if not deals:
+            # Нет сделок - оставляем last_deal_date = None
+            if contact.last_deal_date is not None:
+                contact.last_deal_date = None
+                updated_count += 1
+            continue
+        
+        # Находим последнюю дату сделки (максимальную agreement_date)
+        deals_with_dates = [d for d in deals if d.agreement_date]
+        
+        if not deals_with_dates:
+            # Есть сделки, но у них нет дат
+            if contact.last_deal_date is not None:
+                contact.last_deal_date = None
+                updated_count += 1
+            continue
+        
+        # Находим максимальную дату
+        last_deal_date = max(d.agreement_date for d in deals_with_dates)
+        
+        # Обновляем только если изменилось
+        if contact.last_deal_date != last_deal_date:
+            old_date = contact.last_deal_date
+            contact.last_deal_date = last_deal_date
+            updated_count += 1
+            print(f"  Updated contact {contact.contacts_id} ({contact.full_name}): {old_date} -> {last_deal_date}")
+    
+    # Сохраняем изменения
+    try:
+        db.session.commit()
+        print(f"✅ Updated last_deal_date for {updated_count} contacts")
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error updating last_deal_dates: {e}")
+        raise

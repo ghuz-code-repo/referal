@@ -912,3 +912,244 @@
     margin-right: 8px;
     color: var(--text-secondary);
 }
+
+/* Стили для компактного списка договоров в карточке */
+.deals-list-section {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.deals-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.deals-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.deals-header h3 i {
+    color: var(--primary-color);
+}
+
+.deals-header .total-amount {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.deals-header .total-amount strong {
+    color: var(--primary-color);
+    font-size: 16px;
+}
+
+.deals-compact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.deal-compact-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.deal-compact-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--primary-color);
+    transform: translateX(2px);
+}
+
+.deal-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+}
+
+.deal-number {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.deal-number i {
+    color: var(--primary-color);
+    font-size: 12px;
+}
+
+.deal-amount {
+    color: var(--primary-color);
+    font-weight: 700;
+    font-size: 15px;
+}
+
+/* Статус договора */
+.deal-status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Статусы договоров */
+.deal-status-badge.status-0 {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.dark-theme .deal-status-badge.status-0 {
+    background: #664d03;
+    color: #ffecb3;
+}
+
+.deal-status-badge.status-100 {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.dark-theme .deal-status-badge.status-100 {
+    background: #0a4149;
+    color: #b8daff;
+}
+
+.deal-status-badge.status-200 {
+    background: #d4edda;
+    color: #155724;
+}
+
+.dark-theme .deal-status-badge.status-200 {
+    background: #0f4229;
+    color: #c3e6cb;
+}
+
+.deal-status-badge.status-300 {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.dark-theme .deal-status-badge.status-300 {
+    background: #0a3622;
+    color: #a3cfbb;
+}
+
+.deal-status-badge.status-500 {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.dark-theme .deal-status-badge.status-500 {
+    background: #58151c;
+    color: #f5c2c7;
+}
+
+/* Действия с договором */
+.deal-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Кнопка "Отправить на проверку" */
+.deal-send-review-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.deal-send-review-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+.deal-send-review-btn:active {
+    transform: translateY(0);
+}
+
+.deal-send-review-btn i {
+    font-size: 12px;
+}
+
+/* Обновленный стиль кнопки скачивания */
+.deal-download-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.deal-download-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.deal-download-btn i {
+    font-size: 14px;
+}
+
+/* Адаптивность для мобильных */
+@media (max-width: 768px) {
+    .deals-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .deal-info {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .deal-send-review-btn span {
+        display: none;
+    }
+    
+    .deal-send-review-btn {
+        padding: 6px 8px;
+    }
+}

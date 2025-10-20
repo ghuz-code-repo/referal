@@ -46,6 +46,61 @@
         </div>
 
         <div class="modal-body">
+            <!-- Секция со списком договоров -->
+            {% set deals_count = referal.get_deals_count() %}
+            {% if deals_count > 0 %}
+            <div class="deals-list-section">
+                <div class="deals-header">
+                    <h3><i class="fas fa-file-contract"></i> Договоры реферала ({{ deals_count }})</h3>
+                    <span class="total-amount">
+                        Общая сумма: <strong>{{ referal.get_total_withdrawal_amount()|default(0)|int|format_number }} сум</strong>
+                    </span>
+                </div>
+                
+                <div class="deals-compact-list">
+                    {% for referal_deal in referal.referal_deals %}
+                    {% set deal = referal_deal.deal %}
+                    <div class="deal-compact-item" data-deal-id="{{ referal_deal.id }}" data-status-id="{{ referal_deal.status_id }}">
+                        <div class="deal-info">
+                            <span class="deal-number">
+                                <i class="fas fa-file-alt"></i>
+                                {{ deal.agreement_number if deal else '—' }}
+                            </span>
+                            
+                            <!-- Статус договора -->
+                            <span class="deal-status-badge status-{{ referal_deal.status_id }}">
+                                {{ referal_deal.status_name }}
+                            </span>
+                            
+                            <span class="deal-amount">{{ referal_deal.withdrawal_amount|default(0)|int|format_number }} сум</span>
+                        </div>
+                        
+                        <div class="deal-actions">
+                            <!-- Кнопка "Отправить на проверку" только для статуса 0 -->
+                            {% if referal_deal.status_id == 0 %}
+                            <button type="button" 
+                                    class="deal-send-review-btn" 
+                                    data-deal-id="{{ referal_deal.id }}"
+                                    title="Отправить на проверку">
+                                <i class="fas fa-paper-plane"></i>
+                                <span>Отправить</span>
+                            </button>
+                            {% endif %}
+                            
+                            <!-- Кнопка скачать акт -->
+                            <a href="/get_deal_act/{{ referal_deal.id }}" 
+                               class="deal-download-btn" 
+                               target="_blank"
+                               title="Скачать акт">
+                                <i class="fas fa-download"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
             <form method="POST" action="{{ url_for('referal.update_referal_documents', referal_id=referal.id) }}">
                 
                 <!-- Контейнер для двух карточек -->

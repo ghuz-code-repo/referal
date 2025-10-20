@@ -120,49 +120,95 @@ def get_agreement(user_id):
 
 
 @document_bp.route('/get_referal_act/<int:referal_id>', methods=['GET'])
-def get_referal_act(referal_id):
-    """Генерация акта для реферала"""
+@document_bp.route('/get_deal_act/<int:referal_deal_id>', methods=['GET'])
+def get_referal_act(referal_id=None, referal_deal_id=None):
+    """Генерация акта для реферала или конкретного договора"""
     current_user = get_current_user()
     if not current_user:
         flash('Пользователь не найден', 'error')
         return redirect(url_for('referal.profile'))
-    try:
-        # Получаем данные реферала и связанного пользователя из БД
-        referal = Referal.query.get_or_404(referal_id)
-        user = referal.user  # Получаем пользователя (реферера)
-        user_data = user.user_data if user else None  # Получаем данные пользователя
-        referal_data = referal.referal_data  # Получаем данные реферала
-        
-        if not user or not user_data:
-            flash('Не найдены данные пользователя для данного реферала', 'error')
-            return redirect(url_for('referal.profile'))
-            
-        if not referal_data:
-            flash('Не найдены данные реферала', 'error')
-            return redirect(url_for('referal.profile'))
-
-        deals = MacroDeal.query.filter_by(contacts_buy_id=referal.contact_id)
-        if not deals:
-            flash('Deal not found', 'error')
-            return redirect(url_for('referal.profile'))
     
-        # Находим подходящую сделку (приоритет - проведенная, иначе любая с валидным платежом)
-        real_deal = None
-        for deal in deals:
-            if deal.deal_status_name == "Сделка проведена":
-                real_deal = deal
-                break
+    # Проверяем права админа
+    from permission_utils import has_permission
+    is_admin = has_permission('referal.admin.panel')
+    
+    try:
+        # Определяем какой endpoint вызван
+        if referal_deal_id:
+            # Новая логика: генерация для конкретного договора
+            referal_deal = ReferalDeal.query.get_or_404(referal_deal_id)
+            referal = referal_deal.referal
+            deal = referal_deal.deal
+            
+            # Проверяем доступ: либо владелец, либо админ
+            if not is_admin and referal.user_id != current_user.id:
+                flash('Доступ запрещен', 'error')
+                return redirect(url_for('referal.profile'))
+            
+            user = referal.user
+            user_data = user.user_data if user else None
+            referal_data = referal.referal_data
+            
+            if not user or not user_data:
+                flash('Не найдены данные пользователя для данного реферала', 'error')
+                return redirect(url_for('referal.profile'))
+                
+            if not referal_data:
+                flash('Не найдены данные реферала', 'error')
+                return redirect(url_for('referal.profile'))
+            
+            if not deal:
+                flash('Договор не найден', 'error')
+                return redirect(url_for('referal.profile'))
+            
+            real_deal = deal
+            withdrawal_amount = referal_deal.withdrawal_amount
+            
+        else:
+            # Старая логика: генерация для первого найденного договора (для обратной совместимости)
+            referal = Referal.query.get_or_404(referal_id)
+            
+            # Проверяем доступ: либо владелец, либо админ
+            if not is_admin and referal.user_id != current_user.id:
+                flash('Доступ запрещен', 'error')
+                return redirect(url_for('referal.profile'))
+            
+            user = referal.user
+            user_data = user.user_data if user else None
+            referal_data = referal.referal_data
+            
+            if not user or not user_data:
+                flash('Не найдены данные пользователя для данного реферала', 'error')
+                return redirect(url_for('referal.profile'))
+                
+            if not referal_data:
+                flash('Не найдены данные реферала', 'error')
+                return redirect(url_for('referal.profile'))
+
+            deals = MacroDeal.query.filter_by(contacts_buy_id=referal.contact_id)
+            if not deals:
+                flash('Deal not found', 'error')
+                return redirect(url_for('referal.profile'))
         
-        # Если нет проведенной сделки, берем первую с валидным платежом
-        if not real_deal:
+            # Находим подходящую сделку (приоритет - проведенная, иначе любая с валидным платежом)
+            real_deal = None
             for deal in deals:
-                if deal.has_valid_payment():
+                if deal.deal_status_name == "Сделка проведена":
                     real_deal = deal
                     break
-        
-        # Если все еще нет сделки, берем первую
-        if not real_deal:
-            real_deal = deals[0]
+            
+            # Если нет проведенной сделки, берем первую с валидным платежом
+            if not real_deal:
+                for deal in deals:
+                    if deal.has_valid_payment():
+                        real_deal = deal
+                        break
+            
+            # Если все еще нет сделки, берем первую
+            if not real_deal:
+                real_deal = deals[0]
+            
+            withdrawal_amount = referal.withdrawal_amount
         
         # Определяем путь к шаблону
         template_path = os.path.join(current_app.root_path, 'documents', f"{os.getenv('ACT_DOC_NAME')}.docx")
@@ -222,7 +268,7 @@ def get_referal_act(referal_id):
             'referal_passport_number': referal_data.passport_number or '',
             'referal_passport_date': referal_passport_date_str,
             'referal_passport_giver': referal_data.passport_giver or '',
-            'contract_number': referal_data.contract_number or '',
+            'contract_number': real_deal.agreement_number or '',  # Берём из MacroDeal, а не из ReferalData
             
             'contract_day': agreement_date.day,
             'contract_month': month_name_genitive(int(agreement_date.month)),
@@ -234,8 +280,8 @@ def get_referal_act(referal_id):
             'house_number': real_deal.house_number or '',
             'appartment_number': real_deal.apartment_number or '',
             'appartment_area': real_deal.deal_metr,
-            'contract_price': real_deal.agreement_price or 0,
-            'withdrawal_amount': str(math.ceil(referal.withdrawal_amount/(1-float(os.getenv('NDS_PERCENT'))/100)) or 0),
+            'contract_price': real_deal.agreement_price or '',
+            'withdrawal_amount': str(math.ceil(withdrawal_amount/(1-float(os.getenv('NDS_PERCENT'))/100)) or 0),
             
             'referer_name': user_data.full_name or '',
             'passport_address': user_data.passport_adress or '',
@@ -257,7 +303,7 @@ def get_referal_act(referal_id):
             'house_number': 'Номер дома',
             'appartment_number': 'Номер квартиры',
             'appartment_area': 'Площадь квартиры',
-            'contract_price': 'Цена договора',
+            # 'contract_price': 'Цена договора',  # Необязательное поле - не всегда есть в базе
             'withdrawal_amount': 'Сумма к выводу',
             'referer_name': 'Имя реферера',
             'passport_address': 'Адрес прописки реферера',

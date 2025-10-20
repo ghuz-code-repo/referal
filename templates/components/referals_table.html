@@ -1,26 +1,21 @@
 <div class="referals-section">
-    <div class="section-header">
-        <div class="section-title">
-            <h3><i class="fas fa-users"></i> Мои рефералы</h3>
-            <p class="section-subtitle">Список всех ваших рефералов и их статусы</p>
-        </div>
-        <div class="section-actions">
-            {% if current_sort %}
-            <a href="{{ url_for('referal.profile', **current_filters) }}" class="reset-sort-btn" title="Сбросить сортировку">
-                <i class="fas fa-undo"></i> Сбросить сортировку
-            </a>
-            {% endif %}
-            {% if can_add_referrals %}
-            <button type="button" class="add-referal-btn open_document_form" data-referal-id="new">
-                <i class="fas fa-plus"></i>
-                Добавить реферала
-            </button>
-            {% endif %}
-        </div>
+    <!-- Заголовок секции вынесен в родительский шаблон -->
+    <div class="section-actions" style="margin-bottom: 1rem; display: flex; justify-content: flex-end; gap: 1rem;">
+        {% if current_sort %}
+        <a href="{{ url_for('referal.profile', **current_filters) }}" class="reset-sort-btn" title="Сбросить сортировку">
+            <i class="fas fa-undo"></i> Сбросить сортировку
+        </a>
+        {% endif %}
         {% if can_add_referrals %}
-        {% include 'modals/add_referal_form.html' %}
+        <button type="button" class="add-referal-btn open_document_form" data-referal-id="new">
+            <i class="fas fa-plus"></i>
+            Добавить реферала
+        </button>
         {% endif %}
     </div>
+    {% if can_add_referrals %}
+    {% include 'modals/add_referal_form.html' %}
+    {% endif %}
     
     {% if total_user_referals > 0 %}
     <div class="table-container">
@@ -106,7 +101,7 @@
                     <th >
                         <div class="header-cell">
                             <div class="header-title">
-                                <span>Договор</span>
+                                <span>Договора</span>
                                 <div class="sort-controls">
                                     {% for sort_field in sort_fields %}
                                         {% if sort_field.field == 'contract' %}
@@ -160,24 +155,24 @@
                             </div>
                         </div>
                     </th>
-                    <th >
+                    <th>
                         <div class="header-cell">
                             <div class="header-title">
-                                <span>Статус</span>
+                                <span>Дата добавления</span>
                                 <div class="sort-controls">
                                     {% for sort_field in sort_fields %}
-                                        {% if sort_field.field == 'status' %}
-                                    <button type="button" class="clear-sort-btn" data-field="status" title="Убрать из сортировки">
+                                        {% if sort_field.field == 'created_at' %}
+                                    <button type="button" class="clear-sort-btn" data-field="created_at" title="Убрать из сортировки">
                                         <i class="fas fa-times cancel_sort"></i>
                                     </button>
                                     <span class="sort-number">{{ loop.index }}</span>
                                         {% endif %}
                                     {% endfor %}
                                     
-                                    <button type="button" class="sort-btn" data-field="status" title="Изменить сортировку">
-                                        {% if sort_fields|selectattr('field', 'equalto', 'status')|list %}
-                                            {% set status_field = sort_fields|selectattr('field', 'equalto', 'status')|first %}
-                                            <i class="fas fa-caret-{{ 'up' if status_field.order == 'asc' else 'down' }}"></i>
+                                    <button type="button" class="sort-btn" data-field="created_at" title="Изменить сортировку">
+                                        {% if sort_fields|selectattr('field', 'equalto', 'created_at')|list %}
+                                            {% set created_at_field = sort_fields|selectattr('field', 'equalto', 'created_at')|first %}
+                                            <i class="fas fa-caret-{{ 'up' if created_at_field.order == 'asc' else 'down' }}"></i>
                                         {% else %}
                                             <i class="fas fa-sort"></i>
                                         {% endif %}
@@ -185,58 +180,94 @@
                                 </div>
                             </div>
                             <div class="header-controls">
-                                <div class="multiselect-filter" id="status-filter-container">
-                                    <button type="button" class="multiselect-btn" id="status-filter-btn">
-                                        <span>Статусы</span> <i class="fas fa-chevron-down"></i>
-                                    </button>
-                                    <div class="multiselect-dropdown" id="status-filter-dropdown">
-                                        <div class="multiselect-options">
-                                            <div class="multiselect-actions">
-                                            <button class="action-btn apply-btn" id='all_btn'>Выбрать все</button>
-                                            <button class="action-btn apply-btn" id='clear_btn'>Очистить</button>
-                                            </div>
-                                            {% for status in statuses %}
-                                                <label>
-                                                <div class="multiselect-option">
-                                                    <input type="checkbox" name="status" value="{{ status.id }}" 
-                                                           {% if status.id in selected_statuses %}checked{% endif %}>
-                                                            <span>{{ status.name }}</span>
-                                                        </input>
-                                                </div></label>
-                                            {% endfor %}
-                                        </div>
-                                        <div class="multiselect-actions">
-                                            <button type="button" class="action-btn apply-btn" id="apply-status-filter">Применить</button>
-                                            <button type="button" class="action-btn default-btn" id="default-status-filter">По умолчанию</button>
-                                        </div>
-                                    </div>
-                                </div>
+                                <input type="date" 
+                                       class="header-filter" 
+                                       placeholder="Дата"
+                                       value="{{ current_filters.created_at }}"
+                                       data-filter="created_at">
+                                {% if current_filters.created_at %}
+                                <button type="button" class="clear-filter-btn" data-filter="created_at" title="Очистить фильтр">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                {% endif %}
                             </div>
                         </div>
                     </th>
-                    <th >
+                    <th>
                         <div class="header-cell">
                             <div class="header-title">
-                                <span>Сумма к выводу</span>
+                                <span>Сумма выплат</span>
                                 <div class="sort-controls">
                                     {% for sort_field in sort_fields %}
-                                        {% if sort_field.field == 'amount' %}
-                                    <button type="button" class="clear-sort-btn" data-field="amount" title="Убрать из сортировки">
+                                        {% if sort_field.field == 'total_withdrawal' %}
+                                    <button type="button" class="clear-sort-btn" data-field="total_withdrawal" title="Убрать из сортировки">
                                         <i class="fas fa-times cancel_sort"></i>
                                     </button>
                                     <span class="sort-number">{{ loop.index }}</span>
                                         {% endif %}
                                     {% endfor %}
                                     
-                                    <button type="button" class="sort-btn" data-field="amount" title="Изменить сортировку">
-                                        {% if sort_fields|selectattr('field', 'equalto', 'amount')|list %}
-                                            {% set amount_field = sort_fields|selectattr('field', 'equalto', 'amount')|first %}
-                                            <i class="fas fa-caret-{{ 'up' if amount_field.order == 'asc' else 'down' }}"></i>
+                                    <button type="button" class="sort-btn" data-field="total_withdrawal" title="Изменить сортировку">
+                                        {% if sort_fields|selectattr('field', 'equalto', 'total_withdrawal')|list %}
+                                            {% set total_withdrawal_field = sort_fields|selectattr('field', 'equalto', 'total_withdrawal')|first %}
+                                            <i class="fas fa-caret-{{ 'up' if total_withdrawal_field.order == 'asc' else 'down' }}"></i>
                                         {% else %}
                                             <i class="fas fa-sort"></i>
                                         {% endif %}
                                     </button>
                                 </div>
+                            </div>
+                            <div class="header-controls">
+                                <input type="number" 
+                                       class="header-filter" 
+                                       placeholder="Мин. сумма"
+                                       value="{{ current_filters.total_withdrawal }}"
+                                       data-filter="total_withdrawal"
+                                       min="0">
+                                {% if current_filters.total_withdrawal %}
+                                <button type="button" class="clear-filter-btn" data-filter="total_withdrawal" title="Очистить фильтр">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="header-cell">
+                            <div class="header-title">
+                                <span>Кол-во договоров</span>
+                                <div class="sort-controls">
+                                    {% for sort_field in sort_fields %}
+                                        {% if sort_field.field == 'deals_count' %}
+                                    <button type="button" class="clear-sort-btn" data-field="deals_count" title="Убрать из сортировки">
+                                        <i class="fas fa-times cancel_sort"></i>
+                                    </button>
+                                    <span class="sort-number">{{ loop.index }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <button type="button" class="sort-btn" data-field="deals_count" title="Изменить сортировку">
+                                        {% if sort_fields|selectattr('field', 'equalto', 'deals_count')|list %}
+                                            {% set deals_count_field = sort_fields|selectattr('field', 'equalto', 'deals_count')|first %}
+                                            <i class="fas fa-caret-{{ 'up' if deals_count_field.order == 'asc' else 'down' }}"></i>
+                                        {% else %}
+                                            <i class="fas fa-sort"></i>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="header-controls">
+                                <input type="number" 
+                                       class="header-filter" 
+                                       placeholder="Кол-во"
+                                       value="{{ current_filters.deals_count }}"
+                                       data-filter="deals_count"
+                                       min="0">
+                                {% if current_filters.deals_count %}
+                                <button type="button" class="clear-filter-btn" data-filter="deals_count" title="Очистить фильтр">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                {% endif %}
                             </div>
                         </div>
                     </th>
@@ -257,7 +288,7 @@
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="9" class="no-results">
+                        <td colspan="7" class="no-results">
                             <div class="no-results-content">
                                 <i class="fas fa-search"></i>
                                 <h4>По заданным фильтрам ничего не найдено</h4>

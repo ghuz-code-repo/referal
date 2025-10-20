@@ -210,6 +210,119 @@ html, body {
     height: 99%;
 }
 
+/* Переключатель режима просмотра */
+.view-mode-toggle {
+    display: flex;
+    gap: 8px;
+    background: var(--input-bg);
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.view-mode-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.view-mode-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+.view-mode-btn.active {
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.view-mode-btn i {
+    font-size: 16px;
+}
+
+/* Обновленный заголовок с переключателем */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+/* Таблица договоров */
+.deals-table .deal-agreement-number {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.deals-table .deal-amount-value {
+    font-weight: 700;
+    color: var(--success-color);
+}
+
+.deals-table .user-login-link {
+    color: var(--primary-color);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.deals-table .user-login-link:hover {
+    color: var(--primary-hover);
+}
+
+.deals-table .no-data {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.deals-table .no-data i {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.3;
+}
+
+.deals-table .no-data p {
+    margin: 0;
+    font-size: 16px;
+}
+
+/* Форма обновления статуса договора */
+.deal-status-update-form {
+    display: inline-block;
+    margin: 0;
+}
+
+.deal-status-select {
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    max-width: 95% !important;
+}
+
+.deal-status-select:hover {
+    border-color: var(--primary-color);
+}
+
+.deal-status-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
     .admin-panel {
         padding: 10px;
@@ -223,6 +336,16 @@ html, body {
     .section-header {
         flex-direction: column;
         align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .view-mode-toggle {
+        width: 100%;
+    }
+    
+    .view-mode-btn {
+        flex: 1;
+        justify-content: center;
     }
 
     .section-title h3 {

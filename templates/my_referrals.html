@@ -25,12 +25,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/inputs.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/macro-crm.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/deals-modal.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/deal-badges.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/responsive.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/filters.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/pagination.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/table-filters.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/footer.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/referals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 
     <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
@@ -45,7 +48,188 @@
         <!-- Основной контент -->
         <main class="main">
             <div class="container">
-                {% include 'components/referals_table.html' %}
+                <div class="admin-section">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <h3>{{ 'Мои договора' if view_mode == 'deals' else 'Мои рефералы' }}</h3>
+                            <p class="section-subtitle">{{ 'Все мои договора рефералов' if view_mode == 'deals' else 'Список моих рефералов' }}</p>
+                        </div>
+                        
+                        <!-- Переключатель режима просмотра -->
+                        <div class="view-mode-toggle">
+                            <button class="view-mode-btn {% if view_mode == 'referals' %}active{% endif %}" 
+                                    onclick="switchViewMode('referals')">
+                                <i class="fas fa-user-friends"></i>
+                                <span>Мои рефералы</span>
+                            </button>
+                            <button class="view-mode-btn {% if view_mode == 'deals' %}active{% endif %}" 
+                                    onclick="switchViewMode('deals')">
+                                <i class="fas fa-file-contract"></i>
+                                <span>Договора</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        {% if view_mode == 'referals' %}
+                            {% include 'components/referals_table.html' %}
+                        {% elif view_mode == 'deals' %}
+                            <!-- Таблица договоров для пользователя -->
+                            <table class="admin-table deals-table">
+                                <thead>
+                                    <tr>
+                                        <th>№ Договора</th>
+                                        <th>Реферал</th>
+                                        <th>Сумма выплаты</th>
+                                        <th>Статус</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                    <tr class="filter-row">
+                                        <th>
+                                            <input type="text" 
+                                                   class="table-filter" 
+                                                   data-filter="contract"
+                                                   placeholder="Поиск по номеру..."
+                                                   value="{{ request.args.get('contract', '') }}">
+                                        </th>
+                                        <th>
+                                            <input type="text" 
+                                                   class="table-filter" 
+                                                   data-filter="name"
+                                                   placeholder="Поиск по имени..."
+                                                   value="{{ request.args.get('name', '') }}">
+                                        </th>
+                                        <th>
+                                            <input type="number" 
+                                                   class="table-filter" 
+                                                   data-filter="amount"
+                                                   placeholder="Мин. сумма"
+                                                   min="0"
+                                                   value="{{ request.args.get('amount', '') }}">
+                                        </th>
+                                        <th>
+                                            <!-- Фильтр статусов с чекбоксами -->
+                                            <div class="status-filter-container" id="user-status-filter-container">
+                                                <button type="button" class="status-filter-btn" id="user-status-filter-btn">
+                                                    <i class="fas fa-filter"></i>
+                                                    <span>Статусы</span>
+                                                    <i class="fas fa-chevron-down"></i>
+                                                </button>
+                                                <div class="status-filter-dropdown" id="user-status-filter-dropdown">
+                                                    <div class="filter-header">
+                                                        <span>Выберите статусы</span>
+                                                    </div>
+                                                    <div class="filter-options">
+                                                        {% set selected_statuses = request.args.get('status', '').split(',') if request.args.get('status') else [] %}
+                                                        {% for status in all_statuses_in_db %}
+                                                        <label class="filter-option">
+                                                            <input type="checkbox" 
+                                                                   value="{{ status.id }}" 
+                                                                   {% if status.id|string in selected_statuses %}checked{% endif %}>
+                                                            <span>{{ status.name }}</span>
+                                                        </label>
+                                                        {% endfor %}
+                                                    </div>
+                                                    <div class="filter-actions">
+                                                        <button type="button" class="btn-select-all" id="user-all-btn">
+                                                            <i class="fas fa-check-double"></i> Выбрать всё
+                                                        </button>
+                                                        <button type="button" class="btn-clear-all" id="user-clear-btn">
+                                                            <i class="fas fa-times"></i> Очистить
+                                                        </button>
+                                                    </div>
+                                                    <div class="filter-buttons">
+                                                        <button type="button" class="btn btn-secondary" id="user-default-status-filter">
+                                                            По умолчанию
+                                                        </button>
+                                                        <button type="button" class="btn btn-primary" id="user-apply-status-filter">
+                                                            Применить
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </th>
+                                        <th>
+                                            <button class="btn btn-secondary btn-sm clear-filters-btn" title="Очистить фильтры">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if deals %}
+                                        {% for deal in deals %}
+                                        <tr data-deal-id="{{ deal.id }}">
+                                            <td>
+                                                <span class="deal-agreement-number">
+                                                    {{ deal.deal.agreement_number if deal.deal else '—' }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if deal.referal and deal.referal.referal_data %}
+                                                    {{ deal.referal.referal_data.full_name }}
+                                                {% else %}
+                                                    Не указано
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="deal-amount-value">
+                                                    {{ deal.withdrawal_amount|default(0)|int|format_number }} сум
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="deal-status-badge status-{{ deal.status_id }}">
+                                                    {{ deal.status_name }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="admin-actions">
+                                                    <!-- Кнопка "Отправить на проверку" - только для статуса "Ждет проверки" (0) -->
+                                                    {% if deal.status_id == 0 and deal.withdrawal_amount and deal.withdrawal_amount > 0 %}
+                                                    <button class="table_button btn-submit-for-review" 
+                                                            data-deal-id="{{ deal.id }}"
+                                                            data-referal-id="{{ deal.referal.id if deal.referal else '' }}"
+                                                            title="Отправить на проверку">
+                                                        <i class="fas fa-paper-plane"></i> Отправить
+                                                    </button>
+                                                    {% endif %}
+                                                    
+                                                    <!-- Кнопка "Скачать акт" - всегда показываем -->
+                                                    <button class="table_button btn-download-act" 
+                                                            data-referal-id="{{ deal.referal.id if deal.referal else '' }}"
+                                                            title="Скачать акт">
+                                                        <i class="fas fa-download"></i> Акт
+                                                    </button>
+                                                    
+                                                    <!-- Кнопка "Причина отказа" - только для статуса "Отказано" (100) -->
+                                                    {% if deal.status_id == 100 %}
+                                                    <button class="table_button btn-view-rejection" 
+                                                            data-deal-id="{{ deal.id }}"
+                                                            data-referal-id="{{ deal.referal.id if deal.referal else '' }}"
+                                                            title="Посмотреть причину отказа">
+                                                        <i class="fas fa-comment-slash"></i> Причина отказа
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="5" class="no-data">
+                                                <i class="fas fa-inbox"></i>
+                                                <p>Нет договоров для отображения</p>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Модальное окно списка договоров реферала -->
+                    {% include 'modals/deals_list_modal.html' %}
+                </div>
             </div>
         </main>
         
@@ -55,6 +239,7 @@
 <!-- Подключение JavaScript файлов в правильном порядке -->
 <script src="{{ url_for('static', filename='js/components/flash-messages.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/modal-handler.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/deals-modal.js') }}"></script>
 
 <!-- Validation scripts -->
 <script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
@@ -65,6 +250,9 @@
 
 <!-- Date picker component -->
 <script src="{{ url_for('static', filename='js/components/date-picker.js')}}"></script>
+
+<!-- Deal actions -->
+<script src="{{ url_for('static', filename='js/deal-actions.js') }}"></script>
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
@@ -125,10 +313,177 @@ $(document).ready(function() {
         
         return false;
     });
+    
+    // Обработчики для кнопок действий с договорами
+    
+    // Отправить на проверку
+    $(document).on('click', '.btn-submit-for-review', function() {
+        const dealId = $(this).data('deal-id');
+        const referalId = $(this).data('referal-id');
+        
+        if (!confirm('Вы уверены, что хотите отправить договор на проверку?')) {
+            return;
+        }
+        
+        $.ajax({
+            url: '/referal/deal/' + dealId + '/send_for_review',
+            type: 'POST',
+            success: function(response) {
+                if (response.success) {
+                    showFlashMessage('success', response.message || 'Договор отправлен на проверку');
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    showFlashMessage('error', response.message || 'Ошибка при отправке на проверку');
+                }
+            },
+            error: function() {
+                showFlashMessage('error', 'Ошибка при отправке на проверку');
+            }
+        });
+    });
+    
+    // Скачать акт
+    $(document).on('click', '.btn-download-act', function() {
+        const referalId = $(this).data('referal-id');
+        
+        if (!referalId) {
+            showFlashMessage('error', 'Не удалось определить ID реферала');
+            return;
+        }
+        
+        // Открываем модальное окно генерации документа
+        openDealsModal(referalId);
+    });
+    
+    // Посмотреть причину отказа
+    $(document).on('click', '.btn-view-rejection', function() {
+        const dealId = $(this).data('deal-id');
+        
+        $.ajax({
+            url: '/referal/get_rejection_reason/' + dealId,
+            type: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    alert('Причина отказа:\n\n' + (response.reason || 'Причина не указана'));
+                } else {
+                    showFlashMessage('error', response.message || 'Ошибка при получении причины отказа');
+                }
+            },
+            error: function() {
+                showFlashMessage('error', 'Ошибка при получении причины отказа');
+            }
+        });
+    });
 });
 
 particlesJS('particles-js', {
     "particles": { "number": { "value": 50, "density": { "enable": true, "value_area": 800 } }, "color": { "value": "#c4a668" }, "shape": { "type": "polygon", "stroke": { "width": 1, "color": "#c4a668" }, "polygon": { "nb_sides": 6 } }, "opacity": { "value": 0.2, "random": true, "anim": { "enable": true, "speed": 0.5, "opacity_min": 0.05, "sync": false } }, "size": { "value": 4, "random": true }, "line_linked": { "enable": true, "distance": 180, "color": "#c4a668", "opacity": 0.15, "width": 1 }, "move": { "enable": true, "speed": 0.8, "direction": "none", "random": true, "straight": false, "out_mode": "out" } }, "interactivity": { "detect_on": "canvas", "events": { "onhover": { "enable": true, "mode": "bubble" } }, "modes": { "bubble": { "distance": 200, "size": 6, "duration": 2, "opacity": 0.6 } } }, "retina_detect": true
+});
+
+// Функция переключения режима просмотра
+function switchViewMode(mode) {
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.set('view_mode', mode);
+    // Сбрасываем страницу на первую при переключении режима
+    currentUrl.searchParams.set('page', '1');
+    window.location.href = currentUrl.toString();
+}
+
+// Фильтр статусов с чекбоксами для пользовательской страницы
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('user-status-filter-container');
+    if (!container) return;
+
+    const btn = document.getElementById('user-status-filter-btn');
+    const dropdown = document.getElementById('user-status-filter-dropdown');
+    const applyBtn = document.getElementById('user-apply-status-filter');
+    const defaultBtn = document.getElementById('user-default-status-filter');
+    const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+    const allBtn = document.getElementById('user-all-btn');
+    const clearBtn = document.getElementById('user-clear-btn');
+
+    // Выбрать все
+    allBtn.addEventListener('click', (e) => {
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = true;
+        });
+        updateButtonText();
+    });
+
+    // Очистить все
+    clearBtn.addEventListener('click', (e) => {
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        updateButtonText();
+    });
+
+    // Функция для обновления текста на кнопке
+    const updateButtonText = () => {
+        const checkedCount = dropdown.querySelectorAll('input[type="checkbox"]:checked').length;
+        const btnText = btn.querySelector('span');
+        if (checkedCount > 0) {
+            btnText.textContent = `Выбрано ${checkedCount}`;
+        } else {
+            btnText.textContent = 'Статусы';
+        }
+    };
+
+    // Открытие/закрытие выпадающего списка
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('active');
+    });
+
+    // Закрытие по клику вне элемента
+    document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) {
+            dropdown.classList.remove('active');
+        }
+    });
+    
+    // Не закрывать меню при клике внутри него
+    dropdown.addEventListener('click', (e) => e.stopPropagation());
+
+    // Обновление текста при изменении чекбоксов
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateButtonText);
+    });
+
+    // Кнопка "Применить"
+    applyBtn.addEventListener('click', () => {
+        const selectedStatuses = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
+        const currentUrl = new URL(window.location);
+        const params = currentUrl.searchParams;
+
+        if (selectedStatuses.length > 0) {
+            params.set('status', selectedStatuses.join(','));
+        } else {
+            params.delete('status');
+        }
+        
+        params.set('page', '1');
+        window.location.search = params.toString();
+    });
+    
+    // Кнопка "По умолчанию"
+    defaultBtn.addEventListener('click', () => {
+        const currentUrl = new URL(window.location);
+        const params = currentUrl.searchParams;
+        
+        params.delete('status');
+        params.set('page', '1');
+        
+        window.location.search = params.toString();
+    });
+    
+    // Инициализация текста кнопки при загрузке страницы
+    updateButtonText();
 });
 </script>
 </body>

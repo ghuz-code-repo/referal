@@ -4,8 +4,9 @@ Shows how to migrate from simple role checks to permission-based authorization
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, g, current_app, flash
+from sqlalchemy import or_, not_
 import services.referal_service as referal_service
-from models import User, Referal, ReferalData, MacroContact, Status, db
+from models import User, Referal, ReferalData, MacroContact, Status, ReferalDeal, MacroDeal, db
 import re
 import os
 import random
@@ -44,6 +45,7 @@ def get_user():
         legacy_user = get_current_user()
         print(f"🔍 get_user() | AUTH_CONNECTOR_AVAILABLE: False | get_current_user() returned: {type(legacy_user).__name__ if legacy_user else 'None'}")
         return legacy_user
+
 
 # COMMENTED OUT - now handled by @app.route('/') in app_with_auth_connector.py
 # @referal_bp.route('/', methods=['GET'])
@@ -398,7 +400,7 @@ def add_referal():
 @referal_bp.route('/my_referrals')
 @require_permission('referal.referrals.view')
 def my_referrals():
-    """View user's referrals"""
+    """View user's referrals and deals"""
     # Get auth-connector user first for permissions
     auth_user = None
     if AUTH_CONNECTOR_AVAILABLE:
@@ -429,20 +431,95 @@ def my_referrals():
         can_view_referrals = auth_user.has_any_permission(['referal.referrals.list', 'referal.referrals.view'])
         can_add_referrals = auth_user.has_any_permission(['referal.referrals.create', 'referal.referrals.add'])
     
-    # Get user's referrals
+    # Получаем режим просмотра: 'referals' (по умолчанию) или 'deals'
+    view_mode = request.args.get('view_mode', 'referals')
+    
+    # Получаем параметры фильтрации
+    name_filter = request.args.get('name', '').strip()
+    contract_filter = request.args.get('contract', '').strip()
+    status_filter = request.args.get('status', '').strip()
+    amount_filter = request.args.get('amount', '').strip()
+    
+    # Get user's referrals or deals based on view_mode
+    referrals = []
+    total_user_referals = 0
+    deals = []
+    
     if hasattr(user, 'id'):
-        referrals = Referal.query.filter_by(user_id=user.id).all()
-        total_user_referals = len(referrals)
-    else:
-        referrals = []
-        total_user_referals = 0
+        if view_mode == 'referals':
+            # Режим рефералов - показываем список рефералов
+            referrals = Referal.query.filter_by(user_id=user.id).all()
+            total_user_referals = len(referrals)
+        elif view_mode == 'deals':
+            # Режим договоров - показываем все договоры пользователя
+            from sqlalchemy.orm import joinedload
+            
+            # Получаем все договоры пользователя через его рефералов
+            deals_query = ReferalDeal.query\
+                .options(
+                    joinedload(ReferalDeal.status),
+                    joinedload(ReferalDeal.deal),
+                    joinedload(ReferalDeal.referal).joinedload(Referal.referal_data),
+                    joinedload(ReferalDeal.referal).joinedload(Referal.user)
+                )\
+                .join(Referal, ReferalDeal.referal_id == Referal.id)\
+                .filter(Referal.user_id == user.id)\
+                .join(MacroDeal, ReferalDeal.deal_id == MacroDeal.id)
+            
+            # Фильтруем только реальные договоры (с номером договора)
+            # Логика соответствует get_deals_summary(): показываем если есть оплата ИЛИ выплата И статус валидный
+            deals_query = deals_query.filter(
+                MacroDeal.agreement_number.isnot(None),
+                MacroDeal.agreement_number != ''
+            )
+            
+            # Фильтруем: либо есть оплата >= 3млн, либо есть рассчитанная выплата
+            deals_query = deals_query.filter(
+                or_(
+                    MacroDeal.total_payments >= 3000000,
+                    ReferalDeal.withdrawal_amount > 0
+                )
+            )
+            
+            # Только реальные договора: "Сделка проведена" и "Сделка в работе"
+            valid_statuses = ['Сделка проведена', 'Сделка в работе']
+            deals_query = deals_query.filter(
+                MacroDeal.deal_status_name.in_(valid_statuses)
+            )
+            
+            # Применяем фильтры для режима договоров
+            if status_filter:
+                try:
+                    # Обрабатываем множественный выбор статусов (через запятую)
+                    status_ids = [int(s.strip()) for s in status_filter.split(',') if s.strip().isdigit()]
+                    if status_ids:
+                        deals_query = deals_query.filter(ReferalDeal.status_id.in_(status_ids))
+                except ValueError:
+                    pass
+            
+            if name_filter:
+                deals_query = deals_query.join(ReferalData, Referal.id == ReferalData.referal_id).filter(
+                    ReferalData.full_name.ilike(f'%{name_filter}%')
+                )
+            
+            if contract_filter:
+                deals_query = deals_query.filter(MacroDeal.agreement_number.ilike(f'%{contract_filter}%'))
+            
+            if amount_filter:
+                try:
+                    min_amount = float(amount_filter)
+                    deals_query = deals_query.filter(ReferalDeal.withdrawal_amount >= min_amount)
+                except ValueError:
+                    pass
+            
+            # Сортировка по ID (новые сверху)
+            deals_query = deals_query.order_by(ReferalDeal.id.desc())
+            
+            # Получаем все договоры
+            deals = deals_query.all()
     
-    # Get all statuses for filter
-    statuses = Status.query.all()
-    
-    # Get selected statuses - by default exclude "Paid" status (300)
-    EXCLUDED_STATUSES = [300]
-    selected_statuses = [s.id for s in Status.query.filter(Status.id.notin_(EXCLUDED_STATUSES)).all()]
+    # Получаем все статусы для фильтра
+    all_statuses_in_db = Status.query.all()
     
     return render_template('my_referrals.html', 
                          user=user, 
@@ -450,8 +527,9 @@ def my_referrals():
                          total_user_referals=total_user_referals,
                          can_add_referrals=can_add_referrals,
                          can_view_referrals=can_view_referrals,
-                         statuses=statuses,
-                         selected_statuses=selected_statuses,
+                         view_mode=view_mode,
+                         deals=deals,
+                         all_statuses_in_db=all_statuses_in_db,
                          sort_fields=[],
                          current_filters={},
                          current_sort=None)
@@ -698,6 +776,174 @@ def send_referral_notification(user, full_name, phone):
         
     except Exception as e:
         print(f"Failed to send referral notification: {str(e)}")
+
+# DEAL STATUS UPDATE
+@referal_bp.route('/deal/<int:deal_id>/send_for_review', methods=['POST'])
+def send_deal_for_review(deal_id):
+    """Отправляет договор на проверку (меняет статус с 0 на 100)"""
+    try:
+        user = get_user()
+        if not user:
+            print(f"🚫 Send for review: User not found")
+            return jsonify({'success': False, 'message': 'Пользователь не найден'}), 401
+        
+        print(f"👤 Send for review: User {user.user_id}, Deal ID: {deal_id}")
+        
+        # Находим договор
+        referal_deal = ReferalDeal.query.get(deal_id)
+        if not referal_deal:
+            print(f"🚫 Send for review: Deal {deal_id} not found")
+            return jsonify({'success': False, 'message': 'Договор не найден'}), 404
+        
+        print(f"📄 Deal {deal_id}: Referal ID: {referal_deal.referal_id}, Referal user_id: {referal_deal.referal.user_id}, Current status: {referal_deal.status_id}")
+        
+        # Находим пользователя в локальной таблице user по auth_user_id
+        local_user = User.query.filter_by(auth_user_id=user.user_id).first()
+        if not local_user:
+            print(f"🚫 Send for review: Local user not found for auth_user_id {user.user_id}")
+            return jsonify({'success': False, 'message': 'Пользователь не найден в системе'}), 404
+        
+        print(f"👤 Local user found: ID={local_user.id}, Login={local_user.login}")
+        
+        # Проверяем права - пользователь должен быть владельцем реферала
+        if referal_deal.referal.user_id != local_user.id:
+            print(f"🚫 Send for review: Access denied. Referal user_id={referal_deal.referal.user_id}, Local user id={local_user.id}")
+            return jsonify({'success': False, 'message': 'Нет прав для этой операции'}), 403
+        
+        # Проверяем текущий статус - можно отправить только со статусом 0
+        if referal_deal.status_id != 0:
+            print(f"🚫 Send for review: Wrong status. Current: {referal_deal.status_id} ({referal_deal.status_name})")
+            return jsonify({
+                'success': False, 
+                'message': f'Договор уже имеет статус "{referal_deal.status_name}". Отправить можно только договоры со статусом "Ждет проверки".'
+            }), 400
+        
+        # Обновляем статус на 1 (Проверка отделом аналитики)
+        print(f"✅ Updating deal {deal_id} status: 0 -> 1")
+        referal_deal.status_id = 1
+        referal_deal.deal_status = 'sent_for_review'
+        
+        db.session.commit()
+        print(f"✅ Deal {deal_id} successfully sent for review with status_id=1")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Договор {referal_deal.deal.agreement_number if referal_deal.deal else deal_id} отправлен на проверку',
+            'new_status_id': 1,
+            'new_status_name': referal_deal.status_name
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error sending deal for review: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+@referal_bp.route('/get_referal_deals/<int:referal_id>', methods=['GET'])
+def get_referal_deals(referal_id):
+    """API endpoint для получения списка договоров реферала"""
+    print(f"🔍 get_referal_deals called with referal_id={referal_id}")
+    try:
+        user_context = get_user()
+        
+        if not user_context:
+            print(f"❌ User not authorized")
+            return jsonify({'success': False, 'message': 'Пользователь не авторизован'}), 401
+        
+        # Получаем локального пользователя из БД
+        from models import User
+        local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
+        
+        print(f"🔍 Auth user_id: {user_context.user_id}")
+        print(f"🔍 Local user: {local_user.id if local_user else 'NOT FOUND'}")
+        print(f"🔍 Is admin: {user_context.is_admin}")
+        
+        if not local_user:
+            print(f"❌ Local user not found for auth_user_id={user_context.user_id}")
+            return jsonify({'success': False, 'message': 'Пользователь не найден в системе'}), 404
+        
+        print(f"🔍 Looking for referal with id={referal_id}")
+        referal = Referal.query.get_or_404(referal_id)
+        print(f"✅ Referal found: {referal.id}, user_id={referal.user_id}")
+        
+        # Проверяем права доступа: либо это владелец реферала, либо админ
+        is_owner = referal.user_id == local_user.id
+        is_admin = user_context.is_admin
+        
+        print(f"🔍 Is admin: {is_admin}, Is owner: {is_owner}")
+        
+        if not is_admin and not is_owner:
+            print(f"❌ Access denied: not admin and not owner")
+            return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+        
+        print(f"🔍 Access granted! Getting deals summary...")
+        deals_summary = referal.get_deals_summary()
+        print(f"✅ Deals summary retrieved: {len(deals_summary)} deals")
+        
+        # Отладка: выводим первый договор если есть
+        if deals_summary:
+            print(f"🔍 First deal data: {deals_summary[0]}")
+        
+        # Получаем данные реферала
+        referal_data = referal.referal_data
+        
+        result = {
+            'success': True,
+            'referal_id': referal.id,
+            'referal_name': referal_data.full_name if referal_data else 'Неизвестно',
+            'referal_phone': referal_data.phone_number if referal_data else '',
+            'referal_contact_id': referal.contact_id if referal.contact_id else '',
+            'passport_number': referal_data.passport_number if referal_data else '',
+            'passport_giver': referal_data.passport_giver if referal_data else '',
+            'passport_date': referal_data.passport_date.strftime('%Y-%m-%d') if referal_data and referal_data.passport_date else '',
+            'total_deals': referal.get_deals_count(),
+            'pending_deals': referal.get_pending_deals_count(),
+            'approved_deals': referal.get_approved_deals_count(),
+            'total_withdrawal': referal.get_total_withdrawal_amount(),
+            'deals': deals_summary
+        }
+        print(f"✅ Returning success response")
+        return jsonify(result)
+    except Exception as e:
+        print(f"❌ ERROR in get_referal_deals: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+@referal_bp.route('/get_rejection_reason/<int:deal_id>', methods=['GET'])
+def get_rejection_reason(deal_id):
+    """Получить причину отказа для договора"""
+    try:
+        user = get_user()
+        if not user:
+            return jsonify({'success': False, 'message': 'Пользователь не найден'}), 401
+        
+        # Находим договор
+        referal_deal = ReferalDeal.query.get(deal_id)
+        if not referal_deal:
+            return jsonify({'success': False, 'message': 'Договор не найден'}), 404
+        
+        # Проверяем права - пользователь должен быть владельцем реферала
+        if referal_deal.referal.user_id != user.user_id:
+            return jsonify({'success': False, 'message': 'Нет прав для просмотра'}), 403
+        
+        # Проверяем, что есть причина отказа
+        rejection_reason = referal_deal.rejection_reason or 'Причина отказа не указана'
+        
+        return jsonify({
+            'success': True,
+            'reason': rejection_reason,
+            'status_name': referal_deal.status_name,
+            'status_id': referal_deal.status_id
+        })
+        
+    except Exception as e:
+        print(f"Error getting rejection reason: {str(e)}")
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
 
 # PERMISSION DEMONSTRATION ROUTE
 @referal_bp.route('/debug/permissions')

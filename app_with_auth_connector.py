@@ -104,6 +104,22 @@ def clean_none_filter(value):
         return ''
     return value
 
+# Добавляем фильтр для форматирования чисел
+@app.template_filter('format_number')
+def format_number_filter(value):
+    """Фильтр для форматирования чисел с разделителями тысяч"""
+    if value is None:
+        return '0'
+    try:
+        # Преобразуем в число и форматируем с пробелами как разделителями тысяч
+        return '{:,}'.format(int(value)).replace(',', ' ')
+    except (ValueError, TypeError):
+        return '0'
+
+# Регистрируем фильтры напрямую в Jinja окружении (для надежности)
+app.jinja_env.filters['clean_none'] = clean_none_filter
+app.jinja_env.filters['format_number'] = format_number_filter
+
 def get_user_documents_from_auth_service(user_id):
     """Получение документов пользователя из auth-service через API для сервиса referal
     Новая логика:
