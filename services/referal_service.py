@@ -50,7 +50,7 @@ def send_deal_available_notification(user, referal, deal, withdrawal_amount):
 - Сумма выплаты: {withdrawal_amount:,} сум
 
 Вы можете отправить этот договор на проверку в личном кабинете реферальной программы:
-{os.getenv('APP_BASE_URL', 'http://localhost')}/referal/my_referrals
+{os.getenv('APP_BASE_URL', ' https://analytics.gh.uz')}/referal/my_referrals
 
 После отправки на проверку договор будет рассмотрен нашими специалистами, и вы получите выплату.
 
