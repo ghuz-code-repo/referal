@@ -826,11 +826,18 @@ def send_deal_for_review(deal_id):
         db.session.commit()
         print(f"✅ Deal {deal_id} successfully sent for review with status_id=1")
         
+        # Обновляем объект после коммита чтобы подгрузить связанный статус
+        db.session.refresh(referal_deal)
+        
+        # Получаем название статуса
+        status_name = referal_deal.status_name if referal_deal.status else 'Проверка отделом аналитики'
+        print(f"📊 New status name: {status_name}")
+        
         return jsonify({
             'success': True,
             'message': f'Договор {referal_deal.deal.agreement_number if referal_deal.deal else deal_id} отправлен на проверку',
             'new_status_id': 1,
-            'new_status_name': referal_deal.status_name
+            'new_status_name': status_name
         })
         
     except Exception as e:

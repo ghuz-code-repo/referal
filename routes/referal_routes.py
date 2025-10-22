@@ -568,9 +568,13 @@ def request_withdrawal_deal(referal_deal_id):
                 'message': 'Необходимо заполнить паспортные данные реферала'
             }), 400
         
-        # Обновляем статус
+        # Обновляем статус договора на "Проверка отделом аналитики" (status_id = 1)
+        referal_deal.status_id = 1
         referal_deal.deal_status = 'sent_for_review'
         db.session.commit()
+        
+        # Обновляем объект после коммита чтобы подгрузить связанный статус
+        db.session.refresh(referal_deal)
         
         # Отправляем уведомление (можно добавить позже)
         # notification_service.notify_deal_sent_for_review(referal_deal)
@@ -578,7 +582,9 @@ def request_withdrawal_deal(referal_deal_id):
         return jsonify({
             'success': True,
             'message': f'Договор {referal_deal.deal.agreement_number} отправлен на проверку',
-            'new_status': 'sent_for_review'
+            'new_status': 'sent_for_review',
+            'new_status_id': 1,
+            'new_status_name': referal_deal.status_name
         })
     except Exception as e:
         db.session.rollback()

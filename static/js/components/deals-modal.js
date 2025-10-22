@@ -233,8 +233,8 @@ function sendDealForReview(referalDealId) {
     // Получаем базовый путь
     const basePath = getApiBasePath();
     
-    // Отправляем запрос
-    fetch(`${basePath}/request_withdrawal_deal/${referalDealId}`, {
+    // Отправляем запрос на тот же endpoint что и на вкладке "Документы"
+    fetch(`${basePath}/deal/${referalDealId}/send_for_review`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -243,9 +243,18 @@ function sendDealForReview(referalDealId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            // Показываем успешное сообщение
             showFlashMessage('success', data.message || 'Договор отправлен на проверку');
-            // Перезагружаем данные
-            loadDealsData(currentReferalId);
+            
+            // Меняем кнопку на индикатор успеха
+            button.innerHTML = '<i class="fas fa-check"></i> Отправлено';
+            button.classList.add('btn-success');
+            button.classList.remove('btn-primary');
+            
+            // Через 1 секунду перезагружаем данные (кнопка исчезнет)
+            setTimeout(() => {
+                loadDealsData(currentReferalId);
+            }, 1000);
         } else {
             showFlashMessage('error', data.message || 'Ошибка при отправке договора');
             button.disabled = false;
@@ -390,17 +399,25 @@ function saveReferalData() {
  * Показывает flash-сообщение
  */
 function showFlashMessage(type, message) {
-    // Используем существующую систему flash-сообщений если она есть
-    if (typeof window.showFlashMessage === 'function') {
-        window.showFlashMessage(type, message);
-        return;
-    }
+    // Просто создаём уведомление
+    const isSuccess = type === 'success';
+    const bgColor = isSuccess ? '#d4edda' : '#f8d7da';
+    const textColor = isSuccess ? '#155724' : '#721c24';
+    const borderColor = isSuccess ? '#c3e6cb' : '#f5c6cb';
     
-    // Если нет, создаём простое уведомление
-    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
     const alertDiv = document.createElement('div');
-    alertDiv.className = `alert ${alertClass}`;
-    alertDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 15px 20px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+    alertDiv.style.cssText = `
+        position: fixed; 
+        top: 20px; 
+        right: 20px; 
+        z-index: 9999; 
+        padding: 15px 20px; 
+        border-radius: 6px; 
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        background-color: ${bgColor};
+        color: ${textColor};
+        border: 1px solid ${borderColor};
+    `;
     alertDiv.textContent = message;
     
     document.body.appendChild(alertDiv);

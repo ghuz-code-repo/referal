@@ -353,6 +353,21 @@ else:
 # Создание таблиц в контексте приложения
 with app.app_context():
     db.create_all()
+    
+    # Инициализация статусов если их еще нет
+    if not Status.query.filter_by(id=0).first():
+        print("⚙️ Initializing status table...")
+        db.session.add(Status(id=0, name='Ждёт проверки', is_start=True, is_final=False))
+        db.session.add(Status(id=1, name='Проверка отделом аналитики', is_final=False))
+        db.session.add(Status(id=10, name='Проверка колл центром', is_final=False))
+        db.session.add(Status(id=20, name='Проверка Коммерческим Директором', is_final=False))
+        db.session.add(Status(id=200, name='Акцептовано к оплате', is_final=False))
+        db.session.add(Status(id=300, name='Оплачено', is_final=True))
+        db.session.add(Status(id=500, name='Отказано', is_final=True))
+        db.session.commit()
+        print("✅ Status table initialized successfully")
+    else:
+        print("✅ Status table already initialized")
 
 # Инициализация планировщика
 scheduler = APScheduler()
