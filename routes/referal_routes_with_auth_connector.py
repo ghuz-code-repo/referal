@@ -10,7 +10,9 @@ from models import User, Referal, ReferalData, MacroContact, Status, ReferalDeal
 import re
 import os
 import random
+import requests
 from services import notification_service
+from notification_client import get_notification_client
 from routes.auth_routes import get_current_user
 import utils
 
@@ -768,14 +770,208 @@ def send_referral_notification(user, full_name, phone):
             return
         
         # Send notification
-        notification_service.send_notification(
-            to=call_center_email,
+        notification_client = get_notification_client()
+        notification_client.send_email(
+            recipient=call_center_email,
             subject='Новый реферал добавлен',
             body=f'Пользователь {user.user_data.full_name if hasattr(user, "user_data") else user.full_name} добавил нового реферала: {full_name} ({phone}). Создайте встречу реферала с менеджером: {manager} для дальнейшего взаимодействия с клиентом.'
         )
         
     except Exception as e:
         print(f"Failed to send referral notification: {str(e)}")
+
+
+def get_user_email_from_auth_service(auth_user_id):
+    """Получить актуальный email пользователя из auth-service"""
+    try:
+        auth_service_url = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:80')
+        profile_url = f"{auth_service_url}/api/users/{auth_user_id}/profile"
+        
+        response = requests.get(profile_url, timeout=5)
+        
+        if response.status_code == 200:
+            profile_data = response.json()
+            email = profile_data.get('email')
+            if email:
+                print(f"✅ Got email from auth-service for user {auth_user_id}: {email}")
+                return email
+            else:
+                print(f"⚠️ No email in auth-service profile for user {auth_user_id}")
+        else:
+            print(f"⚠️ Failed to get profile from auth-service: {response.status_code}")
+    except Exception as e:
+        print(f"❌ Error getting email from auth-service: {str(e)}")
+    
+    return None
+
+
+def send_deal_status_notification(referal_deal, user, new_status_id, new_status_name):
+    """Send notification about deal status change to appropriate recipient based on new status"""
+    try:
+        # Определяем получателя на основе нового статуса
+        # Status mapping:
+        # 0 -> Ждёт проверки
+        # 1 -> Проверка отделом аналитики (MAIN_ADMIN_EMAIL)
+        # 10 -> Проверка колл центром (CALL_CENTER_MANAGER_EMAIL)
+        # 20 -> Проверка Коммерческим Директором (MAIN_ADMIN_EMAIL)
+        # 200 -> Акцептовано к оплате (PAYMENT_MANAGER_EMAIL)
+        # 300 -> Оплачено (PAYMENT_MANAGER_EMAIL)
+        # 500 -> Отказано (уведомить пользователя)
+        
+        recipient_email = None
+        subject_prefix = ""
+        
+        if new_status_id == 1:
+            # Проверка отделом аналитики
+            recipient_email = os.getenv('MAIN_ADMIN_EMAIL')
+            subject_prefix = "на проверку отделом аналитики"
+        elif new_status_id == 10:
+            # Проверка колл-центром
+            recipient_email = os.getenv('CALL_CENTER_MANAGER_EMAIL')
+            subject_prefix = "на проверку колл-центром"
+        elif new_status_id == 20:
+            # Проверка КД - админу
+            recipient_email = os.getenv('MAIN_ADMIN_EMAIL')
+            subject_prefix = f"на проверку Коммерческим Директором"
+        elif new_status_id in [200, 300]:
+            # Акцептовано к оплате или Оплачено - менеджеру по платежам
+            recipient_email = os.getenv('PAYMENT_MANAGER_EMAIL')
+            subject_prefix = f"изменён на '{new_status_name}'"
+        elif new_status_id == 500:
+            # Отказано - уведомить пользователя-реферала + администраторов
+            user_email = None
+            
+            # Получаем актуальный email из auth-service
+            if referal_deal.referal and referal_deal.referal.user and referal_deal.referal.user.auth_user_id:
+                user_email = get_user_email_from_auth_service(referal_deal.referal.user.auth_user_id)
+            
+            # Получаем данные о договоре
+            agreement_number = referal_deal.deal.agreement_number if referal_deal.deal else 'Неизвестно'
+            referal_name = referal_deal.referal.referal_data.full_name if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
+            referal_phone = referal_deal.referal.referal_data.phone_number if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
+            withdrawal_amount = referal_deal.withdrawal_amount or 0
+            rejection_reason = referal_deal.rejection_reason or 'Причина не указана'
+            user_name = user.user_data.full_name if hasattr(user, "user_data") and user.user_data else user.full_name if hasattr(user, "full_name") else "Неизвестный пользователь"
+            
+            notification_client = get_notification_client()
+            
+            # 1. Отправляем письмо пользователю об отказе
+            if user_email:
+                subject = f'Отказ по договору №{agreement_number}'
+                body = f"""Уважаемый(ая) {referal_name},
+
+К сожалению, ваш договор №{agreement_number} был отклонён.
+
+Причина отказа: {rejection_reason}
+
+Если у вас есть вопросы, пожалуйста, свяжитесь с нами."""
+                
+                notification_client.send_email(
+                    recipient=user_email,
+                    subject=subject,
+                    body=body
+                )
+                print(f"✅ Rejection notification sent to user {user_email} for deal {referal_deal.id}")
+            else:
+                print(f"⚠️ Cannot send rejection notification: user email not found for deal {referal_deal.id}")
+            
+            # 2. Отправляем уведомление MAIN_ADMIN
+            main_admin_email = os.getenv('MAIN_ADMIN_EMAIL')
+            if main_admin_email:
+                subject = f'Договор №{agreement_number} отклонён'
+                body = f"""Сотрудник {user_name} отклонил договор.
+
+Детали договора:
+- Номер договора: {agreement_number}
+- Реферал: {referal_name} ({referal_phone})
+- Сумма вывода: {withdrawal_amount:,.0f} сум
+- Статус: Отказано
+- Причина отказа: {rejection_reason}"""
+                
+                if user_email:
+                    body += f"\n\n✅ Пользователь уведомлён на email: {user_email}"
+                else:
+                    body += f"\n\n⚠️ Email пользователя не найден, уведомление не отправлено"
+                
+                notification_client.send_email(
+                    recipient=main_admin_email,
+                    subject=subject,
+                    body=body
+                )
+                print(f"✅ Rejection notification sent to MAIN_ADMIN {main_admin_email} for deal {referal_deal.id}")
+            
+            # 3. Отправляем уведомление PAYMENT_MANAGER
+            payment_manager_email = os.getenv('PAYMENT_MANAGER_EMAIL')
+            if payment_manager_email and payment_manager_email != main_admin_email:
+                subject = f'Договор №{agreement_number} отклонён'
+                body = f"""Сотрудник {user_name} отклонил договор.
+
+Детали договора:
+- Номер договора: {agreement_number}
+- Реферал: {referal_name} ({referal_phone})
+- Сумма вывода: {withdrawal_amount:,.0f} сум
+- Статус: Отказано
+- Причина отказа: {rejection_reason}"""
+                
+                notification_client.send_email(
+                    recipient=payment_manager_email,
+                    subject=subject,
+                    body=body
+                )
+                print(f"✅ Rejection notification sent to PAYMENT_MANAGER {payment_manager_email} for deal {referal_deal.id}")
+            
+            return
+        else:
+            print(f"⚠️ Unknown status_id {new_status_id} - skipping notification")
+            return
+        
+        if not recipient_email:
+            print(f"⚠️ Email not configured for status {new_status_id}")
+            return
+        
+        # Получаем данные о договоре и реферале
+        agreement_number = referal_deal.deal.agreement_number if referal_deal.deal else 'Неизвестно'
+        referal_name = referal_deal.referal.referal_data.full_name if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
+        referal_phone = referal_deal.referal.referal_data.phone_number if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
+        withdrawal_amount = referal_deal.withdrawal_amount or 0
+        user_name = user.user_data.full_name if hasattr(user, "user_data") and user.user_data else user.full_name if hasattr(user, "full_name") else "Неизвестный пользователь"
+        
+        # Формируем тело письма
+        subject = f'Договор №{agreement_number} отправлен {subject_prefix}'
+        body = f"""Сотрудник {user_name} отправил договор {subject_prefix}.
+
+Детали договора:
+- Номер договора: {agreement_number}
+- Реферал: {referal_name} ({referal_phone})
+- Сумма вывода: {withdrawal_amount:,.0f} сум
+- Новый статус: {new_status_name}
+
+Требуется ваша проверка."""
+        
+        # Получаем notification client
+        notification_client = get_notification_client()
+        
+        # Отправляем уведомление основному получателю
+        notification_client.send_email(
+            recipient=recipient_email,
+            subject=subject,
+            body=body
+        )
+        print(f"✅ Deal status notification sent to {recipient_email} for deal {referal_deal.id}, status {new_status_id}")
+        
+        # Дублируем письмо на MAIN_ADMIN_EMAIL если это не он был основным получателем
+        main_admin_email = os.getenv('MAIN_ADMIN_EMAIL')
+        if main_admin_email and recipient_email != main_admin_email and new_status_id != 1:
+            notification_client.send_email(
+                recipient=main_admin_email,
+                subject=f"[Копия] {subject}",
+                body=body
+            )
+            print(f"✅ Copy sent to MAIN_ADMIN_EMAIL: {main_admin_email}")
+        
+    except Exception as e:
+        print(f"❌ Failed to send deal status notification: {str(e)}")
+
 
 # DEAL STATUS UPDATE
 @referal_bp.route('/deal/<int:deal_id>/send_for_review', methods=['POST'])
@@ -832,6 +1028,9 @@ def send_deal_for_review(deal_id):
         # Получаем название статуса
         status_name = referal_deal.status_name if referal_deal.status else 'Проверка отделом аналитики'
         print(f"📊 New status name: {status_name}")
+        
+        # Отправляем уведомление в отдел аналитики
+        send_deal_status_notification(referal_deal, user, 1, status_name)
         
         return jsonify({
             'success': True,
