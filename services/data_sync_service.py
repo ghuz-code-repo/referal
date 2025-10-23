@@ -589,7 +589,13 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                         h.complex_name as project_name,
                         h.geo_street_name as house_address,
                         h.geo_house as house_number,
-                        es.estate_rooms as apartment_number,
+                        es.geo_flatnum as apartment_number,
+                        es.estate_rooms as rooms,
+                        es.estate_riser as entrance,
+                        es.estate_floor as floor,
+                        (SELECT MAX(es2.estate_floor) 
+                         FROM estate_sells es2 
+                         WHERE es2.house_id = h.id) as max_floor,
                         ed.finances_income as agreement_price,
                         ed.agreement_date
                     FROM estate_deals ed
@@ -599,7 +605,8 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                     WHERE ed.contacts_buy_id IS NOT NULL
                     AND ed.agreement_number IS NOT NULL
                     GROUP BY ed.id, ed.deal_status_name, ed.agreement_number, ed.contacts_buy_id, ed.deal_area,
-                             h.complex_name, h.geo_street_name, h.geo_house, es.estate_rooms, 
+                             h.complex_name, h.geo_street_name, h.geo_house, es.geo_flatnum, es.estate_rooms,
+                             es.estate_riser, es.estate_floor, h.id,
                              ed.finances_income, ed.agreement_date
                 """
                 cursor.execute(query_deals)
@@ -627,8 +634,8 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                     deals_updated_count = 0
                     for row_data in rows: 
                         (deal_status_name, agreement_number, contacts_buy_id, deal_area, total_payments,
-                         project_name, house_address, house_number, apartment_number, 
-                         agreement_price, agreement_date) = row_data
+                         project_name, house_address, house_number, apartment_number, rooms, entrance, 
+                         floor, max_floor, agreement_price, agreement_date) = row_data
                         try:
                             # Check if deal already exists by agreement_number
                             existing_deal = MacroDeal.query.filter_by(agreement_number=agreement_number).first()
@@ -643,6 +650,10 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                                 existing_deal.house_address = house_address
                                 existing_deal.house_number = house_number
                                 existing_deal.apartment_number = apartment_number
+                                existing_deal.rooms = rooms
+                                existing_deal.entrance = entrance
+                                existing_deal.floor = floor
+                                existing_deal.max_floor = max_floor
                                 existing_deal.agreement_price = agreement_price
                                 existing_deal.agreement_date = agreement_date
                                 deals_updated_count += 1
@@ -658,6 +669,10 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                                     house_address=house_address,
                                     house_number=house_number,
                                     apartment_number=apartment_number,
+                                    rooms=rooms,
+                                    entrance=entrance,
+                                    floor=floor,
+                                    max_floor=max_floor,
                                     agreement_price=agreement_price,
                                     agreement_date=agreement_date
                                 )

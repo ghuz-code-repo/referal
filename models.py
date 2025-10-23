@@ -257,6 +257,10 @@ class MacroDeal(db.Model):
     house_address = db.Column(db.String(200), nullable=True)  # адрес дома
     house_number = db.Column(db.String(50), nullable=True)  # номер дома
     apartment_number = db.Column(db.String(50), nullable=True)  # номер квартиры
+    rooms = db.Column(db.Integer, nullable=True)  # комнатность
+    entrance = db.Column(db.String(50), nullable=True)  # подъезд
+    floor = db.Column(db.Integer, nullable=True)  # этаж квартиры
+    max_floor = db.Column(db.Integer, nullable=True)  # этажность дома
     agreement_price = db.Column(db.Float, nullable=True)  # цена договора
     agreement_date = db.Column(db.Date, nullable=True)  # дата договора
     

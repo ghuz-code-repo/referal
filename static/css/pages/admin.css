@@ -155,7 +155,7 @@ html, body {
 
 .update-status-btn {
     background: transparent;
-    color: var(--primary-text);
+    color: var(--text-primary);
     border: none;
     padding: 6px 12px;
     border-radius: 4px;

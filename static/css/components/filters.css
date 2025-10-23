@@ -85,10 +85,10 @@
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
-    background: var(--card-bg, #1a1a1a);
+    background: var(--light-background-color, #1a1a1a);
     border: 1px solid var(--golden-color, #c4a668);
     border-radius: 6px;
-    color: var(--primary-text, #ffffff);
+    color: var(--text-primary, #ffffff);
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -123,7 +123,7 @@
     left: 0;
     min-width: 280px;
     max-width: 320px;
-    background: var(--card-bg, #1a1a1a);
+    background: var(--light-background-color, #1a1a1a);
     border: 1px solid var(--golden-color, #c4a668);
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(196, 166, 104, 0.3), 0 0 40px rgba(196, 166, 104, 0.1);
@@ -143,7 +143,7 @@
 .filter-header {
     padding: 12px 16px;
     border-bottom: 1px solid rgba(196, 166, 104, 0.3);
-    background: var(--surface-bg, #252525);
+    background: var(--card-background, #252525);
     border-radius: 8px 8px 0 0;
 }
 
@@ -169,7 +169,7 @@
 }
 
 .filter-option:hover {
-    background: var(--surface-bg, #252525);
+    background: var(--card-background, #252525);
 }
 
 
@@ -183,7 +183,7 @@
 
 .filter-option span {
     font-size: 14px;
-    color: var(--primary-text, #ffffff);
+    color: var(--text-primary, #ffffff);
 }
 
 .filter-actions {
@@ -202,10 +202,10 @@
     justify-content: center;
     gap: 6px;
     padding: 8px 12px;
-    background: var(--surface-bg, #252525);
+    background: var(--card-background, #252525);
     border: 1px solid rgba(196, 166, 104, 0.5);
     border-radius: 6px;
-    color: var(--primary-text, #ffffff);
+    color: var(--text-primary, #ffffff);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -246,8 +246,8 @@
 }
 
 .filter-buttons .btn-secondary {
-    background: var(--surface-bg, #252525);
-    color: var(--primary-text, #ffffff);
+    background: var(--card-background, #252525);
+    color: var(--text-primary, #ffffff);
     border: 1px solid rgba(196, 166, 104, 0.5);
 }
 
@@ -275,7 +275,7 @@
 }
 
 .filter-options::-webkit-scrollbar-track {
-    background: var(--surface-bg, #252525);
+    background: var(--card-background, #252525);
 }
 
 .filter-options::-webkit-scrollbar-thumb {

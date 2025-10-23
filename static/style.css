@@ -13,6 +13,8 @@
     --font-size-large: 1.5em;
     --font-size-medium: 1.2em;
     --font-size-small: 1em;
+    --light-background-color: #f8f9fa;
+
     
     /* Цветовая палитра для светлой темы */
     --white: #fff;
@@ -26,6 +28,7 @@
     --danger-color: #dc3545;
     
     /* Семантические цвета для светлой темы */
+    
     --text-primary: #242424;
     --text-secondary: #363636;
     --text-muted: #727272;
@@ -58,7 +61,7 @@
     --primary-color: #d4af37;
     --primary-color-rgb: 212, 175, 55;
     --primary-color-hover: #b8860b;
-    --primary-text-color: white;
+    --text-primary-color: white;
     --card-background-color: #fff;
     --text-color: #333;
 }
@@ -102,12 +105,13 @@
     --form-section-background: #2a2a2a;
     --readonly-input-background: #1f1f1f;
     --disabled-color: #5f5f5f;
+    --light-background-color: #2c2c2c;
     
     /* Дополнительные переменные для совместимости с auth-service в темной теме */
     --primary-color: #b8860b;
     --primary-color-rgb: 184, 134, 11;
     --primary-color-hover: #a0740a;
-    --primary-text-color: #e0e0e0;
+    --text-primary-color: #e0e0e0;
     --card-background-color: #1e1e1e;
     --text-color: #e0e0e0;
 

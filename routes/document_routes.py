@@ -4,6 +4,7 @@ import math
 from flask import Blueprint, request, redirect, url_for, flash, send_file, current_app
 from datetime import datetime
 import os
+from decimal import Decimal, ROUND_HALF_UP
 from .auth_routes import get_current_user
 from models import *
 from macro_data import get_property_details
@@ -152,6 +153,11 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             if not user or not user_data:
                 flash('Не найдены данные пользователя для данного реферала', 'error')
                 return redirect(url_for('referal.profile'))
+            
+            # Проверяем наличие паспортных данных реферера (из документа паспорта)
+            if not user_data.full_name or not user_data.passport_number:
+                flash('❌ Отсутствуют паспортные данные реферера. Пожалуйста, заполните ФИО и номер паспорта в профиле перед генерацией акта.', 'error')
+                return redirect(url_for('referal.profile'))
                 
             if not referal_data:
                 flash('Не найдены данные реферала', 'error')
@@ -267,14 +273,14 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             elif hasattr(referal_data.passport_date, 'strftime'):
                 referal_passport_date_str = referal_data.passport_date.strftime('%d.%m.%Y')
         
-        # Форматируем дату для замены
+        # Форматируем дату для замены - используем дату договора из MacroDeal
         replacements = {
-            'day': current_date.day,
-            'month': month_name_genitive(current_date.month),
-            'year': current_date.year,
+            'day': agreement_date.day,
+            'month': month_name_genitive(int(agreement_date.month)),
+            'year': agreement_date.year,
             
-            'full_name': user_data.full_name or '',
-            'referal_name': referal_data.full_name or '',
+            'full_name': (user_data.full_name or '').upper(),
+            'referal_name': (referal_data.full_name or '').upper(),
             'referal_passport_number': referal_data.passport_number or '',
             'referal_passport_date': referal_passport_date_str,
             'referal_passport_giver': referal_data.passport_giver or '',
@@ -289,46 +295,58 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             'house_address': real_deal.house_address or '',
             'house_number': real_deal.house_number or '',
             'appartment_number': real_deal.apartment_number or '',
+            'apartment_number': real_deal.apartment_number or '',  # Оба варианта написания для совместимости
+            'rooms': real_deal.rooms or '',
+            'entrance': real_deal.entrance or '',
+            'floor': real_deal.floor or '',
+            'max_floor': real_deal.max_floor or '',
             'appartment_area': real_deal.deal_metr,
-            'contract_price': real_deal.agreement_price or '',
-            'withdrawal_amount': str(math.ceil((withdrawal_amount or 0)/(1-float(os.getenv('NDS_PERCENT'))/100))),
+            'contract_price': '{:,}'.format(int(float(real_deal.agreement_price or 0))).replace(',', ' ') if real_deal.agreement_price else '',
+            'withdrawal_amount': '{:,}'.format(
+                int(round((withdrawal_amount or 0)/(1-float(os.getenv('NDS_PERCENT'))/100) + float(os.getenv('NDS_ROUNDING_ADJUSTMENT', '1'))))
+            ).replace(',', ' '),
             
-            'referer_name': user_data.full_name or '',
+            'referer_name': (user_data.full_name or '').upper(),
             'passport_address': user_data.passport_adress or '',
             'pinfl': user_data.pinfl.replace(' ','') or '',
             'referer_phone': user_data.phone.replace(' ','') or '',
             'referer_email': user_data.e_mail or '',
         }
 
-        # Проверяем наличие всех обязательных полей
+        # Проверяем наличие всех обязательных полей с указанием источника данных
         required_fields = {
-            'full_name': 'Полное имя пользователя',
-            'referal_name': 'Полное имя реферала',
-            'referal_passport_number': 'Номер паспорта реферала',
-            'referal_passport_date': 'Дата выдачи паспорта реферала',
-            'referal_passport_giver': 'Орган выдачи паспорта реферала',
-            'contract_number': 'Номер договора',
-            'project_name': 'Название проекта',
-            'house_address': 'Адрес дома',
-            'house_number': 'Номер дома',
-            'appartment_number': 'Номер квартиры',
-            'appartment_area': 'Площадь квартиры',
-            # 'contract_price': 'Цена договора',  # Необязательное поле - не всегда есть в базе
-            'withdrawal_amount': 'Сумма к выводу',
-            'referer_name': 'Имя реферера',
-            'passport_address': 'Адрес прописки реферера',
-            'pinfl': 'ПИНФЛ реферера',
-            'referer_phone': 'Телефон реферера',
+            # Данные реферера (из профиля пользователя)
+            'full_name': ('Полное имя реферера (ФИО)', 'Профиль пользователя'),
+            'referer_name': ('Имя реферера', 'Профиль пользователя'),
+            'passport_address': ('Адрес прописки реферера', 'Профиль пользователя → Паспорт'),
+            'pinfl': ('ПИНФЛ реферера', 'Профиль пользователя → Документ ПИНФЛ'),
+            'referer_phone': ('Телефон реферера', 'Профиль пользователя'),
+            
+            # Данные реферала (клиента)
+            'referal_name': ('Полное имя реферала (клиента)', 'Данные реферала'),
+            'referal_passport_number': ('Номер паспорта реферала', 'Данные реферала → Паспорт'),
+            'referal_passport_date': ('Дата выдачи паспорта реферала', 'Данные реферала → Паспорт'),
+            'referal_passport_giver': ('Орган выдачи паспорта реферала', 'Данные реферала → Паспорт'),
+            
+            # Данные сделки (из MacroCRM)
+            'contract_number': ('Номер договора', 'Данные сделки из MacroCRM'),
+            'project_name': ('Название проекта (ЖК)', 'Данные недвижимости из MacroCRM'),
+            'house_address': ('Адрес дома', 'Данные недвижимости из MacroCRM'),
+            'house_number': ('Номер дома', 'Данные недвижимости из MacroCRM'),
+            'appartment_number': ('Номер квартиры', 'Данные недвижимости из MacroCRM'),
+            'appartment_area': ('Площадь квартиры', 'Данные недвижимости из MacroCRM'),
+            'withdrawal_amount': ('Сумма к выводу', 'Расчет выплаты'),
         }
         
         missing_fields = []
-        for field_key, field_name in required_fields.items():
+        for field_key, (field_name, source) in required_fields.items():
             value = replacements.get(field_key, '')
             if not value or str(value).strip() == '' or str(value).strip() == '0':
-                missing_fields.append(field_name)
+                missing_fields.append(f"• {field_name} (источник: {source})")
         
         if missing_fields:
-            error_message = f"Невозможно сгенерировать акт. Отсутствуют обязательные поля: {', '.join(missing_fields)}"
+            error_message = "❌ Невозможно сгенерировать акт. Отсутствуют обязательные данные:\n" + '\n'.join(missing_fields)
+            error_message += "\n\nПожалуйста, заполните недостающие данные в профиле или обратитесь к администратору для проверки данных сделки."
             flash(error_message, 'error')
             return redirect(url_for('referal.profile'))
 
