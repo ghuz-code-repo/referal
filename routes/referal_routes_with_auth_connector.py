@@ -1071,7 +1071,12 @@ def get_referal_deals(referal_id):
             return jsonify({'success': False, 'message': 'Пользователь не найден в системе'}), 404
         
         print(f"🔍 Looking for referal with id={referal_id}")
-        referal = Referal.query.get_or_404(referal_id)
+        referal = Referal.query.get(referal_id)
+        
+        if not referal:
+            print(f"❌ Referal not found: id={referal_id}")
+            return jsonify({'success': False, 'message': 'Реферал не найден'}), 404
+            
         print(f"✅ Referal found: {referal.id}, user_id={referal.user_id}")
         
         # Проверяем права доступа: либо это владелец реферала, либо админ

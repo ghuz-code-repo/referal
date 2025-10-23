@@ -9,17 +9,17 @@ user_documents_bp = Blueprint('user_documents', __name__)
 @user_documents_bp.route('/user_documents')
 def list_user_documents():
     """Отображение списка документов пользователя"""
-    from auth_connector import AuthClient, require_permission
-    
-    # Проверяем разрешение на просмотр документов
-    if not require_permission('profile.documents'):
-        flash('У вас нет прав для просмотра документов', 'error')
-        return redirect(url_for('referal.profile'))
+    from auth_connector import AuthClient
     
     current_user = get_current_user()
     if not current_user:
         flash('Пользователь не найден', 'error')
         return redirect(url_for('auth.login'))
+    
+    # Проверяем разрешение на просмотр документов
+    if not current_user.is_admin and not current_user.has_permission('profile.documents'):
+        flash('У вас нет прав для просмотра документов', 'error')
+        return redirect(url_for('referal.profile'))
     
     # Получаем документы пользователя из auth-service
     auth_client = AuthClient(current_app.config['AUTH_SERVICE_URL'], 'referal')
@@ -43,18 +43,17 @@ def list_user_documents():
 @user_documents_bp.route('/download_attachment/<document_id>/<attachment_id>')
 def download_attachment(document_id, attachment_id):
     """Скачивание прикрепленного файла документа"""
-    from auth_connector import require_permission
     import requests
-    
-    # Проверяем разрешение на скачивание документов
-    if not require_permission('profile.documents.download'):
-        flash('У вас нет прав для скачивания документов', 'error')
-        return redirect(url_for('user_documents.list_user_documents'))
     
     current_user = get_current_user()
     if not current_user:
         flash('Пользователь не найден', 'error')
         return redirect(url_for('auth.login'))
+    
+    # Проверяем разрешение на скачивание документов
+    if not current_user.is_admin and not current_user.has_permission('profile.documents.download'):
+        flash('У вас нет прав для скачивания документов', 'error')
+        return redirect(url_for('user_documents.list_user_documents'))
     
     try:
         # Проксируем запрос к auth-service
@@ -222,15 +221,14 @@ def download_all_user_documents(user_id):
     import tempfile
     import zipfile
     import os
-    from auth_connector import require_permission
-    
-    # Проверяем разрешение на скачивание документов
-    if not require_permission('profile.documents.download'):
-        return "У вас нет прав для скачивания документов", 403
     
     current_user = get_current_user()
     if not current_user:
         return "Пользователь не найден", 401
+    
+    # Проверяем разрешение на скачивание документов
+    if not current_user.is_admin and not current_user.has_permission('profile.documents.download'):
+        return "У вас нет прав для скачивания документов", 403
     
     temp_file_path = None
     
@@ -341,7 +339,6 @@ def download_document_type(user_id, document_type):
     """Скачивание документов конкретного типа пользователя - теперь скачиваем файлы по одному как в профиле"""
     from flask import redirect, url_for
     import requests
-    from auth_connector import require_permission
     
     current_app.logger.info(f"Download request for document type: '{document_type}' (user {user_id})")
     
@@ -349,15 +346,15 @@ def download_document_type(user_id, document_type):
     if isinstance(document_type, bytes):
         document_type = document_type.decode('utf-8')
     
-    # Проверяем разрешение на скачивание документов
-    if not require_permission('profile.documents.download'):
-        from flask import jsonify
-        return jsonify({'error': 'У вас нет прав для скачивания документов'}), 403
-
     current_user = get_current_user()
     if not current_user:
         from flask import jsonify
         return jsonify({'error': 'Пользователь не найден'}), 401
+
+    # Проверяем разрешение на скачивание документов
+    if not current_user.is_admin and not current_user.has_permission('profile.documents.download'):
+        from flask import jsonify
+        return jsonify({'error': 'У вас нет прав для скачивания документов'}), 403
 
     try:
         # Получаем auth_user_id из локальной базы данных
