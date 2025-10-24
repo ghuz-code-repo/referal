@@ -273,10 +273,19 @@ def limited_profile():
 @require_permission('referal.referrals.create')
 def add_referal():
     """Add new referral with permission check"""
-    user = get_user()
+    user_context = get_user()
     
-    if not user:
+    if not user_context:
         return jsonify({'success': False, 'message': 'Пользователь не авторизован'})
+    
+    # Get local user from database
+    local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
+    
+    if not local_user:
+        return jsonify({
+            'success': False, 
+            'message': 'Пользователь не найден в системе. Обратитесь к администратору.'
+        })
     
     try:
         # Get form data
@@ -342,7 +351,7 @@ def add_referal():
         
         # Create new referral with initial status
         new_referal = Referal(
-            user_id=user.id,
+            user_id=local_user.id,
             status_id=initial_status.id if initial_status else 1,
             status_name=initial_status.name if initial_status else 'Не начата'
         )
@@ -377,11 +386,11 @@ def add_referal():
         db.session.commit()
         
         # Send notification if user has permission
-        if AUTH_CONNECTOR_AVAILABLE and user.has_permission('referal.notifications.send'):
-            send_referral_notification(user, full_name, formatted_phone)
+        if AUTH_CONNECTOR_AVAILABLE and user_context.has_permission('referal.notifications.send'):
+            send_referral_notification(local_user, full_name, formatted_phone)
         elif not AUTH_CONNECTOR_AVAILABLE:
             # Legacy notification sending
-            send_referral_notification(user, full_name, formatted_phone)
+            send_referral_notification(local_user, full_name, formatted_phone)
         
         return jsonify({
             'success': True,
@@ -403,35 +412,22 @@ def add_referal():
 @require_permission('referal.referrals.view')
 def my_referrals():
     """View user's referrals and deals"""
-    # Get auth-connector user first for permissions
-    auth_user = None
-    if AUTH_CONNECTOR_AVAILABLE:
-        try:
-            from auth_connector import get_current_user as get_auth_user
-            auth_user = get_auth_user()
-        except:
-            pass
+    # Get user context from auth-connector
+    user_context = get_user()
     
-    # Get DB user for referrals
-    user = get_user()
-    
-    if not user:
+    if not user_context:
         return redirect(url_for('referal.profile'))
     
-    # Legacy user handling for backward compatibility
-    if not hasattr(user, 'id') and hasattr(user, 'user_id'):
-        # This is auth-connector user, need to get from DB
-        db_user = User.query.filter_by(login=user.username).first()
-        if db_user:
-            user = db_user
+    # Get local user from database
+    local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
     
-    # Check permissions using auth_user if available  
-    can_add_referrals = True  # Default to True if user passed @require_permission check
-    can_view_referrals = True  # Default to True if user passed @require_permission check
+    if not local_user:
+        flash('Пользователь не найден в системе. Обратитесь к администратору.', 'error')
+        return redirect(url_for('referal.profile'))
     
-    if auth_user:
-        can_view_referrals = auth_user.has_any_permission(['referal.referrals.list', 'referal.referrals.view'])
-        can_add_referrals = auth_user.has_any_permission(['referal.referrals.create', 'referal.referrals.add'])
+    # Check permissions
+    can_add_referrals = user_context.has_any_permission(['referal.referrals.create', 'referal.referrals.add'])
+    can_view_referrals = user_context.has_any_permission(['referal.referrals.list', 'referal.referrals.view'])
     
     # Получаем режим просмотра: 'referals' (по умолчанию) или 'deals'
     view_mode = request.args.get('view_mode', 'referals')
@@ -447,84 +443,83 @@ def my_referrals():
     total_user_referals = 0
     deals = []
     
-    if hasattr(user, 'id'):
-        if view_mode == 'referals':
-            # Режим рефералов - показываем список рефералов
-            referrals = Referal.query.filter_by(user_id=user.id).all()
-            total_user_referals = len(referrals)
-        elif view_mode == 'deals':
-            # Режим договоров - показываем все договоры пользователя
-            from sqlalchemy.orm import joinedload
-            
-            # Получаем все договоры пользователя через его рефералов
-            deals_query = ReferalDeal.query\
-                .options(
-                    joinedload(ReferalDeal.status),
-                    joinedload(ReferalDeal.deal),
-                    joinedload(ReferalDeal.referal).joinedload(Referal.referal_data),
-                    joinedload(ReferalDeal.referal).joinedload(Referal.user)
-                )\
-                .join(Referal, ReferalDeal.referal_id == Referal.id)\
-                .filter(Referal.user_id == user.id)\
-                .join(MacroDeal, ReferalDeal.deal_id == MacroDeal.id)
-            
-            # Фильтруем только реальные договоры (с номером договора)
-            # Логика соответствует get_deals_summary(): показываем если есть оплата ИЛИ выплата И статус валидный
-            deals_query = deals_query.filter(
-                MacroDeal.agreement_number.isnot(None),
-                MacroDeal.agreement_number != ''
+    if view_mode == 'referals':
+        # Режим рефералов - показываем список рефералов
+        referrals = Referal.query.filter_by(user_id=local_user.id).all()
+        total_user_referals = len(referrals)
+    elif view_mode == 'deals':
+        # Режим договоров - показываем все договоры пользователя
+        from sqlalchemy.orm import joinedload
+        
+        # Получаем все договоры пользователя через его рефералов
+        deals_query = ReferalDeal.query\
+            .options(
+                joinedload(ReferalDeal.status),
+                joinedload(ReferalDeal.deal),
+                joinedload(ReferalDeal.referal).joinedload(Referal.referal_data),
+                joinedload(ReferalDeal.referal).joinedload(Referal.user)
+            )\
+            .join(Referal, ReferalDeal.referal_id == Referal.id)\
+            .filter(Referal.user_id == local_user.id)\
+            .join(MacroDeal, ReferalDeal.deal_id == MacroDeal.id)
+        
+        # Фильтруем только реальные договоры (с номером договора)
+        # Логика соответствует get_deals_summary(): показываем если есть оплата ИЛИ выплата И статус валидный
+        deals_query = deals_query.filter(
+            MacroDeal.agreement_number.isnot(None),
+            MacroDeal.agreement_number != ''
+        )
+        
+        # Фильтруем: либо есть оплата >= 3млн, либо есть рассчитанная выплата
+        deals_query = deals_query.filter(
+            or_(
+                MacroDeal.total_payments >= 3000000,
+                ReferalDeal.withdrawal_amount > 0
             )
-            
-            # Фильтруем: либо есть оплата >= 3млн, либо есть рассчитанная выплата
-            deals_query = deals_query.filter(
-                or_(
-                    MacroDeal.total_payments >= 3000000,
-                    ReferalDeal.withdrawal_amount > 0
-                )
+        )
+        
+        # Только реальные договора: "Сделка проведена" и "Сделка в работе"
+        valid_statuses = ['Сделка проведена', 'Сделка в работе']
+        deals_query = deals_query.filter(
+            MacroDeal.deal_status_name.in_(valid_statuses)
+        )
+        
+        # Применяем фильтры для режима договоров
+        if status_filter:
+            try:
+                # Обрабатываем множественный выбор статусов (через запятую)
+                status_ids = [int(s.strip()) for s in status_filter.split(',') if s.strip().isdigit()]
+                if status_ids:
+                    deals_query = deals_query.filter(ReferalDeal.status_id.in_(status_ids))
+            except ValueError:
+                pass
+        
+        if name_filter:
+            deals_query = deals_query.join(ReferalData, Referal.id == ReferalData.referal_id).filter(
+                ReferalData.full_name.ilike(f'%{name_filter}%')
             )
-            
-            # Только реальные договора: "Сделка проведена" и "Сделка в работе"
-            valid_statuses = ['Сделка проведена', 'Сделка в работе']
-            deals_query = deals_query.filter(
-                MacroDeal.deal_status_name.in_(valid_statuses)
-            )
-            
-            # Применяем фильтры для режима договоров
-            if status_filter:
-                try:
-                    # Обрабатываем множественный выбор статусов (через запятую)
-                    status_ids = [int(s.strip()) for s in status_filter.split(',') if s.strip().isdigit()]
-                    if status_ids:
-                        deals_query = deals_query.filter(ReferalDeal.status_id.in_(status_ids))
-                except ValueError:
-                    pass
-            
-            if name_filter:
-                deals_query = deals_query.join(ReferalData, Referal.id == ReferalData.referal_id).filter(
-                    ReferalData.full_name.ilike(f'%{name_filter}%')
-                )
-            
-            if contract_filter:
-                deals_query = deals_query.filter(MacroDeal.agreement_number.ilike(f'%{contract_filter}%'))
-            
-            if amount_filter:
-                try:
-                    min_amount = float(amount_filter)
-                    deals_query = deals_query.filter(ReferalDeal.withdrawal_amount >= min_amount)
-                except ValueError:
-                    pass
-            
-            # Сортировка по ID (новые сверху)
-            deals_query = deals_query.order_by(ReferalDeal.id.desc())
-            
-            # Получаем все договоры
-            deals = deals_query.all()
+        
+        if contract_filter:
+            deals_query = deals_query.filter(MacroDeal.agreement_number.ilike(f'%{contract_filter}%'))
+        
+        if amount_filter:
+            try:
+                min_amount = float(amount_filter)
+                deals_query = deals_query.filter(ReferalDeal.withdrawal_amount >= min_amount)
+            except ValueError:
+                pass
+        
+        # Сортировка по ID (новые сверху)
+        deals_query = deals_query.order_by(ReferalDeal.id.desc())
+        
+        # Получаем все договоры
+        deals = deals_query.all()
     
     # Получаем все статусы для фильтра
     all_statuses_in_db = Status.query.all()
     
     return render_template('my_referrals.html', 
-                         user=user, 
+                         user=local_user, 
                          referals=referrals,  # Changed from referrals to referals
                          total_user_referals=total_user_referals,
                          can_add_referrals=can_add_referrals,
@@ -561,13 +556,20 @@ def update_referal_documents(referal_id):
     """Update referral documents and data"""
     from datetime import datetime
     
-    user = get_user()
-    if not user:
+    user_context = get_user()
+    if not user_context:
         flash('Пользователь не авторизован', 'error')
         return redirect(url_for('referal.my_referrals'))
     
+    # Get local user from database
+    local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
+    
+    if not local_user:
+        flash('Пользователь не найден в системе', 'error')
+        return redirect(url_for('referal.my_referrals'))
+    
     # Check if referal belongs to user
-    referal = Referal.query.filter_by(id=referal_id, user_id=user.id).first()
+    referal = Referal.query.filter_by(id=referal_id, user_id=local_user.id).first()
     if not referal:
         flash('Реферал не найден', 'error')
         return redirect(url_for('referal.my_referrals'))
