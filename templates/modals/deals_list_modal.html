@@ -13,37 +13,75 @@
                 <!-- Левая панель: Информация о реферале -->
                 <div class="referal-info-panel">
                     <h3><i class="fas fa-user"></i> Данные реферала</h3>
+                    <h4 style="margin-top: 10px; color: #666;">Обязательные данные</h4>
                     
                     <div id="referal-info-content">
-                        <!-- Заполняется через JavaScript -->
+                        <!-- ФИО с валидацией -->
                         <div class="info-field">
-                            <label>ФИО:</label>
-                            <input type="text" id="referal-full-name" class="referal-input" placeholder="Введите ФИО">
+                            <label>ФИО: <span style="font-size: 12px; color: #666;">Минимум 2 слова</span> <span class="field-error" id="deals-name-error" style="color: red; margin-left: 10px;"></span></label>
+                            <input type="text" 
+                                   id="referal-full-name" 
+                                   name="full_name"
+                                   class="referal-input editable-input" 
+                                   placeholder="Введите ФИО реферала (минимум 2 слова)">
                         </div>
+                        
+                        <!-- Телефон с валидацией и форматированием -->
                         <div class="info-field">
-                            <label>Телефон:</label>
-                            <input type="text" id="referal-phone" class="referal-input" placeholder="Введите телефон">
+                            <label>Телефон: <span style="font-size: 12px; color: #666;">Формат: +998 XX XXX XX XX</span> <span class="field-error" id="deals-phone-error" style="color: red; margin-left: 10px;"></span></label>
+                            <input type="tel" 
+                                   id="referal-phone" 
+                                   name="phone_number"
+                                   class="referal-input editable-input" 
+                                   placeholder="+998 XX XXX XX XX">
                         </div>
+                        
+                        <!-- ID (только для чтения) -->
                         <div class="info-field">
-                            <label>ID:</label>
-                            <input type="text" id="referal-contact-id" class="referal-input" disabled placeholder="Введите ID">
+                            <label>Macro ID:</label>
+                            <input type="text" 
+                                   id="referal-contact-id" 
+                                   name="contact_id"
+                                   class="referal-input" 
+                                   disabled 
+                                   placeholder="ID из MacroCRM">
                         </div>
                     </div>
                     
-                    <h3 class="passport-section-title"><i class="fas fa-passport"></i> Паспортные данные</h3>
+                    <h3 class="passport-section-title"><i class="fas fa-passport"></i> Паспортная информация (необязательные поля)</h3>
                     
                     <div class="passport-info-section" id="passport-info-content">
+                        <!-- Серия и номер паспорта с валидацией -->
                         <div class="info-field">
-                            <label>Серия и номер:</label>
-                            <input type="text" id="referal-passport-number" class="referal-input" placeholder="Введите серию и номер">
+                            <label>Серия и номер паспорта: <span class="field-error" id="deals-passport-error" style="color: red; margin-left: 10px;"></span></label>
+                            <input type="text" 
+                                   id="referal-passport-number" 
+                                   name="passport_number"
+                                   class="referal-input editable-input" 
+                                   placeholder="AA1234567"
+                                   maxlength="9">
                         </div>
+                        
+                        <!-- Кем выдан -->
                         <div class="info-field">
-                            <label>Кем выдан:</label>
-                            <input type="text" id="referal-passport-giver" class="referal-input" placeholder="Кем выдан паспорт">
+                            <label>Кем выдан паспорт:</label>
+                            <input type="text" 
+                                   id="referal-passport-giver" 
+                                   name="passport_giver"
+                                   class="referal-input editable-input" 
+                                   placeholder="Название органа">
                         </div>
+                        
+                        <!-- Дата выдачи с datepicker -->
                         <div class="info-field">
-                            <label>Дата выдачи:</label>
-                            <input type="date" id="referal-passport-date" class="referal-input">
+                            <label>Дата выдачи паспорта:</label>
+                            <input type="text" 
+                                   id="referal_passport_date_deals_modal" 
+                                   name="passport_date"
+                                   class="referal-input editable-input datepicker-input" 
+                                   placeholder="Выберите дату"
+                                   autocomplete="off"
+                                   readonly>
                         </div>
                     </div>
                     

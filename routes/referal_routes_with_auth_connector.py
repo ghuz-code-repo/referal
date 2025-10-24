@@ -551,28 +551,37 @@ def request_withdrawal(referal_id):
         return redirect(url_for('referal.my_referrals'))
 
 @referal_bp.route('/update_referal_documents/<int:referal_id>', methods=['POST'])
-@require_permission('referal.referrals.edit')
 def update_referal_documents(referal_id):
-    """Update referral documents and data"""
+    """Update referral documents and data - доступно владельцам и админам"""
     from datetime import datetime
     
     user_context = get_user()
     if not user_context:
-        flash('Пользователь не авторизован', 'error')
-        return redirect(url_for('referal.my_referrals'))
+        return jsonify({
+            'success': False,
+            'message': 'Пользователь не авторизован'
+        }), 401
     
     # Get local user from database
     local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
     
     if not local_user:
-        flash('Пользователь не найден в системе', 'error')
-        return redirect(url_for('referal.my_referrals'))
+        return jsonify({
+            'success': False,
+            'message': 'Пользователь не найден в системе'
+        }), 404
     
-    # Check if referal belongs to user
-    referal = Referal.query.filter_by(id=referal_id, user_id=local_user.id).first()
+    # Check if referal belongs to user (admins can edit any)
+    if user_context.is_admin:
+        referal = Referal.query.get(referal_id)
+    else:
+        referal = Referal.query.filter_by(id=referal_id, user_id=local_user.id).first()
+    
     if not referal:
-        flash('Реферал не найден', 'error')
-        return redirect(url_for('referal.my_referrals'))
+        return jsonify({
+            'success': False,
+            'message': 'Реферал не найден'
+        }), 404
     
     try:
         # If referal has no data, create it
@@ -619,32 +628,47 @@ def update_referal_documents(referal_id):
                         passport_date = datetime.strptime(passport_date_str, '%d/%m/%Y')
                         referal.referal_data.passport_date = passport_date
                     except ValueError:
-                        flash('Неверный формат даты выдачи паспорта. Используйте формат ДД.ММ.ГГГГ', 'error')
-                        return redirect(url_for('referal.my_referrals'))
+                        return jsonify({
+                            'success': False,
+                            'message': 'Неверный формат даты выдачи паспорта. Используйте формат ДД.ММ.ГГГГ'
+                        }), 400
         else:
             referal.referal_data.passport_date = None
         
-        # Валидация ФИО
-        if full_name and (not re.match(r'^[A-Za-z`\']+(?: [A-Za-z`\']+){2,}$', full_name) or '  ' in full_name):
-            flash('Неверно введено ФИО. Используйте латиницу и минимум 3 слова', 'error')
-            return redirect(url_for('referal.my_referrals'))
+        # Валидация ФИО (опциональная - только если заполнено)
+        if full_name:
+            # Проверяем минимум 2 слова и отсутствие двойных пробелов
+            words = full_name.strip().split()
+            if len(words) < 2 or '  ' in full_name:
+                return jsonify({
+                    'success': False,
+                    'message': 'Неверно введено ФИО. Минимум 2 слова без двойных пробелов'
+                }), 400
         
         # Валидация телефона
         if phone_number and not formatted_phone:
-            flash('Неверный формат телефона. Введите корректный номер телефона', 'error')
-            return redirect(url_for('referal.my_referrals'))
+            return jsonify({
+                'success': False,
+                'message': 'Неверный формат телефона. Введите корректный номер телефона'
+            }), 400
         
         db.session.commit()
-        flash('Данные реферала успешно обновлены', 'success')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Данные реферала успешно обновлены'
+        })
         
     except Exception as e:
         db.session.rollback()
         print(f"Error updating referal documents: {str(e)}")
         import traceback
         traceback.print_exc()
-        flash(f'Ошибка при обновлении данных: {e}', 'error')
-    
-    return redirect(url_for('referal.my_referrals'))
+        
+        return jsonify({
+            'success': False,
+            'message': f'Ошибка при обновлении данных: {str(e)}'
+        }), 400
 
 @referal_bp.route('/payments')
 @require_permission('referal.payments.view')

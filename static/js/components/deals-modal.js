@@ -39,6 +39,26 @@ function openDealsModal(referalId) {
     
     // Загружаем данные о договорах
     loadDealsData(referalId);
+    
+    // Инициализируем валидацию и форматирование полей после небольшой задержки
+    setTimeout(function() {
+        console.log('🔧 Инициализация валидации для deals modal...');
+        
+        // Инициализируем форматирование телефона
+        if (typeof initPhoneValidation === 'function') {
+            initPhoneValidation();
+        }
+        
+        // Инициализируем валидацию паспорта
+        if (typeof initPassportValidation === 'function') {
+            initPassportValidation();
+        }
+        
+        // Инициализируем datepicker для даты паспорта
+        if (typeof initReferalDatePickers === 'function') {
+            initReferalDatePickers();
+        }
+    }, 200);
 }
 
 /**
@@ -103,7 +123,7 @@ function displayDealsData(data) {
         'referal-contact-id',
         'referal-passport-number',
         'referal-passport-giver',
-        'referal-passport-date',
+        'referal_passport_date_deals_modal',
         'save-referal-data-btn',
         'total-deals-count',
         'total-withdrawal-amount',
@@ -140,7 +160,7 @@ function displayDealsData(data) {
     // Заполняем паспортные данные (если есть)
     document.getElementById('referal-passport-number').value = data.passport_number || '';
     document.getElementById('referal-passport-giver').value = data.passport_giver || '';
-    document.getElementById('referal-passport-date').value = data.passport_date || '';
+    document.getElementById('referal_passport_date_deals_modal').value = data.passport_date || '';
     
     // Сохраняем referal_id для последующего сохранения
     const saveBtn = document.getElementById('save-referal-data-btn');
@@ -354,7 +374,7 @@ function saveReferalData() {
     const contactId = document.getElementById('referal-contact-id').value;
     const passportNumber = document.getElementById('referal-passport-number').value;
     const passportGiver = document.getElementById('referal-passport-giver').value;
-    const passportDate = document.getElementById('referal-passport-date').value;
+    const passportDate = document.getElementById('referal_passport_date_deals_modal').value;
     
     const saveBtn = document.getElementById('save-referal-data-btn');
     const originalText = saveBtn.innerHTML;
@@ -370,7 +390,7 @@ function saveReferalData() {
         },
         body: new URLSearchParams({
             'full_name': fullName,
-            'phone': phone,
+            'phone_number': phone,
             'contact_id': contactId,
             'passport_number': passportNumber,
             'passport_giver': passportGiver,
