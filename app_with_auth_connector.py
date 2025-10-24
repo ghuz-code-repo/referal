@@ -446,7 +446,7 @@ app.register_blueprint(referal_bp)  # БЕЗ префикса - nginx уже о�
 app.register_blueprint(admin_bp)
 app.register_blueprint(document_bp)
 app.register_blueprint(user_documents_bp)  # Новый blueprint для документов
-app.register_blueprint(user_documents_api_bp)  # API blueprint для документов
+app.register_blueprint(api_user_documents_bp)  # API blueprint для документов
 # app.register_blueprint(test_profile_bp)  # Тестовый blueprint для профиля
 # app.register_blueprint(test_headers_bp)  # Тестовый blueprint для заголовков
 # app.register_blueprint(test_email_bp)  # Быстрый тест email

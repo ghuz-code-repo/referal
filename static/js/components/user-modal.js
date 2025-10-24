@@ -394,21 +394,39 @@ function downloadDocumentType(userId, documentType) {
                 throw new Error(`Ошибка сервера: ${response.status}`);
             }
         }
-        return response.blob();
-    })
-    .then(blob => {
-        // Определяем расширение файла
-        let fileExtension = '.zip';
-        const contentType = blob.type;
-        if (contentType.includes('pdf')) fileExtension = '.pdf';
-        else if (contentType.includes('image')) fileExtension = '.jpg';
-        else if (contentType.includes('text')) fileExtension = '.txt';
         
+        // Получаем имя файла из заголовка Content-Disposition
+        let filename = `${userName}_${documentType}`;
+        const contentDisposition = response.headers.get('Content-Disposition');
+        if (contentDisposition) {
+            // Пробуем извлечь filename из заголовка
+            const filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.+)/);
+            if (filenameMatch) {
+                filename = decodeURIComponent(filenameMatch[1]);
+            } else {
+                const simpleMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+                if (simpleMatch) {
+                    filename = simpleMatch[1];
+                }
+            }
+        } else {
+            // Если нет заголовка, определяем расширение по типу контента
+            const contentType = response.headers.get('Content-Type') || '';
+            let fileExtension = '.zip';
+            if (contentType.includes('pdf')) fileExtension = '.pdf';
+            else if (contentType.includes('image')) fileExtension = '.jpg';
+            else if (contentType.includes('text')) fileExtension = '.txt';
+            filename += fileExtension;
+        }
+        
+        return response.blob().then(blob => ({ blob, filename }));
+    })
+    .then(({ blob, filename }) => {
         // Создаем URL для blob и скачиваем файл
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${userName}_${documentType}${fileExtension}`;
+        link.download = filename;
         link.style.display = 'none';
         document.body.appendChild(link);
         link.click();

@@ -675,7 +675,8 @@
 }
 
 .document-buttons {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto auto;
     gap: 8px;
     flex-wrap: wrap;
 }
@@ -705,6 +706,7 @@
 
 .download-doc-btn.pinfl-btn {
     background: var(--success-color, #28a745);
+    color: white;
 }
 
 .download-doc-btn.pinfl-btn:hover {
@@ -714,6 +716,7 @@
 
 .download-doc-btn.passport-btn {
     background: var(--info-color, #17a2b8);
+    color: white;
 }
 
 .download-doc-btn.passport-btn:hover {
@@ -723,12 +726,22 @@
 
 .download-doc-btn.bank-btn {
     background: var(--warning-color, #ffc107);
-    color: var(--text-dark, #212529);
+    color: white;
 }
 
 .download-doc-btn.bank-btn:hover {
     background: var(--warning-dark, #e0a800);
     box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
+}
+
+.download-doc-btn.employment-btn {
+    background: var(--purple-color, #9378c7);
+    color: white;
+}
+
+.download-doc-btn.employment-btn:hover {
+    background: var(--purple-dark, #755aa8);
+    box-shadow: 0 2px 8px rgba(111, 66, 193, 0.3);
 }
 
 .download-doc-btn i {
