@@ -762,6 +762,56 @@ def add_deal_to_referal(referal_id):
         
         print(f"✅ Admin manually added deal {agreement_number} to referal {referal_id} | User: {user.login}")
         
+        # Отправляем уведомление менеджеру КЦ о новом договоре
+        try:
+            import os
+            from notification_client import get_notification_client
+            
+            notification_client = get_notification_client()
+            call_center_email = os.getenv('CALL_CENTER_MANAGER_EMAIL')
+            main_admin_email = os.getenv('MAIN_ADMIN_EMAIL')
+            
+            # Получаем информацию о рефе��але
+            referal_name = referal.referal_data.full_name if referal.referal_data else 'Неизвестно'
+            referal_phone = referal.referal_data.phone_number if referal.referal_data else 'Неизвестно'
+            admin_name = user.user_data.full_name if hasattr(user, "user_data") and user.user_data else user.login
+            
+            subject = f'Новый договор №{agreement_number} добавлен к рефералу'
+            body = f"""Администратор {admin_name} добавил новый договор к рефералу.
+
+Детали договора:
+- Номер договора: {agreement_number}
+- Проект: {deal.project_name or 'Не указан'}
+- Сумма платежей: {deal.total_payments:,.0f} сум
+
+Информация о реферале:
+- ФИО: {referal_name}
+- Телефон: {referal_phone}
+
+Необходимо связаться с рефералом для назначения встречи."""
+
+            # Отправляем менеджеру КЦ
+            if call_center_email:
+                notification_client.send_email(
+                    recipient=call_center_email,
+                    subject=subject,
+                    body=body
+                )
+                print(f"✅ Notification sent to call center manager: {call_center_email}")
+            
+            # Копия главному админу
+            if main_admin_email and main_admin_email != call_center_email:
+                notification_client.send_email(
+                    recipient=main_admin_email,
+                    subject=f"[Копия] {subject}",
+                    body=body
+                )
+                print(f"✅ Copy sent to main admin: {main_admin_email}")
+                
+        except Exception as email_error:
+            print(f"⚠️ Failed to send notification for deal add: {str(email_error)}")
+            # Не прерываем операцию если письмо не отправилось
+        
         return jsonify({
             'success': True,
             'message': f'Договор "{agreement_number}" успешно привязан к рефералу',
