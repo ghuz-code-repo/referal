@@ -2,7 +2,7 @@
 
 import math
 from flask import Blueprint, request, redirect, url_for, flash, send_file, current_app
-from datetime import datetime
+from datetime import datetime, date
 import os
 from decimal import Decimal, ROUND_HALF_UP
 from .auth_routes import get_current_user
@@ -232,6 +232,12 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
         # Проверяем тип agreement_date и конвертируем если нужно
         # Теперь используем данные из локальной базы (MacroDeal)
         agreement_date_raw = real_deal.agreement_date
+        
+        # Проверяем что дата договора заполнена
+        if agreement_date_raw is None:
+            flash('❌ Дата договора не заполнена. Невозможно сгенерировать акт без даты договора.', 'error')
+            return redirect(url_for('referal.profile'))
+        
         if isinstance(agreement_date_raw, str):
             if agreement_date_raw:
                 # Пытаемся распарсить строку в datetime (пробуем разные форматы)
@@ -243,20 +249,23 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
                         # Пробуем формат с временем
                         agreement_date = datetime.strptime(agreement_date_raw, '%Y-%m-%d %H:%M:%S').date()
                     except ValueError:
-                        # Если не получилось, используем текущую дату
-                        print(f"Warning: Could not parse agreement_date '{agreement_date_raw}', using current date")
-                        agreement_date = datetime.now().date()
+                        # Если не получилось, показываем ошибку
+                        flash(f'❌ Неверный формат даты договора: {agreement_date_raw}. Обратитесь к администратору.', 'error')
+                        return redirect(url_for('referal.profile'))
             else:
-                # Пустая строка - используем текущую дату
-                print(f"Warning: Empty agreement_date, using current date")
-                agreement_date = datetime.now().date()
+                # Пустая строка
+                flash('❌ Дата договора пустая. Невозможно сгенерировать акт без даты договора.', 'error')
+                return redirect(url_for('referal.profile'))
         elif hasattr(agreement_date_raw, 'date'):
             # Это datetime/pandas Timestamp объект
             agreement_date = agreement_date_raw.date()
+        elif isinstance(agreement_date_raw, date):
+            # Это уже date объект
+            agreement_date = agreement_date_raw
         else:
-            # Неизвестный тип - используем текущую дату
-            print(f"Warning: Unknown agreement_date type {type(agreement_date_raw)}, using current date")
-            agreement_date = datetime.now().date()
+            # Неизвестный тип
+            flash(f'❌ Неизвестный тип даты договора: {type(agreement_date_raw)}. Обратитесь к администратору.', 'error')
+            return redirect(url_for('referal.profile'))
             
         print(f"Agreement date: {agreement_date}")
         # Загружаем шаблон
