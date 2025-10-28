@@ -43,6 +43,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Обработка фильтров в таблице договоров (table-filter)
+    const tableFilterInputs = document.querySelectorAll('.table-filter');
+    tableFilterInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            applyFilters();
+        });
+        
+        // Добавляем обработчик на Enter
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                applyFilters();
+            }
+        });
+        
+        // Добавляем обработчик на потерю фокуса
+        input.addEventListener('blur', function() {
+            applyFilters();
+        });
+    });
+    
     // Обработка изменения количества элементов на странице
     const perPageSelect = document.getElementById('per_page_select');
     if (perPageSelect) {
@@ -103,9 +123,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Собираем значения фильтров с правильным префиксом
+        // Обрабатываем header-filter (для referals)
         filterInputs.forEach(input => {
             const filterName = input.dataset.filter; // например, 'name' или 'phone'
             const paramName = prefix + filterName;  // 'r_name' или 'd_name'
+            const value = input.value.trim();
+            
+            if (value) {
+                params.set(paramName, value);
+            }
+        });
+        
+        // Обрабатываем table-filter (для deals)
+        const tableFilterInputs = document.querySelectorAll('.table-filter');
+        tableFilterInputs.forEach(input => {
+            const filterName = input.dataset.filter; // например, 'name' или 'contract'
+            const paramName = prefix + filterName;  // 'd_name' или 'd_contract'
             const value = input.value.trim();
             
             if (value) {

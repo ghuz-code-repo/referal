@@ -486,21 +486,21 @@
                                                class="table-filter" 
                                                data-filter="contract"
                                                placeholder="Поиск по номеру..."
-                                               value="{{ request.args.get('contract', '') }}">
+                                               value="{{ current_filters.contract if current_filters else '' }}">
                                     </th>
                                     <th>
                                         <input type="text" 
                                                class="table-filter" 
                                                data-filter="name"
                                                placeholder="Поиск по имени..."
-                                               value="{{ request.args.get('name', '') }}">
+                                               value="{{ current_filters.name if current_filters else '' }}">
                                     </th>
                                     <th>
                                         <input type="text" 
                                                class="table-filter" 
                                                data-filter="user"
                                                placeholder="Поиск по реферу..."
-                                               value="{{ request.args.get('user', '') }}">
+                                               value="{{ current_filters.user if current_filters else '' }}">
                                     </th>
                                     <th>
                                         <input type="number" 
@@ -508,7 +508,7 @@
                                                data-filter="amount"
                                                placeholder="Мин. сумма"
                                                min="0"
-                                               value="{{ request.args.get('amount', '') }}">
+                                               value="{{ current_filters.amount if current_filters else '' }}">
                                     </th>
                                     <th>
                                         <!-- Фильтр статусов с чекбоксами -->
