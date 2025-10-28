@@ -456,7 +456,7 @@ def admin_panel():
         query = query.filter(func.date(Referal.created_at) == created_at_filter)
     
     if total_withdrawal_filter:
-        query = query.filter(cast(Referal.total_withdrawal, String).ilike(f'%{total_withdrawal_filter}%'))
+        query = query.filter(cast(User.total_withdrawal, String).ilike(f'%{total_withdrawal_filter}%'))
     
     # deals_count убираем - это вычисляемое поле, не колонка БД
     
@@ -465,7 +465,7 @@ def admin_panel():
     need_referal_data_join = False
     
     # Проверяем фильтры
-    if user_filter:
+    if user_filter or total_withdrawal_filter:
         need_user_join = True
     if name_filter or phone_filter or contract_filter:
         need_referal_data_join = True
@@ -506,7 +506,7 @@ def admin_panel():
             elif field == 'created_at':
                 clause = Referal.created_at.desc() if order == 'desc' else Referal.created_at.asc()
             elif field == 'total_withdrawal':
-                clause = Referal.total_withdrawal.desc() if order == 'desc' else Referal.total_withdrawal.asc()
+                clause = User.total_withdrawal.desc() if order == 'desc' else User.total_withdrawal.asc()
             # deals_count убираем - это вычисляемое поле
             else:
                 continue

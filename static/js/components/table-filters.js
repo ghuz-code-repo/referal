@@ -16,14 +16,29 @@ document.addEventListener('DOMContentLoaded', function() {
     let filterTimeout;
     
     filterInputs.forEach(input => {
-        input.addEventListener('input', function() {
-            clearTimeout(filterTimeout);
-            filterTimeout = setTimeout(() => {
-                applyFilters();
-            }, 300); // Задержка 300мс для избежания лишних запросов
-        });
+        // Убираем автоматическое применение по вводу - только по Enter и blur
+        // input.addEventListener('input', function() {
+        //     clearTimeout(filterTimeout);
+        //     filterTimeout = setTimeout(() => {
+        //         applyFilters();
+        //     }, 300); // Задержка 300мс для избежания лишних запросов
+        // });
         
         input.addEventListener('change', function() {
+            applyFilters();
+        });
+        
+        // Добавляем обработчик на Enter
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                clearTimeout(filterTimeout);
+                applyFilters();
+            }
+        });
+        
+        // Добавляем обработчик на потерю фокуса
+        input.addEventListener('blur', function() {
+            clearTimeout(filterTimeout);
             applyFilters();
         });
     });
