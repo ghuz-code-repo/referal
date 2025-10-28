@@ -148,6 +148,12 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
                 return redirect(url_for('referal.profile'))
             
             user = referal.user
+            
+            # ПРИНУДИТЕЛЬНО синхронизируем данные пользователя из auth-service
+            from utils import sync_user_data_from_auth_service
+            from flask import request
+            sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
+            
             user_data = user.user_data if user else None
             referal_data = referal.referal_data
             
@@ -186,6 +192,12 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
                 return redirect(url_for('referal.profile'))
             
             user = referal.user
+            
+            # ПРИНУДИТЕЛЬНО синхронизируем данные пользователя из auth-service
+            from utils import sync_user_data_from_auth_service
+            from flask import request
+            sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
+            
             user_data = user.user_data if user else None
             referal_data = referal.referal_data
             
