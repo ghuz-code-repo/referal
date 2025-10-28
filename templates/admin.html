@@ -875,8 +875,38 @@ document.addEventListener('DOMContentLoaded', function() {
     // Функция переключения режима просмотра
     function switchViewMode(mode) {
         const currentUrl = new URL(window.location);
-        currentUrl.searchParams.set('view_mode', mode);
-        currentUrl.searchParams.set('page', '1'); // Сбрасываем на первую страницу
+        const params = currentUrl.searchParams;
+        
+        // Определяем какие параметры нужно очистить
+        const oldMode = params.get('view_mode') || 'deals';
+        
+        // Если переключаемся С договоров НА рефералов - удаляем все d_* параметры
+        if (oldMode === 'deals' && mode === 'referals') {
+            // Удаляем все параметры договоров
+            params.delete('d_status');
+            params.delete('d_name');
+            params.delete('d_contract');
+            params.delete('d_user');
+            params.delete('d_amount');
+            params.delete('d_sort');
+        }
+        
+        // Если переключаемся С рефералов НА договоры - удаляем все r_* параметры
+        if (oldMode === 'referals' && mode === 'deals') {
+            // Удаляем все параметры рефералов
+            params.delete('r_status');
+            params.delete('r_name');
+            params.delete('r_phone');
+            params.delete('r_contract');
+            params.delete('r_contact_id');
+            params.delete('r_user');
+            params.delete('r_created_at');
+            params.delete('r_total_withdrawal');
+            params.delete('r_sort');
+        }
+        
+        params.set('view_mode', mode);
+        params.set('page', '1'); // Сбрасываем на первую страницу
         window.location.href = currentUrl.toString();
     }
     
@@ -949,11 +979,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const currentUrl = new URL(window.location);
             const params = currentUrl.searchParams;
+            
+            // Определяем текущий режим просмотра
+            const viewMode = params.get('view_mode') || 'deals';
+            const prefix = viewMode === 'referals' ? 'r_' : 'd_';
+            const statusParam = prefix + 'status';
 
             if (selectedStatuses.length > 0) {
-                params.set('status', selectedStatuses.join(','));
+                params.set(statusParam, selectedStatuses.join(','));
             } else {
-                params.delete('status');
+                params.delete(statusParam);
             }
             
             params.set('page', '1');
@@ -965,7 +1000,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const currentUrl = new URL(window.location);
             const params = currentUrl.searchParams;
             
-            params.delete('status');
+            // Определяем текущий режим просмотра
+            const viewMode = params.get('view_mode') || 'deals';
+            const prefix = viewMode === 'referals' ? 'r_' : 'd_';
+            const statusParam = prefix + 'status';
+            
+            params.delete(statusParam);
             params.set('page', '1');
             
             window.location.search = params.toString();

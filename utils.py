@@ -322,13 +322,14 @@ def send_email(recipient_email, subject, body):
     thread.start()
 
 
-def sync_user_data_from_auth_service(user, force_sync=False):
+def sync_user_data_from_auth_service(user, force_sync=False, headers=None):
     """
     Синхронизирует данные пользователя из auth-service.
     
     Args:
         user: Объект пользователя из referal сервиса
         force_sync: Принудительная синхронизация даже если данные уже есть
+        headers: Request headers для fallback данных (phone, email)
     
     Returns:
         bool: True если синхронизация прошла успешно
@@ -346,33 +347,40 @@ def sync_user_data_from_auth_service(user, force_sync=False):
         
         # Проверяем наличие auth_user_id
         if not hasattr(user, 'auth_user_id') or not user.auth_user_id:
-            print(f"User {user.login} does not have auth_user_id set, skipping sync")
+            print(f"❌ User {user.login} does not have auth_user_id set, skipping sync")
+            print(f"   User object: id={user.id}, login={user.login}, has auth_user_id attr: {hasattr(user, 'auth_user_id')}")
+            if hasattr(user, 'auth_user_id'):
+                print(f"   auth_user_id value: '{user.auth_user_id}'")
             return False
             
         # Проверяем, есть ли уже данные пользователя
         user_data = UserData.query.filter_by(user_id=user.id).first()
         
+        print(f"🔄 Syncing user data for {user.login} (auth_user_id: {user.auth_user_id})")
+        print(f"   UserData exists: {user_data is not None}, force_sync: {force_sync}")
+        
         # Если данные есть и принудительная синхронизация не требуется, пропускаем
-        if user_data and not force_sync and user_data.full_name:
-            return True
-            
         # Получаем данные профиля из auth-service
         profile_url = f"/api/users/{user.auth_user_id}/profile"
+        print(f"📡 Fetching profile from: {auth_client.auth_service_url.rstrip('/')}{profile_url}")
         try:
             profile_response = requests.get(
                 f"{auth_client.auth_service_url.rstrip('/')}{profile_url}",
                 timeout=5
             )
             
+            print(f"   Response status: {profile_response.status_code}")
+            
             if profile_response.status_code != 200:
-                # Не критичная ошибка - данные пользователя уже есть в headers
-                # Просто возвращаем False без навязчивых логов
+                print(f"   ❌ Failed to fetch profile: {profile_response.text[:200]}")
                 return False
         except Exception as e:
-            # Тихо пропускаем ошибки синхронизации - данные уже в headers
+            print(f"   ❌ Exception fetching profile: {e}")
             return False
             
         profile_data = profile_response.json()
+        
+        print(f"📥 Profile data from auth-service: {profile_data}")
         
         # Создаем или обновляем UserData
         if not user_data:
@@ -381,8 +389,8 @@ def sync_user_data_from_auth_service(user, force_sync=False):
         
         # Синхронизируем данные профиля
         user_data.full_name = profile_data.get('full_name', '')
-        user_data.phone = profile_data.get('phone', '')
-        user_data.e_mail = profile_data.get('email', '')
+        user_data.phone = profile_data.get('phone') or profile_data.get('phone_number', '')
+        user_data.e_mail = profile_data.get('email') or profile_data.get('e_mail', '')
         user_data.passport_number = profile_data.get('passport_number', '')
         user_data.passport_giver = profile_data.get('passport_issued_by', '')
         user_data.passport_adress = profile_data.get('address', '')
@@ -450,8 +458,26 @@ def sync_user_data_from_auth_service(user, force_sync=False):
                     if 'mfo' in fields and fields['mfo']:
                         user_data.mfo = fields['mfo']
         
+        # Fallback на заголовки если данные не пришли из API
+        if headers and not user_data.phone:
+            header_phone = headers.get('X-User-Phone')
+            if header_phone:
+                user_data.phone = header_phone
+                print(f"   📞 Using phone from headers: {header_phone}")
+        
+        if headers and not user_data.e_mail:
+            header_email = headers.get('X-User-Email')
+            if header_email:
+                user_data.e_mail = header_email
+                print(f"   📧 Using email from headers: {header_email}")
+        
         db.session.commit()
-        print(f"Successfully synced user data for {user.login}")
+        print(f"✅ Successfully synced user data for {user.login}")
+        print(f"   Full name: {user_data.full_name}")
+        print(f"   Phone: {user_data.phone}")
+        print(f"   Email: {user_data.e_mail}")
+        print(f"   PINFL: {user_data.pinfl}")
+        print(f"   Passport: {user_data.passport_number}")
         return True
         
     except Exception as e:

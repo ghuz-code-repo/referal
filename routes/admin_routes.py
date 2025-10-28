@@ -1,7 +1,7 @@
 """Маршруты для администрирования"""
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from sqlalchemy import or_
+from sqlalchemy import or_, cast, String, func, Date
 from services import fetch_data_from_mysql
 from services import notification_service
 from notification_client import get_notification_client
@@ -337,29 +337,47 @@ def admin_panel():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     
-    # Получаем фильтры
-    status_filter = request.args.get('status', '')
-    name_filter = request.args.get('name', '')
-    phone_filter = request.args.get('phone', '')
-    contract_filter = request.args.get('contract', '')
-    contact_id_filter = request.args.get('contact_id', '')
-    user_filter = request.args.get('user', '')
-    amount_filter = request.args.get('amount', '').strip()
+    # РАЗДЕЛЯЕМ ФИЛЬТРЫ ПО РЕЖИМАМ
+    # Префикс 'r_' для рефералов, 'd_' для договоров
+    if view_mode == 'referals':
+        status_filter = ''  # У рефералов НЕТ статусов!
+        name_filter = request.args.get('r_name', '')
+        phone_filter = request.args.get('r_phone', '')
+        contract_filter = request.args.get('r_contract', '')
+        contact_id_filter = request.args.get('r_contact_id', '')
+        user_filter = request.args.get('r_user', '')
+        created_at_filter = request.args.get('r_created_at', '')
+        total_withdrawal_filter = request.args.get('r_total_withdrawal', '')
+        deals_count_filter = ''  # Убираем фильтр по deals_count так как это вычисляемое поле
+        amount_filter = ''
+        sort_param = request.args.get('r_sort', '')
+    else:  # deals
+        status_filter = request.args.get('d_status', '')
+        name_filter = request.args.get('d_name', '')
+        phone_filter = ''  # Для договоров нет фильтра по телефону
+        contract_filter = request.args.get('d_contract', '')
+        contact_id_filter = ''  # Для договоров нет фильтра по contact_id
+        user_filter = request.args.get('d_user', '')
+        created_at_filter = ''  # Для договоров нет фильтра по дате создания
+        total_withdrawal_filter = ''  # Для договоров нет фильтра по выплатам
+        deals_count_filter = ''  # Для договоров нет фильтра по количеству
+        amount_filter = request.args.get('d_amount', '').strip()
+        sort_param = request.args.get('d_sort', '')
     
     # Проверяем наличие заголовка Referer для определения "чистого" захода
     referer = request.headers.get('Referer', '')
     is_direct_access = not referer or '/admin' not in referer
     
-    # УСТАНАВЛИВАЕМ ФИЛЬТРЫ ПО УМОЛЧАНИЮ ТОЛЬКО ПРИ ПРЯМОМ ЗАХОДЕ
-    if not status_filter and not any([name_filter, phone_filter, contract_filter, contact_id_filter, user_filter]) and is_direct_access:
+    # УСТАНАВЛИВАЕМ ФИЛЬТРЫ ПО УМОЛЧАНИЮ ТОЛЬКО ПРИ ПРЯМОМ ЗАХОДЕ (только для договоров!)
+    if view_mode == 'deals' and not status_filter and not any([name_filter, phone_filter, contract_filter, contact_id_filter, user_filter, amount_filter]) and is_direct_access:
         # Используем функцию для получения фильтра по умолчанию на основе разрешений
         default_status = get_default_status_filter()
         if default_status:
-            # Перенаправляем с фильтром по умолчанию
-            return redirect(url_for('admin.admin_panel', status=default_status))
+            # Перенаправляем с фильтром по умолчанию (с правильным префиксом)
+            status_param = f"{'r_status' if view_mode == 'referals' else 'd_status'}"
+            return redirect(url_for('admin.admin_panel', view_mode=view_mode, **{status_param: default_status}))
     
     # Получаем сортировку
-    sort_param = request.args.get('sort', '')
     sort_fields = []
     if sort_param:
         for sort_item in sort_param.split(','):
@@ -373,7 +391,7 @@ def admin_panel():
     selected_statuses = []
     status_ids = []
 
-    # Получаем разрешенные статусы на основе разрешений пользователя
+    # Получаем разрешенные статусы на основе разрешений пользователя (только для договоров!)
     ALL_STATUSES = get_allowed_statuses_for_user()
     
     # Получаем доступные статусы для изменения
@@ -382,33 +400,33 @@ def admin_panel():
     # Для фильтра используем только статусы для просмотра
     # Для выпадающего списка изменения будем использовать allowed_status_changes отдельно
     filter_status_ids = ALL_STATUSES
-         
-    if status_filter:
-        try:
-            statuses = status_filter.split(',')
-            for status in statuses:
-                if status.isdigit():
-                    status_id = int(status)
-                    # Проверяем, может ли пользователь видеть этот статус (только статусы для просмотра в фильтре)
-                    if status_id in filter_status_ids:
-                        status_ids.append(status_id)
-                    else:
-                        flash(f'У вас нет прав для просмотра статуса: {status}', 'warning')
-                else:
-                    flash(f'Неверный формат статуса: {status}', 'warning')
-            if status_ids:
-                query = query.filter(Referal.status_id.in_(status_ids))
-                selected_statuses = status_ids
-        except ValueError:
-            # Если в параметре что-то не то, игнорируем его
-            flash('Получен неверный формат статусов в фильтре.', 'warning')
-            pass 
+    
+    # ВАЖНО: Фильтрация по статусам ТОЛЬКО для режима 'deals', у рефералов нет статусов!
+    # Для рефералов просто показываем все записи
+    if view_mode == 'referals':
+        # Рефералы не имеют статусов - показываем все
+        pass
     else:
-        # СТАНДАРТНОЕ ПОВЕДЕНИЕ: Показываем статусы по умолчанию для роли пользователя (только для просмотра)
-        INCLUDED_STATUSES = filter_status_ids  # Используем только статусы для просмотра
-        if INCLUDED_STATUSES:
-            query = query.filter(Referal.status_id.in_(INCLUDED_STATUSES))
-            selected_statuses = [s.id for s in Status.query.filter(Status.id.in_(INCLUDED_STATUSES)).all()]
+        # Логика фильтрации статусов только для договоров (будет применена позже к ReferalDeal)
+        if status_filter:
+            try:
+                statuses = status_filter.split(',')
+                for status in statuses:
+                    if status.isdigit():
+                        status_id = int(status)
+                        # Проверяем, может ли пользователь видеть этот статус
+                        if status_id in filter_status_ids:
+                            status_ids.append(status_id)
+                        else:
+                            flash(f'У вас нет прав для просмотра статуса: {status}', 'warning')
+                    else:
+                        flash(f'Неверный формат статуса: {status}', 'warning')
+                if status_ids:
+                    selected_statuses = status_ids
+            except ValueError:
+                # Если в параметре что-то не то, игнорируем его
+                flash('Получен неверный формат статусов в фильтре.', 'warning')
+                pass
     
     # Для фильтра используем ТОЛЬКО статусы для просмотра (filter_status_ids)
     # Статусы для изменения (allowed_status_changes) будут использоваться отдельно в выпадающем списке изменения статуса
@@ -427,20 +445,40 @@ def admin_panel():
         query = query.filter(ReferalData.contract_number.ilike(f'%{contract_filter}%'))
     
     if contact_id_filter:
-        query = query.filter(Referal.contact_id.ilike(f'%{contact_id_filter}%'))
+        # contact_id - это integer, приводим к строке через cast
+        query = query.filter(cast(Referal.contact_id, String).ilike(f'%{contact_id_filter}%'))
         
     if user_filter:
         query = query.filter(User.login.ilike(f'%{user_filter}%'))
     
-    # Для сортировки по user.login делаем join с User
+    if created_at_filter:
+        # created_at это timestamp, конвертируем в дату для поиска
+        query = query.filter(func.date(Referal.created_at) == created_at_filter)
+    
+    if total_withdrawal_filter:
+        query = query.filter(cast(Referal.total_withdrawal, String).ilike(f'%{total_withdrawal_filter}%'))
+    
+    # deals_count убираем - это вычисляемое поле, не колонка БД
+    
+    # Определяем нужны ли джойны для фильтров и сортировки
     need_user_join = False
     need_referal_data_join = False
+    
+    # Проверяем фильтры
+    if user_filter:
+        need_user_join = True
+    if name_filter or phone_filter or contract_filter:
+        need_referal_data_join = True
+    
+    # Проверяем сортировку
     if sort_fields:
         for sort_field in sort_fields:
             if sort_field['field'] == 'user':
                 need_user_join = True
             if sort_field['field'] in ['name', 'phone', 'contract']:
                 need_referal_data_join = True
+                
+    # Делаем джойны если нужно
     if need_user_join:
         query = query.join(User, Referal.user_id == User.id)
     if need_referal_data_join:
@@ -465,6 +503,11 @@ def admin_panel():
                 clause = Referal.status_id.desc() if order == 'desc' else Referal.status_id.asc()
             elif field == 'amount':
                 clause = Referal.withdrawal_amount.desc() if order == 'desc' else Referal.withdrawal_amount.asc()
+            elif field == 'created_at':
+                clause = Referal.created_at.desc() if order == 'desc' else Referal.created_at.asc()
+            elif field == 'total_withdrawal':
+                clause = Referal.total_withdrawal.desc() if order == 'desc' else Referal.total_withdrawal.asc()
+            # deals_count убираем - это вычисляемое поле
             else:
                 continue
 
@@ -514,7 +557,9 @@ def admin_panel():
                 joinedload(ReferalDeal.referal).joinedload(Referal.user)
             )\
             .join(Referal, ReferalDeal.referal_id == Referal.id)\
-            .join(MacroDeal, ReferalDeal.deal_id == MacroDeal.id)
+            .join(MacroDeal, ReferalDeal.deal_id == MacroDeal.id)\
+            .join(ReferalData, Referal.id == ReferalData.referal_id)\
+            .join(User, Referal.user_id == User.id)
         
         print(f"Base query created")
         
@@ -552,7 +597,7 @@ def admin_panel():
         #         print(f"Applied default status filter with IDs: {filter_status_ids}")
         
         if name_filter:
-            deals_query = deals_query.join(ReferalData, Referal.id == ReferalData.referal_id).filter(
+            deals_query = deals_query.filter(
                 ReferalData.full_name.ilike(f'%{name_filter}%')
             )
             print(f"Applied name filter: {name_filter}")
@@ -562,7 +607,7 @@ def admin_panel():
             print(f"Applied contract filter: {contract_filter}")
         
         if user_filter:
-            deals_query = deals_query.join(User, Referal.user_id == User.id).filter(
+            deals_query = deals_query.filter(
                 User.login.ilike(f'%{user_filter}%')
             )
             print(f"Applied user filter: {user_filter}")
@@ -598,6 +643,37 @@ def admin_panel():
     
     
     all_statuses_in_db = Status.query.all()
+    
+    # Синхронизируем данные ВСЕХ пользователей перед рендерингом
+    from utils import sync_user_data_from_auth_service
+    synced_users = set()  # Чтобы не синхронизировать одного пользователя дважды
+    
+    print(f"🔄 Starting user data synchronization for admin panel...")
+    
+    # Синхронизируем пользователей из рефералов
+    if referals:
+        for referal in referals:
+            if referal.user and referal.user.auth_user_id and referal.user.id not in synced_users:
+                try:
+                    print(f"  📥 Syncing referal user: {referal.user.login} (auth_user_id: {referal.user.auth_user_id})")
+                    sync_user_data_from_auth_service(referal.user, force_sync=True, headers=request.headers)
+                    synced_users.add(referal.user.id)
+                except Exception as e:
+                    print(f"  ❌ Failed to sync user {referal.user.login}: {e}")
+    
+    # Синхронизируем пользователей из договоров
+    if deals:
+        for deal in deals:
+            if deal.referal and deal.referal.user and deal.referal.user.auth_user_id and deal.referal.user.id not in synced_users:
+                try:
+                    print(f"  📥 Syncing deal user: {deal.referal.user.login} (auth_user_id: {deal.referal.user.auth_user_id})")
+                    sync_user_data_from_auth_service(deal.referal.user, force_sync=True, headers=request.headers)
+                    synced_users.add(deal.referal.user.id)
+                except Exception as e:
+                    print(f"  ❌ Failed to sync user {deal.referal.user.login}: {e}")
+    
+    print(f"✅ Synchronized {len(synced_users)} users")
+    
     return render_template('admin.html', 
                           current_user=user,
                           referals=referals,
@@ -613,6 +689,9 @@ def admin_panel():
                               'contract': contract_filter,
                               'contact_id': contact_id_filter,
                               'user': user_filter,
+                              'amount': amount_filter,
+                              'created_at': created_at_filter,
+                              'total_withdrawal': total_withdrawal_filter,
                               'per_page': per_page
                           },
                           selected_statuses=selected_statuses,

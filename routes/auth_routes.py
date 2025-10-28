@@ -104,7 +104,7 @@ def get_current_user():
         if user and user.auth_user_id:
             try:
                 from utils import sync_user_data_from_auth_service
-                sync_user_data_from_auth_service(user, force_sync=False)
+                sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
             except Exception as e:
                 print(f"Warning: Failed to sync user data from auth-service: {e}")
                 

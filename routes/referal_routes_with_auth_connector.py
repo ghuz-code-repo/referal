@@ -160,11 +160,15 @@ def profile():
         print(f"👤 Looking up database user for {user.username}: {'Found' if db_user else 'Not found'}")
         if db_user:
             print(f"   DB user has auth_user_id: {db_user.auth_user_id if hasattr(db_user, 'auth_user_id') else 'N/A'}")
-            # Синхронизация не требуется - данные пользователя уже в headers от gateway
+            # Синхронизируем ВСЕ данные из auth-service (телефон, email, паспорт, ПИНФЛ, банк)
+            from utils import sync_user_data_from_auth_service
+            sync_user_data_from_auth_service(db_user, force_sync=True, headers=request.headers)
     elif user and hasattr(user, 'id'):
         # This is legacy user from database
         db_user = user
-        # Синхронизация не требуется - данные пользователя уже в headers от gateway
+        # Синхронизируем ВСЕ данные из auth-service (телефон, email, паспорт, ПИНФЛ, банк)
+        from utils import sync_user_data_from_auth_service
+        sync_user_data_from_auth_service(db_user, force_sync=True, headers=request.headers)
     
     # Check available permissions
     can_view_referrals = False
@@ -221,7 +225,7 @@ def limited_profile():
     if user and hasattr(user, 'id'):
         try:
             from utils import sync_user_data_from_auth_service
-            sync_user_data_from_auth_service(user, force_sync=True)
+            sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
         except Exception as e:
             print(f"Warning: Failed to sync user data from auth-service: {e}")
     

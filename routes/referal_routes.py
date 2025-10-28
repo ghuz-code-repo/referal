@@ -37,7 +37,7 @@ def referal_list():
     
     # Автоматически синхронизируем данные пользователя из auth-service
     from utils import sync_user_data_from_auth_service
-    sync_user_data_from_auth_service(user)
+    sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
     
     referal_service.update_deal_info(user)
     

@@ -26,7 +26,8 @@ def get_agreement(user_id):
         
         # Автоматически синхронизируем данные пользователя из auth-service
         from utils import sync_user_data_from_auth_service
-        sync_user_data_from_auth_service(user)
+        from flask import request
+        sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
         
         user_data = user.user_data  # Получаем связанные данные пользователя
         
