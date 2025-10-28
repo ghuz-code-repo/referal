@@ -162,13 +162,15 @@ def profile():
             print(f"   DB user has auth_user_id: {db_user.auth_user_id if hasattr(db_user, 'auth_user_id') else 'N/A'}")
             # Синхронизируем ВСЕ данные из auth-service (телефон, email, паспорт, ПИНФЛ, банк)
             from utils import sync_user_data_from_auth_service
-            sync_user_data_from_auth_service(db_user, force_sync=True, headers=request.headers)
+        # ПРИНУДИТЕЛЬНО синхронизируем данные пользователя из auth-service при каждом запросе
+        from utils import sync_user_profile_always
+        sync_user_profile_always(db_user)
     elif user and hasattr(user, 'id'):
         # This is legacy user from database
         db_user = user
-        # Синхронизируем ВСЕ данные из auth-service (телефон, email, паспорт, ПИНФЛ, банк)
-        from utils import sync_user_data_from_auth_service
-        sync_user_data_from_auth_service(db_user, force_sync=True, headers=request.headers)
+        # ПРИНУДИТЕЛЬНО синхронизируем данные пользователя из auth-service при каждом запросе
+        from utils import sync_user_profile_always
+        sync_user_profile_always(db_user)
     
     # Check available permissions
     can_view_referrals = False

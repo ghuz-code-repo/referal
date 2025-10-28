@@ -8,6 +8,7 @@ from notification_client import get_notification_client
 from .auth_routes import get_current_user
 from models import *
 from services import withdrawal_service
+from utils import get_user_full_name_from_auth
 from permission_utils import (
     requires_admin_access, 
     get_allowed_statuses_for_user, 
@@ -102,7 +103,7 @@ def send_admin_deal_status_notification(referal_deal, admin_user, old_status_id,
             referal_name = referal_deal.referal.referal_data.full_name if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
             referal_phone = referal_deal.referal.referal_data.phone_number if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
             withdrawal_amount = referal_deal.withdrawal_amount or 0
-            admin_name = admin_user.user_data.full_name if hasattr(admin_user, "user_data") and admin_user.user_data else admin_user.login if hasattr(admin_user, "login") else "Администратор"
+            admin_name = get_user_full_name_from_auth(admin_user)
             
             notification_client = get_notification_client()
             
@@ -183,7 +184,7 @@ def send_admin_deal_status_notification(referal_deal, admin_user, old_status_id,
             referal_name = referal_deal.referal.referal_data.full_name if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
             referal_phone = referal_deal.referal.referal_data.phone_number if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
             withdrawal_amount = referal_deal.withdrawal_amount or 0
-            admin_name = admin_user.user_data.full_name if hasattr(admin_user, "user_data") and admin_user.user_data else admin_user.login if hasattr(admin_user, "login") else "Администратор"
+            admin_name = get_user_full_name_from_auth(admin_user)
             
             # Формируем тело письма
             subject = f'Договор №{agreement_number} {subject_prefix}'
@@ -255,7 +256,7 @@ def debug_current_user():
                 'login': user.login,
                 'role': user.role,
                 'auth_user_id': user.auth_user_id,
-                'full_name': user.user_data.full_name if user.user_data else None
+                'full_name': get_user_full_name_from_auth(user)
             },
             'headers': dict(request.headers),
             'admin_access': user.role in ['admin', 'manager', 'call-center']
@@ -853,7 +854,7 @@ def add_deal_to_referal(referal_id):
             # Получаем информацию о рефе��але
             referal_name = referal.referal_data.full_name if referal.referal_data else 'Неизвестно'
             referal_phone = referal.referal_data.phone_number if referal.referal_data else 'Неизвестно'
-            admin_name = user.user_data.full_name if hasattr(user, "user_data") and user.user_data else user.login
+            admin_name = get_user_full_name_from_auth(user)
             
             subject = f'Новый договор №{agreement_number} добавлен к рефералу'
             body = f"""Администратор {admin_name} добавил новый договор к рефералу.
@@ -966,21 +967,21 @@ def update_withdrawal_stage(referal_id):
          utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал поступил на проверку отделом аналитики',
-            f'Реферал от {user.user_data.full_name} поступил на проверку отделу аналитики:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+            f'Реферал от {get_user_full_name_from_auth(user)} поступил на проверку отделу аналитики:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
     
     elif withdrawal_stage == 20:
          utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал прошёл проверку колл-центром',
-            f'Реферал от {user.user_data.full_name} прошёл проверку колл-центром:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+            f'Реферал от {get_user_full_name_from_auth(user)} прошёл проверку колл-центром:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
         
     elif withdrawal_stage == 10:
          utils.send_email(
             os.getenv('CALL_CENTER_MANAGER_EMAIL'),
             'Запрос на проверку реферала',
-            f'Пожалуйста созвонитесь с рефералом от {user.user_data.full_name}: ФИО: {referal.referal_data.full_name} Телефон: {referal.referal_data.phone_number} для проверки его данных после чего обязательно измените статус реферала в системе.\n'
+            f'Пожалуйста созвонитесь с рефералом от {get_user_full_name_from_auth(user)}: ФИО: {referal.referal_data.full_name} Телефон: {referal.referal_data.phone_number} для проверки его данных после чего обязательно измените статус реферала в системе.\n'
         )
         
     elif withdrawal_stage == 200:
@@ -989,7 +990,7 @@ def update_withdrawal_stage(referal_id):
         utils.send_email(
             os.getenv('PAYMENT_MANAGER_EMAIL'),
             'Запрос на выплату рефереру',
-            f'{user.user_data.full_name} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
+            f'{get_user_full_name_from_auth(user)} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
         )
 
 
@@ -998,7 +999,7 @@ def update_withdrawal_stage(referal_id):
         utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал был оплачен рефереру',
-            f'Реферал от {user.user_data.full_name} был помечен как оплаченый:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+            f'Реферал от {get_user_full_name_from_auth(user)} был помечен как оплаченый:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
         if not referal.balance_withdrawn:
             user.pending_withdrawal -= referal.withdrawal_amount
@@ -1011,12 +1012,12 @@ def update_withdrawal_stage(referal_id):
             flash('Пожалуйста, укажите причину отказа', 'error')
             return redirect(url_for('admin.admin_panel', **return_params))
         referal.rejection_reason = rejection_reason
-        rejecter_name = current_user.user_data.full_name
+        rejecter_name = get_user_full_name_from_auth(current_user)
         utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал не прошёл проверку',
             f"""
-            Реферал от {user.user_data.full_name} не прошёл проверку {referal.status_name}\n
+            Реферал от {get_user_full_name_from_auth(user)} не прошёл проверку {referal.status_name}\n
             Причина: {rejection_reason}.\n
             Отклонил: {rejecter_name}\n
             Данные реферала:\n

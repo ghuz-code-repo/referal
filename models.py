@@ -57,6 +57,10 @@ class UserData(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     #Passport
     full_name = db.Column(db.String(120), nullable=False)
+    # Отдельные компоненты ФИО из auth-service
+    first_name = db.Column(db.String(100), nullable=True)
+    last_name = db.Column(db.String(100), nullable=True)
+    middle_name = db.Column(db.String(100), nullable=True)
     passport_number = db.Column(db.String(50), nullable=True)
     passport_giver = db.Column(db.String(100), nullable=True)
     passport_date = db.Column(db.DateTime, nullable=True)

@@ -387,8 +387,31 @@ def sync_user_data_from_auth_service(user, force_sync=False, headers=None):
             user_data = UserData(user_id=user.id)
             db.session.add(user_data)
         
-        # Синхронизируем данные профиля
-        user_data.full_name = profile_data.get('full_name', '')
+        # Получаем компоненты ФИО из auth-service
+        last_name = profile_data.get('last_name', '').strip()
+        first_name = profile_data.get('first_name', '').strip()
+        middle_name = profile_data.get('middle_name', '').strip()
+        suffix = profile_data.get('suffix', '').strip()
+        
+        # Сохраняем компоненты
+        user_data.last_name = last_name
+        user_data.first_name = first_name
+        user_data.middle_name = middle_name
+        
+        # ФОРМИРУЕМ ПОЛНОЕ ИМЯ: Фамилия Имя Отчество Частица
+        name_parts = []
+        if last_name:
+            name_parts.append(last_name)
+        if first_name:
+            name_parts.append(first_name)
+        if middle_name:
+            name_parts.append(middle_name)
+        if suffix:
+            name_parts.append(suffix)
+        
+        user_data.full_name = ' '.join(name_parts) if name_parts else profile_data.get('full_name', '')
+        
+        # Синхронизируем остальные данные профиля
         user_data.phone = profile_data.get('phone') or profile_data.get('phone_number', '')
         user_data.e_mail = profile_data.get('email') or profile_data.get('e_mail', '')
         user_data.passport_number = profile_data.get('passport_number', '')
@@ -473,7 +496,11 @@ def sync_user_data_from_auth_service(user, force_sync=False, headers=None):
         
         db.session.commit()
         print(f"✅ Successfully synced user data for {user.login}")
-        print(f"   Full name: {user_data.full_name}")
+        print(f"   Last name: {last_name}")
+        print(f"   First name: {first_name}")
+        print(f"   Middle name: {middle_name}")
+        print(f"   Suffix: {suffix}")
+        print(f"   ➡️ FULL NAME (constructed): {user_data.full_name}")
         print(f"   Phone: {user_data.phone}")
         print(f"   Email: {user_data.e_mail}")
         print(f"   PINFL: {user_data.pinfl}")
@@ -482,5 +509,171 @@ def sync_user_data_from_auth_service(user, force_sync=False, headers=None):
         
     except Exception as e:
         print(f"Error syncing user data from auth-service: {e}")
+        db.session.rollback()
+        return False
+
+
+def get_user_full_name_from_auth(user):
+    """
+    Получает актуальное полное имя пользователя из auth-service.
+    
+    Args:
+        user: Объект пользователя из referal сервиса
+        
+    Returns:
+        str: Полное имя пользователя из auth-service или fallback значение
+    """
+    from flask import current_app
+    
+    # Сначала пытаемся получить из auth-service
+    try:
+        auth_client = getattr(current_app, 'auth_client', None)
+        
+        if not auth_client or not hasattr(user, 'auth_user_id') or not user.auth_user_id:
+            # Fallback к локальным данным
+            if hasattr(user, 'user_data') and user.user_data and user.user_data.full_name:
+                return user.user_data.full_name
+            return user.login if hasattr(user, 'login') else "Неизвестно"
+        
+        # Получаем данные из auth-service
+        profile_url = f"/api/users/{user.auth_user_id}/profile"
+        profile_response = requests.get(
+            f"{auth_client.auth_service_url.rstrip('/')}{profile_url}",
+            timeout=3  # Короткий timeout для быстрого ответа
+        )
+        
+        if profile_response.status_code == 200:
+            profile_data = profile_response.json()
+            
+            # ФОРМИРУЕМ ПОЛНОЕ ИМЯ ИЗ ОТДЕЛЬНЫХ ПОЛЕЙ: Фамилия Имя Отчество Частица
+            last_name = profile_data.get('last_name', '').strip()
+            first_name = profile_data.get('first_name', '').strip()
+            middle_name = profile_data.get('middle_name', '').strip()
+            suffix = profile_data.get('suffix', '').strip()
+            
+            name_parts = []
+            if last_name:
+                name_parts.append(last_name)
+            if first_name:
+                name_parts.append(first_name)
+            if middle_name:
+                name_parts.append(middle_name)
+            if suffix:
+                name_parts.append(suffix)
+            
+            if name_parts:
+                return ' '.join(name_parts)
+            
+            # Fallback к полю full_name если отдельные поля пусты
+            full_name = profile_data.get('full_name', '').strip()
+            if full_name:
+                return full_name
+        
+    except Exception as e:
+        print(f"Warning: Failed to get user full name from auth-service: {e}")
+    
+    # Fallback к локальным данным
+    if hasattr(user, 'user_data') and user.user_data and user.user_data.full_name:
+        return user.user_data.full_name
+    return user.login if hasattr(user, 'login') else "Неизвестно"
+
+
+def sync_user_profile_always(user):
+    """
+    ВСЕГДА синхронизирует данные пользователя из auth-service при каждом запросе.
+    Если auth-service недоступен - оставляет локальные данные.
+    
+    Args:
+        user: Объект пользователя из referal сервиса
+        
+    Returns:
+        bool: True если синхронизация прошла успешно
+    """
+    from models import UserData, db
+    from flask import current_app
+    
+    try:
+        auth_client = getattr(current_app, 'auth_client', None)
+        
+        if not auth_client or not hasattr(user, 'auth_user_id') or not user.auth_user_id:
+            print(f"❌ Cannot sync user {user.login}: no auth_client or auth_user_id")
+            return False
+        
+        # Получаем данные профиля из auth-service
+        profile_url = f"/api/users/{user.auth_user_id}/profile"
+        print(f"🔄 Syncing profile for {user.login} from auth-service...")
+        
+        profile_response = requests.get(
+            f"{auth_client.auth_service_url.rstrip('/')}{profile_url}",
+            timeout=5
+        )
+        
+        if profile_response.status_code != 200:
+            print(f"❌ Failed to fetch profile: HTTP {profile_response.status_code}")
+            return False
+            
+        profile_data = profile_response.json()
+        print(f"📥 Profile data from auth-service: {profile_data}")
+        print(f"🔍 Checking all keys in profile_data: {list(profile_data.keys())}")
+        
+        # Получаем или создаем UserData
+        user_data = UserData.query.filter_by(user_id=user.id).first()
+        if not user_data:
+            user_data = UserData(user_id=user.id)
+            db.session.add(user_data)
+            print(f"📝 Created new UserData for user {user.login}")
+        
+        # Обновляем данные из auth-service
+        user_data.e_mail = profile_data.get('email', '')
+        user_data.phone = profile_data.get('phone', '')
+        
+        # Получаем компоненты ФИО
+        last_name = profile_data.get('last_name', '').strip()
+        first_name = profile_data.get('first_name', '').strip()
+        middle_name = profile_data.get('middle_name', '').strip()
+        suffix = profile_data.get('suffix', '').strip()  # Частица (O`G`LI, QIZI и т.д.)
+        
+        # Сохраняем компоненты
+        user_data.last_name = last_name
+        user_data.first_name = first_name
+        user_data.middle_name = middle_name
+        
+        # ФОРМИРУЕМ ПОЛНОЕ ИМЯ: Фамилия Имя Отчество Частица
+        name_parts = []
+        if last_name:
+            name_parts.append(last_name)
+        if first_name:
+            name_parts.append(first_name)
+        if middle_name:
+            name_parts.append(middle_name)
+        if suffix:
+            name_parts.append(suffix)
+        
+        user_data.full_name = ' '.join(name_parts) if name_parts else profile_data.get('full_name', '')
+        
+        # Дополнительные поля если есть
+        if 'passport_number' in profile_data:
+            user_data.passport_number = profile_data.get('passport_number', '')
+        if 'pinfl' in profile_data:
+            user_data.pinfl = profile_data.get('pinfl', '')
+        
+        db.session.commit()
+        print(f"✅ Successfully synced user data for {user.login}")
+        print(f"   Last name: {last_name}")
+        print(f"   First name: {first_name}")
+        print(f"   Middle name: {middle_name}")
+        print(f"   Suffix: {suffix}")
+        print(f"   ➡️ FULL NAME (constructed): {user_data.full_name}")
+        print(f"   Phone: {user_data.phone}")
+        print(f"   Email: {user_data.e_mail}")
+        if user_data.pinfl:
+            print(f"   PINFL: {user_data.pinfl}")
+        if user_data.passport_number:
+            print(f"   Passport: {user_data.passport_number}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error syncing user data from auth-service: {e}")
         db.session.rollback()
         return False
