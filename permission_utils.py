@@ -256,11 +256,15 @@ def get_allowed_statuses_for_user():
     """
     # Получаем права пользователя для отладки
     user_permissions = get_user_permissions()
+    print(f"🔍 get_allowed_statuses_for_user: Total permissions count: {len(user_permissions)}")
+    print(f"🔍 get_allowed_statuses_for_user: First 5 permissions: {user_permissions[:5] if user_permissions else 'NONE'}")
     
     # Используем новую систему детализированных разрешений
     viewable_statuses = get_viewable_statuses()
+    print(f"🔍 get_allowed_statuses_for_user: viewable_statuses returned: {viewable_statuses}")
     
     if viewable_statuses:
+        print(f"✅ Returning viewable_statuses: {viewable_statuses}")
         return viewable_statuses
     
     # Fallback к старой системе ролей, если детализированных разрешений нет

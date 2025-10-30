@@ -523,12 +523,11 @@
                                                     <span>Выберите статусы</span>
                                                 </div>
                                                 <div class="filter-options">
-                                                    {% set selected_statuses = request.args.get('status', '').split(',') if request.args.get('status') else [] %}
-                                                    {% for status in all_statuses_in_db %}
+                                                    {% for status in filter_statuses %}
                                                     <label class="filter-option">
                                                         <input type="checkbox" 
                                                                value="{{ status.id }}" 
-                                                               {% if status.id|string in selected_statuses %}checked{% endif %}>
+                                                               {% if status.id in selected_statuses %}checked{% endif %}>
                                                         <span>{{ status.name }}</span>
                                                     </label>
                                                     {% endfor %}

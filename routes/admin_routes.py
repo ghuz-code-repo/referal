@@ -394,6 +394,9 @@ def admin_panel():
 
     # Получаем разрешенные статусы на основе разрешений пользователя (только для договоров!)
     ALL_STATUSES = get_allowed_statuses_for_user()
+    print(f"🔍 DEBUG: get_allowed_statuses_for_user() returned: {ALL_STATUSES}")
+    print(f"🔍 DEBUG: User permissions from headers: {request.headers.get('X-User-Service-Permissions', 'NONE')}")
+    print(f"🔍 DEBUG: User service roles: {request.headers.get('X-User-Service-Roles', 'NONE')}")
     
     # Получаем доступные статусы для изменения
     allowed_status_changes = get_allowed_status_changes_for_user()
@@ -422,12 +425,21 @@ def admin_panel():
                             flash(f'У вас нет прав для просмотра статуса: {status}', 'warning')
                     else:
                         flash(f'Неверный формат статуса: {status}', 'warning')
+                
+                # ВАЖНО: Если пользователь запросил фильтрацию, но ни один статус не прошел проверку прав,
+                # применяем фильтр по умолчанию (только разрешенные статусы)
                 if status_ids:
                     selected_statuses = status_ids
+                else:
+                    # Все запрошенные статусы недоступны - показываем только разрешенные
+                    print(f"⚠️ All requested statuses denied! Applying default filter: {filter_status_ids}")
+                    status_ids = filter_status_ids
+                    selected_statuses = status_ids
             except ValueError:
-                # Если в параметре что-то не то, игнорируем его
+                # Если в параметре что-то не то, применяем фильтр по умолчанию
                 flash('Получен неверный формат статусов в фильтре.', 'warning')
-                pass
+                status_ids = filter_status_ids
+                selected_statuses = status_ids
     
     # Для фильтра используем ТОЛЬКО статусы для просмотра (filter_status_ids)
     # Статусы для изменения (allowed_status_changes) будут использоваться отдельно в выпадающем списке изменения статуса
@@ -586,16 +598,18 @@ def admin_panel():
         
         # Фильтры для режима договоров
         if status_filter:
-            if status_ids:
-                deals_query = deals_query.filter(ReferalDeal.status_id.in_(status_ids))
-                print(f"Applied status filter with IDs: {status_ids}")
-        # ИЗМЕНЕНИЕ: Убираем фильтрацию по умолчанию для договоров
-        # Пользователь может сам выбрать нужные статусы через фильтр
-        # else:
-        #     # Показываем договоры с разрешенными статусами
-        #     if filter_status_ids:
-        #         deals_query = deals_query.filter(ReferalDeal.status_id.in_(filter_status_ids))
-        #         print(f"Applied default status filter with IDs: {filter_status_ids}")
+            # Применяем фильтр по статусам (уже проверенным на права доступа)
+            # Если все статусы были отклонены, status_ids уже содержит filter_status_ids
+            deals_query = deals_query.filter(ReferalDeal.status_id.in_(status_ids))
+            print(f"Applied status filter with IDs: {status_ids}")
+        else:
+            # ФИЛЬТР ПО УМОЛЧАНИЮ: Показываем ТОЛЬКО договоры с разрешенными статусами
+            # Это предотвращает показ ВСЕХ договоров для call-center и других ролей
+            if filter_status_ids:
+                deals_query = deals_query.filter(ReferalDeal.status_id.in_(filter_status_ids))
+                print(f"Applied default status filter with IDs: {filter_status_ids}")
+                # Устанавливаем selected_statuses чтобы UI показывал какие статусы применены
+                selected_statuses = filter_status_ids
         
         if name_filter:
             deals_query = deals_query.filter(
@@ -674,6 +688,9 @@ def admin_panel():
                     print(f"  ❌ Failed to sync user {deal.referal.user.login}: {e}")
     
     print(f"✅ Synchronized {len(synced_users)} users")
+    
+    print(f"📋 Rendering template with selected_statuses: {selected_statuses}")
+    print(f"📋 filter_statuses count: {len(statuses)}")
     
     return render_template('admin.html', 
                           current_user=user,
