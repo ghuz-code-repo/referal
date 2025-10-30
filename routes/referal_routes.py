@@ -191,35 +191,6 @@ def referal_list():
 def add_referal():
     """Добавление нового реферала с проверкой истории CRM и привязкой договоров"""
     
-    managers = ["""Mamatov A'zam""",
-                """Buaxunov Baxtiyor""",
-                """Magovskiy Aleksandr""",
-                """RU Saytxalilov Alisher""",
-                """Komilov Sunnatilla""",
-                """Dayanova Aida""",
-                """Mirvosikov Mirazim""",
-                """Suleymanov Artur""",
-                """Krubayev Enver""",
-                """Raximberdiyev Raxmonberdi""",
-                """Kadirov Timur""",
-                """Kaxarov Sherzod Yuldashevich""",
-                """Mirzaolimov Nurmuhammad""",
-                """Atamatov Davron""",
-                """Nikiforova Kseniya""",
-                """Yulchiyev Umidjon""",
-                """Zairov Odil Kamildjanovich""",
-                """Yulchiyev Ramazon""",
-                """Rustamov Azizbek""",
-                """Miraxmad Mirboboev""",
-                """Djumabayev Akbar""",
-                """Lyovkin Dmitriy""",
-                """Abdukhalikova Jasmina""",
-                """Bekov Abbosbek Alisher ogli""",
-                """Mukhsinov Sukhrob""",
-                """Parpiyeva Nasibaxon"""]
-    
-    manager = managers[random.randint(0, len(managers) - 1)]
-    
     user = get_current_user()
     if not user:
         flash('Необходимо войти в систему', 'error')
@@ -317,13 +288,50 @@ def add_referal():
         else:
             flash(f'✅ Реферал {full_name} успешно добавлен!', 'success')
         
+        # Случайный выбор менеджера для назначения встречи
+        managers = [
+            """Zairov Odil Kamildjanovich""",
+            """Yulchiyev Ramazon""",
+            """Rustamov Azizbek""",
+            """Miraxmad Mirboboev""",
+            """Djumabayev Akbar""",
+            """Lyovkin Dmitriy""",
+            """Abdukhalikova Jasmina""",
+            """Bekov Abbosbek Alisher ogli""",
+            """Mukhsinov Sukhrob""",
+            """Parpiyeva Nasibaxon"""
+        ]
+        manager = managers[random.randint(0, len(managers) - 1)]
+        
         # Отправляем уведомление менеджеру call-центра
-        utils.send_email(
-            os.getenv('CALL_CENTER_MANAGER_EMAIL'),
-            subject='Назначение встречи для реферала',
-            body=f'Пользователь {user.user_data.full_name} добавил нового реферала: {full_name} ({formatted_phone}). '
-                 f'Создайте встречу реферала с менеджером: {manager} для дальнейшего взаимодействия с клиентом.'
-        )
+        try:
+            # Получаем пользователей с ролью call-center из auth-service
+            call_center_users = utils.get_call_center_users_from_auth()
+            
+            if call_center_users:
+                # Берем первого пользователя из списка
+                first_cc_user = call_center_users[0]
+                call_center_email = first_cc_user.get('email')
+                call_center_name = first_cc_user.get('full_name', first_cc_user.get('username', 'Call-center менеджер'))
+                
+                if call_center_email:
+                    utils.send_email(
+                        call_center_email,
+                        subject='Новый реферал для обзвона',
+                        body=f'Пользователь {user.user_data.full_name if user.user_data else user.login} добавил нового реферала:\n\n'
+                             f'Имя: {full_name}\n'
+                             f'Телефон: {formatted_phone}\n\n'
+                             f'Пожалуйста, свяжитесь с рефералом для дальнейшего взаимодействия.'
+                    )
+                    print(f"📧 Email notification sent to call-center manager: {call_center_name} ({call_center_email})")
+                else:
+                    print(f"⚠️ Call-center user found but has no email: {first_cc_user}")
+            else:
+                print(f"⚠️ No call-center users found in auth-service, skipping notification")
+        except Exception as email_error:
+            print(f"❌ Failed to send email notification: {email_error}")
+            import traceback
+            traceback.print_exc()
         
         print(f"✅ Successfully added referal: {full_name} ({formatted_phone}) for user {user.login} with {len(linked_deals)} linked deals")
         

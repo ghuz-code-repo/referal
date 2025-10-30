@@ -677,3 +677,41 @@ def sync_user_profile_always(user):
         print(f"❌ Error syncing user data from auth-service: {e}")
         db.session.rollback()
         return False
+
+
+def get_call_center_users_from_auth():
+    """
+    Получает список пользователей с ролью call-center из auth-service.
+    
+    Returns:
+        list: Список пользователей с email и другими данными, или пустой список при ошибке
+    """
+    from flask import current_app
+    import requests
+    
+    try:
+        auth_client = getattr(current_app, 'auth_client', None)
+        
+        if not auth_client:
+            print("❌ AuthClient not available")
+            return []
+        
+        # Запрашиваем пользователей с ролью call-center для сервиса referal
+        users_url = f"/api/services/referal/users-by-role/call-center"
+        full_url = f"{auth_client.auth_service_url.rstrip('/')}{users_url}"
+        
+        print(f"📡 Fetching call-center users from: {full_url}")
+        
+        response = requests.get(full_url, timeout=5)
+        
+        if response.status_code == 200:
+            users = response.json()
+            print(f"✅ Found {len(users)} call-center users")
+            return users
+        else:
+            print(f"⚠️ Failed to get call-center users: {response.status_code} - {response.text}")
+            return []
+            
+    except Exception as e:
+        print(f"❌ Error getting call-center users from auth-service: {e}")
+        return []

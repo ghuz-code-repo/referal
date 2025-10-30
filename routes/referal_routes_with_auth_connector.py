@@ -391,12 +391,8 @@ def add_referal():
         db.session.add(referal_data)
         db.session.commit()
         
-        # Send notification if user has permission
-        if AUTH_CONNECTOR_AVAILABLE and user_context.has_permission('referal.notifications.send'):
-            send_referral_notification(local_user, full_name, formatted_phone)
-        elif not AUTH_CONNECTOR_AVAILABLE:
-            # Legacy notification sending
-            send_referral_notification(local_user, full_name, formatted_phone)
+        # Always send notification to call-center when new referral is created
+        send_referral_notification(local_user, full_name, formatted_phone)
         
         return jsonify({
             'success': True,
@@ -789,28 +785,40 @@ def admin_export():
         return jsonify({'success': False, 'message': f'Ошибка экспорта: {str(e)}'})
 
 def send_referral_notification(user, full_name, phone):
-    """Send notification about new referral"""
+    """Send notification about new referral to call-center users from auth-service"""
     try:
-        managers = ["Mamatov A'zam", "Saidov Bekzod", "Karimov Jasur", 
-                   "Toshmatov Aziz", "Nazarov Sherzod"]
-        manager = managers[random.randint(0, len(managers) - 1)]
+        # Получаем пользователей с ролью call-center из auth-service
+        call_center_users = utils.get_call_center_users_from_auth()
         
-        # Check if notification service is configured
-        call_center_email = os.getenv('CALL_CENTER_MANAGER_EMAIL')
+        if not call_center_users:
+            print("⚠️ No call-center users found in auth-service, skipping notification")
+            return
+        
+        # Берем первого пользователя из списка
+        first_cc_user = call_center_users[0]
+        call_center_email = first_cc_user.get('email')
+        call_center_name = first_cc_user.get('full_name', first_cc_user.get('username', 'Call-center менеджер'))
+        
         if not call_center_email:
-            print("Call center email not configured")
+            print(f"⚠️ Call-center user found but has no email: {first_cc_user}")
             return
         
         # Send notification
         notification_client = get_notification_client()
         notification_client.send_email(
             recipient=call_center_email,
-            subject='Новый реферал добавлен',
-            body=f'Пользователь {user.user_data.full_name if hasattr(user, "user_data") else user.full_name} добавил нового реферала: {full_name} ({phone}). Создайте встречу реферала с менеджером: {manager} для дальнейшего взаимодействия с клиентом.'
+            subject='Новый реферал для обзвона',
+            body=f'Пользователь {user.user_data.full_name if hasattr(user, "user_data") else user.full_name} добавил нового реферала:\n\n'
+                 f'Имя: {full_name}\n'
+                 f'Телефон: {phone}\n\n'
+                 f'Пожалуйста, свяжитесь с рефералом для дальнейшего взаимодействия.'
         )
+        print(f"📧 Email notification sent to call-center manager: {call_center_name} ({call_center_email})")
         
     except Exception as e:
-        print(f"Failed to send referral notification: {str(e)}")
+        print(f"❌ Failed to send referral notification: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
 def get_user_email_from_auth_service(auth_user_id):
