@@ -56,6 +56,9 @@ app = Flask(__name__,
            static_url_path='/static',
            static_folder='static')
 
+# Explicitly disable debug mode to prevent reloader from starting
+app.debug = False
+
 # Configure app to work behind a proxy
 # x_prefix=1 allows Flask to read X-Forwarded-Prefix header and adjust url_for() accordingly
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -525,15 +528,13 @@ def before_request():
     print(f"[{request.method}] {request.path} | User: {username} (ID: {user_id})")
 
 if __name__ == '__main__':
+    # This block is only for local development/debugging
+    # In production, use: gunicorn -w 4 -b 0.0.0.0:80 app_with_auth_connector:app
+    print("⚠️  Running in development mode. Use gunicorn for production!")
     print("Starting referal application...")
     
     # Show configuration
     print(f"Database URI: {app.config.get('SQLALCHEMY_DATABASE_URI', 'Not configured')}")
     print(f"Auth Service URL: {os.getenv('AUTH_SERVICE_URL', 'Not configured')}")
     
-    # Отключаем логи статических файлов (CSS, JS)
-    import logging
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.ERROR)
-    
-    app.run(debug=True, host='0.0.0.0', port=80)
+    app.run(debug=False, host='0.0.0.0', port=80, use_reloader=False)

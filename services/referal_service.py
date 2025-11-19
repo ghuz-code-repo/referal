@@ -145,30 +145,29 @@ def update_deal_and_balance(referal, user):
     referal_phone = referal.referal_data.phone_number
     contact = None
     
-    # Форматируем номер телефона для поиска
-    formatted_referal_phone = utils.format_phone_number(referal_phone)
-    if not formatted_referal_phone:
-        formatted_referal_phone = referal_phone
+    print(f"DEBUG update_deal_and_balance: Original referal phone: {referal_phone}")
     
-    print(f"DEBUG update_deal_and_balance: Searching for contact with formatted phone: {formatted_referal_phone}")
+    # ПРИОРИТЕТ 1: Поиск по номеру телефона с поддержкой разных форматов
+    # Генерируем все возможные варианты телефонов из данных реферала
+    referal_phone_variants = utils.extract_and_normalize_phones(referal_phone)
+    print(f"DEBUG update_deal_and_balance: Generated {len(referal_phone_variants)} phone variants: {referal_phone_variants}")
     
-    # ПРИОРИТЕТ 1: Поиск по номеру телефона
-    # If the referal has multiple phones (comma-separated), try to find exact match
-    if ',' in referal_phone:
-        phones = [phone.strip() for phone in referal_phone.split(',')]
-        for phone in phones:
-            formatted_phone = utils.format_phone_number(phone)
-            if not formatted_phone:
-                formatted_phone = phone
-            contact = MacroContact.query.filter_by(phone_number=formatted_phone).first()
-            if contact:
-                print(f"DEBUG update_deal_and_balance: Found exact match for phone: {formatted_phone}")
-                # Update referal to use the matched phone number for processing
-                referal.referal_data.phone_number = formatted_phone
-                break
-    else:
-        # Single phone number - direct lookup with formatted phone
-        contact = MacroContact.query.filter_by(phone_number=formatted_referal_phone).first()
+    # Ищем контакт, перебирая все варианты
+    for phone_variant in referal_phone_variants:
+        # Сначала пробуем прямое совпадение
+        contact = MacroContact.query.filter_by(phone_number=phone_variant).first()
+        if contact:
+            print(f"DEBUG update_deal_and_balance: Found exact match for phone variant: {phone_variant}")
+            break
+        
+        # Если не нашли, ищем по частичному совпадению (для случаев с несколькими телефонами в MacroContact)
+        # Используем LIKE для поиска телефона внутри строки (например, в "(+998...,+998...)")
+        contact = MacroContact.query.filter(
+            MacroContact.phone_number.contains(phone_variant)
+        ).first()
+        if contact:
+            print(f"DEBUG update_deal_and_balance: Found partial match for phone variant: {phone_variant} in {contact.phone_number}")
+            break
     
     # ПРИОРИТЕТ 2: Если не найден по телефону, ищем по имени
     if not contact and referal.referal_data.full_name:
@@ -195,29 +194,84 @@ def update_deal_and_balance(referal, user):
             print(f"DEBUG update_deal_and_balance: No MacroDeals found in local DB for contacts_buy_id: {contact.contacts_id}")
             return 
         
-        print(f"DEBUG update_deal_and_balance: Found {len(deals)} MacroDeal(s) for contacts_buy_id: {contact.contacts_id}. Iterating to check status and payments...")
+        print(f"DEBUG update_deal_and_balance: Found {len(deals)} MacroDeal(s) for contacts_buy_id: {contact.contacts_id}. Checking conditions...")
+        
+        # Дата добавления реферала (для проверки 45-дневного окна)
+        referal_date = referal.created_at.date()
+        print(f"DEBUG update_deal_and_balance: Referal creation date: {referal_date}")
         
         suitable_deal_found = False
         for deal_obj in deals:
-            print(f"DEBUG update_deal_and_balance: Checking Deal - Agreement No: '{deal_obj.agreement_number}', Status: '{deal_obj.deal_status_name}', Total Payments: {deal_obj.total_payments}")
+            deal_date = deal_obj.agreement_date
+            deal_payment = deal_obj.total_payments or 0
             
-            # Проверяем только наличие оплат больше чем бронь (3млн)
-            # Статус сделки НЕ важен - платежи могут быть и в работающей сделке
-            if deal_obj.has_valid_payment():
-                print(f"✅ MATCH! Suitable deal found: Agreement '{deal_obj.agreement_number}', Payments: {deal_obj.total_payments} (exceeds booking payment)")
-                if deal_obj not in referal.deals:
-                    referal.deals.append(deal_obj)
-                
-                referal.referal_data.contract_number = deal_obj.agreement_number
-                referal.deal_metr = deal_obj.deal_metr
-                print(f"DEBUG update_deal_and_balance: Set contract_number to '{deal_obj.agreement_number}' and deal_metr to {deal_obj.deal_metr}")
-                suitable_deal_found = True
-                break
+            print(f"DEBUG update_deal_and_balance: Checking Deal '{deal_obj.agreement_number}':")
+            print(f"  - Status: {deal_obj.deal_status_name}")
+            print(f"  - Date: {deal_date}")
+            print(f"  - Payment: {deal_payment}")
+            print(f"  - Area (metr): {deal_obj.deal_metr}")
+            
+            # КРИТИЧЕСКИЕ УСЛОВИЯ:
+            # 1. Дата договора должна быть ПОЗЖЕ даты добавления реферала
+            # 2. Оплата должна быть больше 3 000 000
+            
+            if not deal_date:
+                print(f"  ❌ SKIPPED: No agreement date")
+                continue
+            
+            if deal_date <= referal_date:
+                print(f"  ❌ SKIPPED: Deal date ({deal_date}) <= Referal date ({referal_date})")
+                continue
+            
+            if deal_payment <= 3000000:
+                print(f"  ❌ SKIPPED: Payment ({deal_payment}) <= 3000000")
+                continue
+            
+            # Все условия выполнены!
+            days_diff = (deal_date - referal_date).days
+            print(f"  ✅ MATCH! Deal qualifies:")
+            print(f"     - Days after referal creation: {days_diff}")
+            print(f"     - Payment: {deal_payment} > 3000000")
+            print(f"     - Date: {deal_date} > {referal_date}")
+            
+            # ИСПРАВЛЕНО: используем новую таблицу ReferalDeal вместо старого relationship
+            from models import ReferalDeal
+            existing_link = ReferalDeal.query.filter_by(
+                referal_id=referal.id,
+                deal_id=deal_obj.id
+            ).first()
+            
+            if not existing_link:
+                # Создаём связь реферал-договор
+                is_within_window = days_diff <= referal.days_window
+                new_link = ReferalDeal(
+                    referal_id=referal.id,
+                    deal_id=deal_obj.id,
+                    is_within_window=is_within_window,
+                    days_from_referal_creation=days_diff
+                )
+                db.session.add(new_link)
+                print(f"  ✅ Created ReferalDeal link: referal_id={referal.id}, deal_id={deal_obj.id}, days={days_diff}, within_window={is_within_window}")
             else:
-                print(f"⚠️ SKIPPED: Deal '{deal_obj.agreement_number}' has payments ({deal_obj.total_payments}) ≤ booking payment (3000000)")
+                print(f"  ℹ️ ReferalDeal link already exists")
+            
+            # ВАЖНО: Устанавливаем referal_id в MacroDeal для работы relationship
+            if deal_obj.referal_id != referal.id:
+                deal_obj.referal_id = referal.id
+                print(f"  ✅ Set MacroDeal.referal_id={referal.id}")
+            
+            referal.referal_data.contract_number = deal_obj.agreement_number
+            referal.deal_metr = deal_obj.deal_metr
+            print(f"  ✅ Set contract_number='{deal_obj.agreement_number}', deal_metr={deal_obj.deal_metr}")
+            suitable_deal_found = True
+            break  # Берём первый подходящий договор
 
         if not suitable_deal_found:
-            print(f"❌ No suitable deals found for contacts_buy_id: {contact.contacts_id} (insufficient payments > 3млн)")
+            print(f"❌ No suitable deals found for contact {contact.contacts_id}:")
+            print(f"   All {len(deals)} deals either have:")
+            print(f"   - Agreement date <= {referal_date} (referal creation date)")
+            print(f"   - OR Payment <= 3000000")
+
         
         # The balance update logic depends on referal.deal_metr being set.
         if suitable_deal_found and not referal.balance_updated:
@@ -235,15 +289,36 @@ def update_deal_and_balance(referal, user):
             if referal.withdrawal_amount > 0:
                 referal.balance_updated = True
                 current_user.current_balance += referal.withdrawal_amount
+                
+                # ВАЖНО: Обновляем withdrawal_amount в MacroDeal для отображения в UI
+                if deal_obj:
+                    deal_obj.withdrawal_amount = referal.withdrawal_amount
+                    deal_obj.payment_calculated = True
+                    print(f"  ✅ Set MacroDeal.withdrawal_amount={referal.withdrawal_amount}")
+                
                 print(f"DEBUG update_deal_and_balance: Updated user balance by {referal.withdrawal_amount}. New balance: {current_user.current_balance}")
             else:
                 print(f"DEBUG update_deal_and_balance: No withdrawal amount set for deal_metr: {referal.deal_metr}")
                 
         elif suitable_deal_found and referal.balance_updated:
+            # ВАЖНО: Даже если баланс уже обновлен, нужно обновить MacroDeal.withdrawal_amount для UI
+            if deal_obj and deal_obj.withdrawal_amount != referal.withdrawal_amount:
+                deal_obj.withdrawal_amount = referal.withdrawal_amount
+                deal_obj.payment_calculated = True
+                print(f"  ✅ Updated MacroDeal.withdrawal_amount={referal.withdrawal_amount} (balance already updated)")
             print(f"DEBUG update_deal_and_balance: Deal found but balance already updated for this referal")
 
     else:
-        print(f"DEBUG update_deal_and_balance: No MacroContact found for formatted phone: {formatted_referal_phone}")
+        print(f"DEBUG update_deal_and_balance: No MacroContact found for referal phone: {referal_phone}")
+    
+    # Сохраняем все изменения в БД
+    try:
+        db.session.commit()
+        print(f"DEBUG update_deal_and_balance: ✅ Changes committed to database")
+    except Exception as e:
+        db.session.rollback()
+        print(f"DEBUG update_deal_and_balance: ❌ Error committing changes: {e}")
+        raise
     
     print(f"DEBUG update_deal_and_balance: ---- Finished for Referal ID: {referal.id}. Final contract_number: '{referal.referal_data.contract_number}' ----")
 

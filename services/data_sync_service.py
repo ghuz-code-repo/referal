@@ -20,7 +20,10 @@ def fetch_data_from_mysql():
         'database': os.getenv('MYSQL_DATABASE'),
         'user': os.getenv('MYSQL_USER'),
         'password': os.getenv('MYSQL_PASSWORD'),
-        'cursorclass': pymysql.cursors.Cursor
+        'cursorclass': pymysql.cursors.Cursor,
+        'connect_timeout': 600,  # 10 минут на подключение
+        'read_timeout': 1800,    # 30 минут на чтение результатов
+        'write_timeout': 600     # 10 минут на запись
     }
     
     print("=== Starting synchronous data fetch ===")
@@ -36,30 +39,174 @@ def fetch_data_from_mysql():
     deals_result = _fetch_and_process_deals_task(mysql_config, app.app_context())
     print(f"Deals task result: {deals_result}")
     
-    # Update referal-deal links after synchronization
-    print("\n=== UPDATING REFERAL-DEAL LINKS ===")
+    # НОВЫЙ ШАГ: Нормализация телефонов в ReferalData
+    print("\n=== NORMALIZING REFERAL PHONE NUMBERS ===")
     with app.app_context():
-        from models import Referal, User
-        from services import referal_service
+        _normalize_referal_phone_numbers()
+    
+    # Update referal-deal links after synchronization
+    print("\n=== UPDATING REFERAL-DEAL LINKS AND PAYMENTS ===")
+    with app.app_context():
+        from models import Referal, ReferalDeal
         
-        # Get all users who have referals
-        users_with_referals = User.query.join(Referal).distinct().all()
-        updated_users = 0
+        # Получаем все рефералы
+        all_referals = Referal.query.join(ReferalData).all()
+        print(f"Found {len(all_referals)} referals to process")
+        
         updated_referals = 0
+        created_links = 0
+        updated_payments = 0
         
-        print(f"Found {len(users_with_referals)} users with referals")
-        
-        for user in users_with_referals:
+        for referal in all_referals:
             try:
-                referals_before = len(user.referals) if hasattr(user, 'referals') else 0
-                referal_service.update_deal_info(user)
-                updated_users += 1
-                updated_referals += referals_before
-                print(f"✅ Updated deals for user {user.login} ({referals_before} referals)")
+                print(f"\n🔍 Processing Referal ID={referal.id}, Phone={referal.referal_data.phone_number}, Name={referal.referal_data.full_name}")
+                
+                # 0) Найти реферала (контакт) по номеру телефона или имени
+                contact = None
+                referal_phone = referal.referal_data.phone_number
+                
+                # Пробуем найти по телефону
+                if referal_phone:
+                    referal_phone_variants = utils.extract_and_normalize_phones(referal_phone)
+                    for phone_variant in referal_phone_variants:
+                        contact = MacroContact.query.filter_by(phone_number=phone_variant).first()
+                        if contact:
+                            print(f"  ✅ Found contact by phone: {phone_variant}")
+                            break
+                        contact = MacroContact.query.filter(MacroContact.phone_number.contains(phone_variant)).first()
+                        if contact:
+                            print(f"  ✅ Found contact by partial phone match: {phone_variant}")
+                            break
+                
+                # Если не найден по телефону, ищем по имени
+                if not contact and referal.referal_data.full_name:
+                    referal_full_name = referal.referal_data.full_name.strip()
+                    contact = MacroContact.query.filter_by(full_name=referal_full_name).first()
+                    if contact:
+                        print(f"  ✅ Found contact by name: {referal_full_name}")
+                
+                if not contact:
+                    print(f"  ⚠️ Contact not found for referal")
+                    continue
+                
+                # Обновляем contact_id в referal
+                if referal.contact_id != contact.contacts_id:
+                    referal.contact_id = contact.contacts_id
+                    print(f"  ✅ Updated referal.contact_id = {contact.contacts_id}")
+                
+                # 1) Найти договора РЕФЕРАЛА (клиента) с оплатами > 3000000
+                referal_date = referal.created_at.date()
+                deals = MacroDeal.query.filter_by(contacts_buy_id=contact.contacts_id).all()
+                
+                if not deals:
+                    print(f"  ⚠️ No deals found for contact {contact.contacts_id}")
+                    continue
+                
+                print(f"  📋 Found {len(deals)} deals for contact {contact.contacts_id}")
+                
+                suitable_deals_found = False
+                
+                for deal in deals:
+                    # Проверяем условия:
+                    # - Договор заключен ПОЗЖЕ даты добавления реферала
+                    # - Оплата > 3000000
+                    if not deal.agreement_date:
+                        print(f"    ⏭️ Deal {deal.agreement_number}: No agreement date")
+                        continue
+                    
+                    if deal.agreement_date <= referal_date:
+                        print(f"    ⏭️ Deal {deal.agreement_number}: Date {deal.agreement_date} <= referal date {referal_date}")
+                        continue
+                    
+                    if (deal.total_payments or 0) <= 3000000:
+                        print(f"    ⏭️ Deal {deal.agreement_number}: Payment {deal.total_payments} <= 3000000")
+                        continue
+                    
+                    # Договор подходит!
+                    days_diff = (deal.agreement_date - referal_date).days
+                    print(f"    ✅ MATCH! Deal {deal.agreement_number}: Payment={deal.total_payments}, Date={deal.agreement_date} (+{days_diff} days)")
+                    
+                    # 2) Привязать договор к рефералу (через ReferalDeal)
+                    existing_link = ReferalDeal.query.filter_by(
+                        referal_id=referal.id,
+                        deal_id=deal.id
+                    ).first()
+                    
+                    if not existing_link:
+                        is_within_window = days_diff <= referal.days_window
+                        new_link = ReferalDeal(
+                            referal_id=referal.id,
+                            deal_id=deal.id,
+                            is_within_window=is_within_window,
+                            days_from_referal_creation=days_diff
+                        )
+                        db.session.add(new_link)
+                        created_links += 1
+                        print(f"    ✅ Created ReferalDeal link (within_window={is_within_window})")
+                    else:
+                        print(f"    ℹ️ ReferalDeal link already exists")
+                    
+                    # Обновляем referal_id в MacroDeal для relationship
+                    if deal.referal_id != referal.id:
+                        deal.referal_id = referal.id
+                    
+                    # 3) Вычислить сумму выплаты от площади квартиры
+                    deal_metr = deal.deal_metr or 0
+                    withdrawal_amount = 0
+                    
+                    if 20.0 <= deal_metr < 40.0:
+                        withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_40M', 0))
+                    elif 40.0 <= deal_metr < 60.0:
+                        withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_60M', 0))
+                    elif 60.0 <= deal_metr < 80.0:
+                        withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_80M', 0))
+                    elif deal_metr >= 80.0:
+                        withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_81M', 0))
+                    
+                    if withdrawal_amount > 0:
+                        # 4) Записать сумму выплаты в ReferalDeal
+                        if existing_link:
+                            if existing_link.withdrawal_amount != withdrawal_amount:
+                                existing_link.withdrawal_amount = withdrawal_amount
+                                updated_payments += 1
+                                print(f"    💰 Updated withdrawal_amount: {withdrawal_amount} (area={deal_metr}m²)")
+                        else:
+                            # Для нового линка устанавливаем сразу
+                            new_link.withdrawal_amount = withdrawal_amount
+                            print(f"    💰 Set withdrawal_amount: {withdrawal_amount} (area={deal_metr}m²)")
+                        
+                        # Также обновляем данные в Referal для совместимости
+                        if not referal.referal_data.contract_number:
+                            referal.referal_data.contract_number = deal.agreement_number
+                        if not referal.deal_metr:
+                            referal.deal_metr = deal_metr
+                        if not referal.withdrawal_amount:
+                            referal.withdrawal_amount = withdrawal_amount
+                    
+                    suitable_deals_found = True
+                    # Берём первый подходящий договор (можно убрать break если нужны все)
+                    break
+                
+                if suitable_deals_found:
+                    updated_referals += 1
+                else:
+                    print(f"  ⚠️ No suitable deals found (all deals filtered out)")
+                
             except Exception as e:
-                print(f"❌ Error updating deals for user {user.login}: {e}")
+                print(f"❌ Error processing referal {referal.id}: {e}")
+                import traceback
+                traceback.print_exc()
         
-        print(f"✅ Updated {updated_users} users with {updated_referals} referals")
+        # Сохраняем все изменения
+        try:
+            db.session.commit()
+            print(f"\n✅ Successfully updated {updated_referals} referals")
+            print(f"   - Created {created_links} new ReferalDeal links")
+            print(f"   - Updated {updated_payments} withdrawal amounts")
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Error committing changes: {e}")
+            raise
     
     # Update last deal dates for all contacts
     print("\n=== UPDATING LAST DEAL DATES ===")
@@ -558,6 +705,7 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
             existing_deals_count = MacroDeal.query.count()
             print(f"{task_name}: Current deals in database: {existing_deals_count}")
             
+            # Use mysql_config directly - it already contains all timeout settings
             connection = pymysql.connect(**mysql_config)
             print(f"{task_name}: Connected to MySQL database successfully")
             
@@ -570,6 +718,8 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                     total_deals_to_process = count_result[0]
                 print(f"{task_name}: Total deals to process: {total_deals_to_process}")
 
+                print(f"{task_name}: ⏳ Executing complex SQL query with JOINs... This may take a few minutes...")
+                
                 # Fetch deals data with total payments from finances table + property details
                 # Суммируем все ПРОВЕДЕННЫЕ платежи по договору из таблицы finances (кроме брони)
                 # Также получаем данные о недвижимости для генерации актов
@@ -609,17 +759,29 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                              es.estate_riser, es.estate_floor, h.id,
                              ed.finances_income, ed.agreement_date
                 """
+                
+                # Start timer
+                import time
+                query_start = time.time()
+                print(f"{task_name}: 🔄 Query execution started at {time.strftime('%H:%M:%S')}")
+                
                 cursor.execute(query_deals)
-                print(f"{task_name}: Executed SELECT query for deals.")
+                
+                query_duration = time.time() - query_start
+                print(f"{task_name}: ✅ Query executed successfully in {query_duration:.2f} seconds")
+                print(f"{task_name}: 🔄 Starting to fetch and process results...")
 
                 batch_size = int(os.getenv('DB_FETCH_DEALS_BATCH_SIZE', 1000))
                 batch_number = 0
                 total_deals_processed = 0
                 
                 while True:
+                    fetch_start = time.time()
                     rows = cursor.fetchmany(batch_size)
+                    fetch_duration = time.time() - fetch_start
+                    
                     if not rows:
-                        print(f"✅ {task_name}: All batches processed!")
+                        print(f"✅ {task_name}: All batches processed! No more rows to fetch.")
                         break
                     
                     batch_number += 1
@@ -628,10 +790,12 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                     
                     # Показываем прогресс
                     progress_pct = (total_deals_processed / total_deals_to_process) * 100 if total_deals_to_process > 0 else 0
-                    print(f"📊 DEALS Batch {batch_number} | Fetched: {current_batch_size} rows | Total: {total_deals_processed}/{total_deals_to_process} ({progress_pct:.1f}%)")
+                    print(f"📊 DEALS Batch {batch_number} | Fetched: {current_batch_size} rows in {fetch_duration:.2f}s | Total: {total_deals_processed}/{total_deals_to_process} ({progress_pct:.1f}%)")
                     
                     deals_in_batch_to_add = []
                     deals_updated_count = 0
+                    processing_start = time.time()
+                    
                     for row_data in rows: 
                         (deal_status_name, agreement_number, contacts_buy_id, deal_area, total_payments,
                          project_name, house_address, house_number, apartment_number, rooms, entrance, 
@@ -695,9 +859,13 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                     
                     # Commit all changes (updates + inserts)
                     try:
-                        db.session.commit() 
+                        commit_start = time.time()
+                        db.session.commit()
+                        commit_duration = time.time() - commit_start
+                        processing_duration = time.time() - processing_start
+                        
                         total_in_batch = len(deals_in_batch_to_add) + deals_updated_count
-                        print(f"💾 DEALS Batch {batch_number} | Committed: {len(deals_in_batch_to_add)} new + {deals_updated_count} updated | Total loaded: {loaded_deals}")
+                        print(f"💾 DEALS Batch {batch_number} | Committed: {len(deals_in_batch_to_add)} new + {deals_updated_count} updated | Total loaded: {loaded_deals} | Processing: {processing_duration:.2f}s | Commit: {commit_duration:.2f}s")
                     except Exception as e:
                         db.session.rollback()
                         error_msg = f"{task_name}: Error committing batch: {str(e)}"
@@ -805,3 +973,41 @@ def _update_last_deal_dates_for_contacts():
         db.session.rollback()
         print(f"❌ Error updating last_deal_dates: {e}")
         raise
+
+
+def _normalize_referal_phone_numbers():
+    """
+    Нормализует телефоны в ReferalData в формат '+998 XX XXX XX XX' 
+    для соответствия формату MacroContact.
+    Это критично для правильной работы синхронизации договоров.
+    """
+    from models import ReferalData, db
+    from utils import format_phone_number
+    
+    print("Starting phone number normalization...")
+    
+    # Получаем все записи ReferalData
+    referal_data_list = ReferalData.query.all()
+    updated_count = 0
+    
+    for referal_data in referal_data_list:
+        if referal_data.phone_number:
+            # Нормализуем телефон в формат с пробелами
+            normalized = format_phone_number(referal_data.phone_number)
+            
+            # Обновляем только если формат изменился
+            if normalized and normalized != referal_data.phone_number:
+                old_phone = referal_data.phone_number
+                referal_data.phone_number = normalized
+                updated_count += 1
+                print(f"  Normalized phone for referal {referal_data.referal_id}: '{old_phone}' -> '{normalized}'")
+    
+    # Сохраняем изменения
+    try:
+        db.session.commit()
+        print(f"✅ Normalized {updated_count} phone numbers in ReferalData")
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error normalizing phone numbers: {e}")
+        raise
+

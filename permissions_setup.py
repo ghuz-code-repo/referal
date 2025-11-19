@@ -48,6 +48,7 @@ def setup_referal_permissions():
     registry.register('admin.panel', 'Admin Panel', 'Access to administration panel', 'admin')
     registry.register('admin.settings', 'System Settings', 'Manage system settings and configuration', 'admin')
     registry.register('admin.logs', 'View Logs', 'View system logs and audit trails', 'admin')
+    registry.register('admin.force_update', 'Force Sync Update', 'Force synchronization with MacroData (admin only)', 'admin')
     
     return registry
 

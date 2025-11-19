@@ -311,15 +311,15 @@ def add_referal():
                 'message': 'Телефон реферала обязателен для заполнения'
             })
         
-        # Validate and format phone
-        phone_digits = re.sub(r'\D', '', phone)
-        if len(phone_digits) < 9:
+        # Validate and format phone using standard format_phone_number
+        from utils import format_phone_number
+        formatted_phone = format_phone_number(phone)
+        
+        if not formatted_phone:
             return jsonify({
                 'success': False,
                 'message': 'Пожалуйста, введите корректный номер телефона'
             })
-        
-        formatted_phone = f"+998{phone_digits[-9:]}"
         
         # Check if referral with this phone already exists
         existing_referal = Referal.query.join(ReferalData).filter(

@@ -7,6 +7,7 @@ pandas
 flask
 flask_login
 flask_sqlalchemy
+gunicorn
 requests
 pymysql
 psycopg2-binary

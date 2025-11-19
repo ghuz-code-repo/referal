@@ -179,6 +179,9 @@ def get_user_role_type():
     # Проверяем сервисные роли
     if service_roles_str:
         service_roles = [role.strip() for role in service_roles_str.split(',')]
+        # ВАЖНО: проверяем admin первым!
+        if 'admin' in service_roles:
+            return 'admin'
         if 'analytic' in service_roles or 'analytics' in service_roles:
             return 'analytics'
         if 'manager' in service_roles:

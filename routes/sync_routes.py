@@ -33,11 +33,19 @@ def register_referal_permissions():
     registry.register("referal.payments.view", "Просмотр платежей", "Просмотр истории платежей и балансов", "payments")
     registry.register("referal.payments.request", "Запрос выплат", "Запрос вывода средств", "payments")
     
+    # Разрешения на уведомления
+    registry.register("referal.notifications.new_referral", "Уведомления о новых рефералах", "Получение email уведомлений при создании новых рефералов", "notifications")
+    registry.register("referal.notifications.status_change", "Уведомления об изменении статуса", "Получение уведомлений при изменении статуса реферала", "notifications")
+    registry.register("referal.notifications.payment", "Уведомления о платежах", "Получение уведомлений о платежах и выплатах", "notifications")
+    registry.register("referal.notifications.admin", "Административные уведомления", "Получение административных уведомлений и алертов", "notifications")
+    
     # Административные функции
     registry.register("referal.admin.panel", "Админ панель", "Доступ к административной панели", "admin")
     registry.register("referal.admin.change_status", "Изменение статусов", "Изменение статусов вывода средств рефералов", "admin")
     registry.register("referal.admin.reports", "Отчеты", "Просмотр административных отчетов", "admin")
     registry.register("referal.admin.export", "Экспорт данных", "Экспорт данных в Excel", "admin")
+    registry.register("referal.admin.force_update", "Принудительная синхронизация", "Запуск принудительной синхронизации с MacroData", "admin")
+
 
     # Детализированные разрешения для статусов
     # Статус "Ждет проверки" (ID: 0)

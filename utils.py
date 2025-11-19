@@ -48,6 +48,83 @@ def clean_phone_number(phone: str) -> str:
     return re.sub(r'[^\d+]', '', phone.strip())
 
 
+def extract_and_normalize_phones(phone_field: str) -> list:
+    """
+    Извлекает и нормализует все номера телефонов из строки.
+    Обрабатывает различные форматы:
+    - 9989773824501 (без разделителей)
+    - +998.974031753 (с точками)
+    - (+998.981154200,+998.914093336) (несколько телефонов в скобках через запятую)
+    - +998 90 315 84 14 (с пробелами)
+    
+    Возвращает список всех уникальных вариантов нормализованных номеров для поиска.
+    """
+    if not phone_field:
+        return []
+    
+    phones = []
+    
+    # Удаляем внешние скобки если есть
+    phone_field = phone_field.strip()
+    if phone_field.startswith('(') and phone_field.endswith(')'):
+        phone_field = phone_field[1:-1]
+    
+    # Разделяем по запятым для случая с несколькими номерами
+    phone_parts = [p.strip() for p in phone_field.split(',')]
+    
+    for part in phone_parts:
+        if not part:
+            continue
+        
+        # Убираем точки, пробелы, скобки, дефисы - оставляем только + и цифры
+        clean = re.sub(r'[^\d+]', '', part)
+        
+        if not clean or len(clean) < 9:
+            continue
+        
+        # Генерируем варианты для поиска
+        variants = set()
+        
+        # Вариант 1: как есть после очистки
+        variants.add(clean)
+        
+        # Вариант 2: добавляем + в начало если нет
+        if not clean.startswith('+'):
+            variants.add('+' + clean)
+        
+        # Вариант 3: убираем + если есть
+        if clean.startswith('+'):
+            variants.add(clean[1:])
+        
+        # Вариант 4: для узбекских номеров - стандартизация
+        # Если начинается с 998 или +998
+        if clean.startswith('+998') or clean.startswith('998'):
+            # Извлекаем основную часть (9 цифр после 998)
+            digits = clean.replace('+', '').replace('998', '', 1)
+            if len(digits) == 9:
+                # Добавляем все варианты
+                variants.add('998' + digits)  # 9989XXXXXXXX
+                variants.add('+998' + digits)  # +9989XXXXXXXX
+                variants.add(digits)  # 9XXXXXXXX (без кода страны)
+                # НОВОЕ: добавляем формат С ПРОБЕЛАМИ для поиска в MacroContact
+                variants.add(f"+998 {digits[:2]} {digits[2:5]} {digits[5:7]} {digits[7:9]}")  # +998 XX XXX XX XX
+        
+        # Вариант 5: если номер начинается с 9 и длина 12-13 цифр (998 + 9 цифр)
+        elif clean.startswith('9') and len(clean) >= 12:
+            # Возможно это 9989XXXXXXXX без +
+            if clean[:3] == '998':
+                digits = clean[3:]
+                if len(digits) == 9:
+                    variants.add(clean)  # 9989XXXXXXXX
+                    variants.add('+' + clean)  # +9989XXXXXXXX
+                    variants.add('998' + digits)  # на случай если код дублируется
+        
+        phones.extend(variants)
+    
+    # Убираем дубликаты и возвращаем
+    return list(set(phones))
+
+
 def format_phone_number(phone: str) -> Optional[str]:
     """Форматирует номер телефона согласно стандартам"""
     if not phone:
@@ -681,7 +758,7 @@ def sync_user_profile_always(user):
 
 def get_call_center_users_from_auth():
     """
-    Получает список пользователей с ролью call-center из auth-service.
+    Получает список пользователей с разрешением на получение уведомлений о новых рефералах из auth-service.
     
     Returns:
         list: Список пользователей с email и другими данными, или пустой список при ошибке
@@ -696,22 +773,22 @@ def get_call_center_users_from_auth():
             print("❌ AuthClient not available")
             return []
         
-        # Запрашиваем пользователей с ролью call-center для сервиса referal
-        users_url = f"/api/services/referal/users-by-role/call-center"
+        # Запрашиваем пользователей с разрешением referal.notifications.new_referral
+        users_url = f"/api/services/referal/users-by-permission/referal.notifications.new_referral"
         full_url = f"{auth_client.auth_service_url.rstrip('/')}{users_url}"
         
-        print(f"📡 Fetching call-center users from: {full_url}")
+        print(f"📡 Fetching notification recipients from: {full_url}")
         
         response = requests.get(full_url, timeout=5)
         
         if response.status_code == 200:
             users = response.json()
-            print(f"✅ Found {len(users)} call-center users")
+            print(f"✅ Found {len(users)} users with notification permission")
             return users
         else:
-            print(f"⚠️ Failed to get call-center users: {response.status_code} - {response.text}")
+            print(f"⚠️ Failed to get notification recipients: {response.status_code} - {response.text}")
             return []
             
     except Exception as e:
-        print(f"❌ Error getting call-center users from auth-service: {e}")
+        print(f"❌ Error getting notification recipients from auth-service: {e}")
         return []

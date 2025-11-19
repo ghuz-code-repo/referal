@@ -1092,3 +1092,41 @@ def force_update():
         flash(f'Ошибка при обновлении данных: {str(e)}', 'error')
     
     return redirect(url_for('admin.admin_panel'))
+
+@admin_bp.route('/debug_my_permissions')
+def debug_my_permissions():
+    """Debug endpoint - показывает разрешения текущего пользователя"""
+    user = get_current_user()
+    user_role = get_user_role_type()
+    has_force_update = has_permission('referal.admin.force_update')
+    has_admin_panel = has_permission('referal.admin.panel')
+    
+    # Получаем все заголовки
+    headers = dict(request.headers)
+    
+    # Получаем permissions из заголовков
+    permissions_header = request.headers.get('X-User-Permissions', '')
+    service_roles_header = request.headers.get('X-User-Service-Roles', '')
+    
+    return f"""
+    <h1>Debug: Your Permissions</h1>
+    <h2>User Info</h2>
+    <p>Username: {headers.get('X-User-Name', 'Unknown')}</p>
+    <p>Email: {headers.get('X-User-Email', 'Unknown')}</p>
+    <p>User Role Type: {user_role}</p>
+    
+    <h2>Permission Checks</h2>
+    <p>has_permission('referal.admin.force_update'): <b>{has_force_update}</b></p>
+    <p>has_permission('referal.admin.panel'): <b>{has_admin_panel}</b></p>
+    
+    <h2>Headers</h2>
+    <p>X-User-Service-Roles: {service_roles_header}</p>
+    <p>X-User-Permissions: {permissions_header[:500]}...</p>
+    
+    <h2>All Headers</h2>
+    <pre>{chr(10).join(f'{k}: {v}' for k, v in headers.items() if 'User' in k or 'Auth' in k)}</pre>
+    
+    <hr>
+    <a href="/referal/force_update">Try Force Update</a> | 
+    <a href="/referal/admin">Back to Admin Panel</a>
+    """

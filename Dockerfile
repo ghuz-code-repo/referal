@@ -21,21 +21,21 @@ ENV FLASK_APP=app.py
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy auth-connector package
-COPY auth-connector /tmp/auth-connector
-
-# Copy the requirements file into the container at /app
-COPY requirements.txt .
-
-# Install auth-connector first
-RUN pip install --no-cache-dir /tmp/auth-connector
+# Copy requirements file first for better caching
+COPY referal/requirements.txt .
 
 # Install any needed packages specified in requirements.txt
 # Use --no-cache-dir to reduce image size  
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy shared auth-connector package from parent directory
+COPY auth-connector /tmp/auth-connector
+
+# Install auth-connector (will be updated on each build with --force-reinstall)
+RUN pip install --no-cache-dir --force-reinstall /tmp/auth-connector
+
 # Copy the rest of the application code into the container at /app
-COPY . .
+COPY referal/ .
 
 # Make port 80 available to the world outside this container
 EXPOSE 80
@@ -44,5 +44,10 @@ EXPOSE 80
 # Set environment variable to use this file
 ENV RESOLV_CONF=/etc/resolv.conf.override
 
-# Run app_with_auth_connector.py for auth integration
-CMD ["python", "app_with_auth_connector.py"]
+# Run with gunicorn production server
+# --workers 1: Use 1 worker process (single registration for service discovery)
+# --bind 0.0.0.0:80: Listen on all interfaces, port 80
+# --timeout 120: Timeout for worker processes (for long-running sync tasks)
+# --access-logfile -: Log requests to stdout
+# --error-logfile -: Log errors to stdout
+CMD ["gunicorn", "--workers", "1", "--bind", "0.0.0.0:80", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "app_with_auth_connector:app"]
