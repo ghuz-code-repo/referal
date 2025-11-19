@@ -164,7 +164,7 @@ def fetch_data_from_mysql():
                         withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_81M', 0))
                     
                     if withdrawal_amount > 0:
-                        # 4) Записать сумму выплаты в ReferalDeal
+                        # 4) Записать сумму выплаты в ReferalDeal (ВСЕГДА обновляем!)
                         if existing_link:
                             if existing_link.withdrawal_amount != withdrawal_amount:
                                 existing_link.withdrawal_amount = withdrawal_amount
@@ -175,13 +175,11 @@ def fetch_data_from_mysql():
                             new_link.withdrawal_amount = withdrawal_amount
                             print(f"    💰 Set withdrawal_amount: {withdrawal_amount} (area={deal_metr}m²)")
                         
-                        # Также обновляем данные в Referal для совместимости
+                        # Также обновляем данные в Referal для совместимости (ВСЕГДА обновляем!)
                         if not referal.referal_data.contract_number:
                             referal.referal_data.contract_number = deal.agreement_number
-                        if not referal.deal_metr:
-                            referal.deal_metr = deal_metr
-                        if not referal.withdrawal_amount:
-                            referal.withdrawal_amount = withdrawal_amount
+                        referal.deal_metr = deal_metr  # ВСЕГДА обновляем площадь
+                        referal.withdrawal_amount = withdrawal_amount  # ВСЕГДА обновляем выплату
                     
                     suitable_deals_found = True
                     # Берём первый подходящий договор (можно убрать break если нужны все)

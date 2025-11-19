@@ -47,7 +47,8 @@ ENV RESOLV_CONF=/etc/resolv.conf.override
 # Run with gunicorn production server
 # --workers 1: Use 1 worker process (single registration for service discovery)
 # --bind 0.0.0.0:80: Listen on all interfaces, port 80
-# --timeout 120: Timeout for worker processes (for long-running sync tasks)
+# --timeout 600: Timeout for worker processes (10 min for long-running sync tasks)
+# --graceful-timeout 600: Graceful shutdown timeout
 # --access-logfile -: Log requests to stdout
 # --error-logfile -: Log errors to stdout
-CMD ["gunicorn", "--workers", "1", "--bind", "0.0.0.0:80", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "app_with_auth_connector:app"]
+CMD ["gunicorn", "--workers", "1", "--bind", "0.0.0.0:80", "--timeout", "600", "--graceful-timeout", "600", "--access-logfile", "-", "--error-logfile", "-", "app_with_auth_connector:app"]
