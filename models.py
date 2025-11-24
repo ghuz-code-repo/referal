@@ -9,7 +9,13 @@ class User(db.Model):
     user_data = db.relationship('UserData', backref='user', lazy=True, uselist=False)
     login = db.Column(db.String(80), unique=True, nullable=False)
     auth_user_id = db.Column(db.String(24), nullable=True)  # MongoDB ObjectId from auth-service
+    
+    # DEPRECATED: role поле устарело! Роли теперь управляются через permissions в auth-service
+    # Это поле оставлено только для обратной совместимости
+    # TODO: Удалить после полной миграции на систему permissions
+    # Используйте: get_user_role_type() из permission_utils для определения роли на основе permissions
     role = db.Column(db.String(50), nullable=False, default='user')
+    
     referals = db.relationship('Referal', backref='user', lazy=True)
     current_balance = db.Column(db.Integer, default=0)
     pending_withdrawal = db.Column(db.Integer, default=0)

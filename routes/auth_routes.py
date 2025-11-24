@@ -88,8 +88,9 @@ def get_current_user():
 
     # if user and (user.user_data.full_name != full_name):
     #     user.user_data.full_name = full_name
-    if user and (user.role != role):
-        user.role = role
+    # DEPRECATED: Не обновляем user.role - роли теперь управляются через permissions в auth-service
+    # if user and (user.role != role):
+    #     user.role = role
         
     # Обновляем auth_user_id если он не установлен, но есть в заголовках
     if user and not user.auth_user_id:
@@ -125,3 +126,66 @@ def debug_headers():
         'decoded_full_name': decoded_name,
         'encoding_header': request.headers.get('X-User-Full-Name-Encoding', 'not-set')
     })
+
+
+@auth_bp.route('/debug-documents')
+def debug_documents():
+    """Отладочный маршрут для проверки получения документов из auth-service"""
+    from flask import current_app
+    import requests
+    
+    user_id = request.headers.get('X-User-ID')
+    username = request.headers.get('X-User-Name')
+    
+    result = {
+        'user_id': user_id,
+        'username': username,
+        'auth_service_url': current_app.config.get('AUTH_SERVICE_URL', 'NOT_SET'),
+        'documents_from_headers': {},
+        'documents_from_api': {},
+        'api_request_details': {},
+        'errors': []
+    }
+    
+    # 1. Документы из заголовков
+    result['documents_from_headers'] = {
+        'passport_number': request.headers.get('X-User-Passport-Number'),
+        'passport_giver': request.headers.get('X-User-Passport-Giver'),
+        'passport_date': request.headers.get('X-User-Passport-Date'),
+        'passport_address': request.headers.get('X-User-Passport-Address'),
+        'pinfl': request.headers.get('X-User-PINFL'),
+        'bank_name': request.headers.get('X-User-Bank-Name'),
+        'bank_card': request.headers.get('X-User-Bank-Card'),
+        'bank_account': request.headers.get('X-User-Bank-Account'),
+        'bank_mfo': request.headers.get('X-User-Bank-MFO'),
+    }
+    
+    # 2. Документы через API
+    if user_id:
+        try:
+            auth_service_url = current_app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
+            api_url = f"{auth_service_url}/api/users/{user_id}/documents/for-service/referal"
+            
+            result['api_request_details']['url'] = api_url
+            result['api_request_details']['method'] = 'GET'
+            result['api_request_details']['timeout'] = 5
+            
+            response = requests.get(api_url, timeout=5)
+            result['api_request_details']['status_code'] = response.status_code
+            result['api_request_details']['response_headers'] = dict(response.headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                result['documents_from_api'] = data
+            else:
+                result['errors'].append(f"API returned status {response.status_code}")
+                result['api_request_details']['response_text'] = response.text[:500]
+                
+        except requests.RequestException as e:
+            result['errors'].append(f"Network error: {str(e)}")
+        except Exception as e:
+            result['errors'].append(f"General error: {str(e)}")
+    else:
+        result['errors'].append('No X-User-ID header found')
+    
+    return jsonify(result)

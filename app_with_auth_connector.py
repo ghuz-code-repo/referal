@@ -431,11 +431,13 @@ def home():
                                      required_permissions=['referal.admin.panel', 'referal.referrals.list', 'referal.referrals.create']), 403
             
     except ImportError:
-        # Legacy fallback
+        # DEPRECATED: Legacy fallback - используется только если auth-connector недоступен
+        # TODO: Удалить после полной миграции на auth-connector
         try:
             from routes.auth_routes import get_current_user
             user = get_current_user()
             if user and hasattr(user, 'role') and user.role in ['admin', 'manager', 'call-center']:
+                print("DEBUG HOME: DEPRECATED - Legacy redirect based on user.role field")
                 return redirect(url_for('admin.admin_panel'))
         except Exception as e:
             pass

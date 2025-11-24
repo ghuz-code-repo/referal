@@ -1,4 +1,16 @@
-"""Маршруты для работы с рефералами"""
+"""
+⚠️ DEPRECATED: Этот файл НЕ ИСПОЛЬЗУЕТСЯ в production!
+============================================================
+Вместо него используется: referal_routes_with_auth_connector.py
+
+Этот файл содержит СТАРУЮ систему аутентификации на основе user.role
+и оставлен только для справки и обратной совместимости.
+
+TODO: Удалить после полной миграции на новую систему permissions
+============================================================
+
+Маршруты для работы с рефералами (LEGACY VERSION)
+"""
 
 import random
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
@@ -10,6 +22,8 @@ from services import referal_service, notification_service, data_sync_service, w
 import utils
 import os
 
+# DEPRECATED: Этот Blueprint НЕ регистрируется в app.py
+# Вместо него используется referal_bp из referal_routes_with_auth_connector.py
 referal_bp = Blueprint('referal', __name__)
 
 
@@ -31,6 +45,7 @@ def referal_list():
         </html>
         """), 401
     
+    # DEPRECATED: Проверка по user.role - используйте permissions вместо этого!
     if user.role == 'admin' or user.role == 'manager' or user.role == 'call-center':
         """Перенаправление на административную панель для администраторов."""
         return redirect(url_for('admin.admin_panel'))

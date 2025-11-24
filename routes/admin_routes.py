@@ -249,17 +249,21 @@ def debug_current_user():
                 'headers': dict(request.headers)
             })
         
+        # Получаем тип роли на основе permissions
+        role_type = get_user_role_type()
+        
         user_info = {
             'status': 'user_found',
             'user': {
                 'id': user.id,
                 'login': user.login,
-                'role': user.role,
+                'role_type': role_type,  # Роль определяется из permissions
+                'legacy_role': user.role,  # DEPRECATED: старое поле для совместимости
                 'auth_user_id': user.auth_user_id,
                 'full_name': get_user_full_name_from_auth(user)
             },
             'headers': dict(request.headers),
-            'admin_access': user.role in ['admin', 'manager', 'call-center']
+            'admin_access': requires_admin_access()  # Проверка через permissions
         }
         
         return jsonify(user_info)
@@ -322,7 +326,7 @@ def admin_panel():
         flash('Доступ запрещен - пользователь не найден', 'error')
         return redirect(url_for('referal.profile'))
         
-    # Check permissions instead of hardcoded roles
+    # Проверка доступа через permissions (новая система)
     if not requires_admin_access():
         flash('Доступ запрещен - недостаточно прав', 'error')
         return redirect(url_for('referal.profile'))
