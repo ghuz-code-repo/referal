@@ -34,10 +34,20 @@ def register_referal_permissions():
     registry.register("referal.payments.request", "Запрос выплат", "Запрос вывода средств", "payments")
     
     # Разрешения на уведомления
+    # Общие уведомления
+    registry.register("referal.notifications.all", "Все уведомления сервиса", "Получение ВСЕХ email уведомлений от сервиса рефералов (глобальное)", "notifications")
     registry.register("referal.notifications.new_referral", "Уведомления о новых рефералах", "Получение email уведомлений при создании новых рефералов", "notifications")
-    registry.register("referal.notifications.status_change", "Уведомления об изменении статуса", "Получение уведомлений при изменении статуса реферала", "notifications")
     registry.register("referal.notifications.payment", "Уведомления о платежах", "Получение уведомлений о платежах и выплатах", "notifications")
     registry.register("referal.notifications.admin", "Административные уведомления", "Получение административных уведомлений и алертов", "notifications")
+    
+    # Уведомления по статусам - при переходе В конкретный статус
+    registry.register("referal.notifications.status.pending", "Уведомление: Ожидает проверки", "Получение уведомлений при переходе реферала в статус 'Ждёт проверки'", "notifications_status")
+    registry.register("referal.notifications.status.analytics_review", "Уведомление: Проверка аналитики", "Получение уведомлений при переходе реферала в статус 'Проверка отделом аналитики'", "notifications_status")
+    registry.register("referal.notifications.status.callcenter_review", "Уведомление: Проверка КЦ", "Получение уведомлений при переходе реферала в статус 'Проверка колл центром'", "notifications_status")
+    registry.register("referal.notifications.status.director_review", "Уведомление: Проверка директора", "Получение уведомлений при переходе реферала в статус 'Проверка Коммерческим Директором'", "notifications_status")
+    registry.register("referal.notifications.status.accepted", "Уведомление: Принято к оплате", "Получение уведомлений при переходе реферала в статус 'Акцептовано к оплате'", "notifications_status")
+    registry.register("referal.notifications.status.paid", "Уведомление: Оплачено", "Получение уведомлений при переходе реферала в статус 'Оплачено'", "notifications_status")
+    registry.register("referal.notifications.status.rejected", "Уведомление: Отклонено", "Получение уведомлений при переходе реферала в статус 'Отклонено'", "notifications_status")
     
     # Административные функции
     registry.register("referal.admin.panel", "Админ панель", "Доступ к административной панели", "admin")
