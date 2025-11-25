@@ -24,17 +24,26 @@ def get_agreement(user_id):
         # Получаем данные пользователя из базы
         user = User.query.get_or_404(user_id)
         
-        # Автоматически синхронизируем данные пользователя из auth-service
-        from utils import sync_user_data_from_auth_service
-        from flask import request
-        sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
-        
-        user_data = user.user_data  # Получаем связанные данные пользователя
-        
-        if not user_data:
-            flash('Не найдены данные пользователя', 'error')
+        if not user.auth_user_id:
+            flash('Пользователь не связан с auth-service', 'error')
             return redirect(url_for('referal.profile'))
-
+        
+        # Получаем документы пользователя из Auth-Service
+        from app_with_auth_connector import get_user_documents_from_auth_service
+        documents = get_user_documents_from_auth_service(user.auth_user_id)
+        
+        # Получаем профиль пользователя из auth-service через заголовки
+        from app_with_auth_connector import app
+        auth_service_url = app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
+        import requests
+        profile_response = requests.get(f"{auth_service_url}/api/users/{user.auth_user_id}/profile", timeout=5)
+        
+        if profile_response.status_code != 200:
+            flash('Ошибка получения данных пользователя из auth-service', 'error')
+            return redirect(url_for('referal.profile'))
+        
+        profile = profile_response.json()
+        
         # Определяем путь к шаблону
         template_path = os.path.join(current_app.root_path, 'documents', f"{os.getenv('AGREEMENT_DOC_NAME')}.docx")
 
@@ -42,9 +51,18 @@ def get_agreement(user_id):
         # Загружаем шаблон
         doc = Document(template_path)
         
-        # Подготавливаем данные для замены (используем данные из UserData)
+        # Подготавливаем данные для замены (используем данные из Auth-Service)
         current_date = datetime.now()
         formatted_date = f"{current_date.day} {month_name_genitive(current_date.month)} {current_date.year}"
+        
+        # Формируем полное имя
+        full_name_parts = [
+            profile.get('last_name', ''),
+            profile.get('first_name', ''),
+            profile.get('middle_name', ''),
+            profile.get('suffix', '')
+        ]
+        full_name = ' '.join([p for p in full_name_parts if p]).strip()
         
         replacements = {
             #Дата в шапке (возможно не будет использоваться)
@@ -53,20 +71,20 @@ def get_agreement(user_id):
             'year': current_date.year,
             
             #Данные пользователя 1я страница
-            'full_name': user_data.full_name or '',
-            'passport_number': user_data.passport_number or '',
-            'passport_giver': user_data.passport_giver or '',
-            'passport_date': user_data.passport_date.strftime('%d.%m.%Y') if user_data.passport_date else '',
-            'passport_address': user_data.passport_adress or '',
+            'full_name': full_name,
+            'passport_number': documents.get('passport_number', ''),
+            'passport_giver': documents.get('passport_giver', ''),
+            'passport_date': documents.get('passport_date', ''),
+            'passport_address': documents.get('passport_address', ''),
             
             #Подвал (паспорт адрес и имя тоже юзаются)
-            'pinfl': user_data.pinfl.replace(' ','') or '',
-            'trans_schet': user_data.trans_schet.replace(' ','') or '',
-            'card_number': user_data.card_number.replace(' ','') or '',
-            'bank': user_data.bank_name or '',
-            'mfo': user_data.mfo or '',
-            'phone': user_data.phone.replace(' ','') or '',
-            'e_mail': user_data.e_mail or '',
+            'pinfl': (documents.get('pinfl', '') or '').replace(' ', ''),
+            'trans_schet': (documents.get('bank_account', '') or '').replace(' ', ''),
+            'card_number': (documents.get('bank_card', '') or '').replace(' ', ''),
+            'bank': documents.get('bank_name', ''),
+            'mfo': documents.get('bank_mfo', ''),
+            'phone': (profile.get('phone', '') or '').replace(' ', ''),
+            'e_mail': profile.get('email', ''),
 
         }
 
@@ -91,7 +109,7 @@ def get_agreement(user_id):
                 missing_fields.append(field_name)
         
         if missing_fields:
-            error_message = f"Невозможно сгенерировать акт. Отсутствуют обязательные поля: {', '.join(missing_fields)}"
+            error_message = f"Невозможно сгенерировать соглашение. Отсутствуют обязательные поля: {', '.join(missing_fields)}"
             flash(error_message, 'error')
             return redirect(url_for('referal.profile'))
 
@@ -105,7 +123,7 @@ def get_agreement(user_id):
         file_stream.seek(0)
 
         # Генерируем имя файла
-        safe_name = re.sub(r'[^\w\s-]', '', user_data.full_name or 'user').strip()
+        safe_name = re.sub(r'[^\w\s-]', '', full_name or 'user').strip()
         filename = f"agreement_{safe_name}_{current_date.strftime('%Y%m%d')}.docx"
 
         return send_file(
@@ -149,20 +167,41 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             
             user = referal.user
             
-            # ПРИНУДИТЕЛЬНО синхронизируем данные пользователя из auth-service
-            from utils import sync_user_data_from_auth_service
-            from flask import request
-            sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
-            
-            user_data = user.user_data if user else None
-            referal_data = referal.referal_data
-            
-            if not user or not user_data:
-                flash('Не найдены данные пользователя для данного реферала', 'error')
+            if not user or not user.auth_user_id:
+                flash('Пользователь не связан с auth-service', 'error')
                 return redirect(url_for('referal.profile'))
             
-            # Проверяем наличие паспортных данных реферера (из документа паспорта)
-            if not user_data.full_name or not user_data.passport_number:
+            # Получаем документы реферера из Auth-Service
+            from app_with_auth_connector import get_user_documents_from_auth_service, app
+            import requests
+            
+            user_documents = get_user_documents_from_auth_service(user.auth_user_id)
+            auth_service_url = app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
+            profile_response = requests.get(f"{auth_service_url}/api/users/{user.auth_user_id}/profile", timeout=5)
+            
+            if profile_response.status_code != 200:
+                flash('Ошибка получения данных реферера из auth-service', 'error')
+                return redirect(url_for('referal.profile'))
+            
+            user_profile = profile_response.json()
+            
+            # Формируем полное имя реферера
+            user_full_name_parts = [
+                user_profile.get('last_name', ''),
+                user_profile.get('first_name', ''),
+                user_profile.get('middle_name', ''),
+                user_profile.get('suffix', '')
+            ]
+            user_full_name = ' '.join([p for p in user_full_name_parts if p]).strip()
+            
+            referal_data = referal.referal_data
+            
+            if not referal_data:
+                flash('Не найдены данные реферала', 'error')
+                return redirect(url_for('referal.profile'))
+            
+            # Проверяем наличие паспортных данных реферера из Auth-Service
+            if not user_full_name or not user_documents.get('passport_number'):
                 flash('❌ Отсутствуют паспортные данные реферера. Пожалуйста, заполните ФИО и номер паспорта в профиле перед генерацией акта.', 'error')
                 return redirect(url_for('referal.profile'))
                 
@@ -193,17 +232,34 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             
             user = referal.user
             
-            # ПРИНУДИТЕЛЬНО синхронизируем данные пользователя из auth-service
-            from utils import sync_user_data_from_auth_service
-            from flask import request
-            sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
-            
-            user_data = user.user_data if user else None
-            referal_data = referal.referal_data
-            
-            if not user or not user_data:
-                flash('Не найдены данные пользователя для данного реферала', 'error')
+            if not user or not user.auth_user_id:
+                flash('Пользователь не связан с auth-service', 'error')
                 return redirect(url_for('referal.profile'))
+            
+            # Получаем документы реферера из Auth-Service
+            from app_with_auth_connector import get_user_documents_from_auth_service, app
+            import requests
+            
+            user_documents = get_user_documents_from_auth_service(user.auth_user_id)
+            auth_service_url = app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
+            profile_response = requests.get(f"{auth_service_url}/api/users/{user.auth_user_id}/profile", timeout=5)
+            
+            if profile_response.status_code != 200:
+                flash('Ошибка получения данных реферера из auth-service', 'error')
+                return redirect(url_for('referal.profile'))
+            
+            user_profile = profile_response.json()
+            
+            # Формируем полное имя реферера
+            user_full_name_parts = [
+                user_profile.get('last_name', ''),
+                user_profile.get('first_name', ''),
+                user_profile.get('middle_name', ''),
+                user_profile.get('suffix', '')
+            ]
+            user_full_name = ' '.join([p for p in user_full_name_parts if p]).strip()
+            
+            referal_data = referal.referal_data
                 
             if not referal_data:
                 flash('Не найдены данные реферала', 'error')
@@ -301,7 +357,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             'month': month_name_genitive(int(agreement_date.month)),
             'year': agreement_date.year,
             
-            'full_name': (user_data.full_name or '').upper(),
+            'full_name': (user_full_name or '').upper(),
             'referal_name': (referal_data.full_name or '').upper(),
             'referal_passport_number': referal_data.passport_number or '',
             'referal_passport_date': referal_passport_date_str,
@@ -328,11 +384,11 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
                 int(round((withdrawal_amount or 0)/(1-float(os.getenv('NDS_PERCENT'))/100) + float(os.getenv('NDS_ROUNDING_ADJUSTMENT', '1'))))
             ).replace(',', ' '),
             
-            'referer_name': (user_data.full_name or '').upper(),
-            'passport_address': user_data.passport_adress or '',
-            'pinfl': user_data.pinfl.replace(' ','') or '',
-            'referer_phone': user_data.phone.replace(' ','') or '',
-            'referer_email': user_data.e_mail or '',
+            'referer_name': (user_full_name or '').upper(),
+            'passport_address': user_documents.get('passport_address', ''),
+            'pinfl': (user_documents.get('pinfl', '') or '').replace(' ', ''),
+            'referer_phone': (user_profile.get('phone', '') or '').replace(' ', ''),
+            'referer_email': user_profile.get('email', ''),
         }
 
         # Проверяем наличие всех обязательных полей с указанием источника данных
@@ -344,11 +400,10 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             'pinfl': ('ПИНФЛ реферера', 'Профиль пользователя → Документ ПИНФЛ'),
             'referer_phone': ('Телефон реферера', 'Профиль пользователя'),
             
-            # Данные реферала (клиента)
+            # Данные реферала (клиента) - только имя и номер паспорта обязательны
             'referal_name': ('Полное имя реферала (клиента)', 'Данные реферала'),
             'referal_passport_number': ('Номер паспорта реферала', 'Данные реферала → Паспорт'),
-            'referal_passport_date': ('Дата выдачи паспорта реферала', 'Данные реферала → Паспорт'),
-            'referal_passport_giver': ('Орган выдачи паспорта реферала', 'Данные реферала → Паспорт'),
+            # referal_passport_date и referal_passport_giver - опциональные
             
             # Данные сделки (из MacroCRM)
             'contract_number': ('Номер договора', 'Данные сделки из MacroCRM'),

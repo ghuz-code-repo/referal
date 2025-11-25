@@ -18,6 +18,8 @@ function getApiBasePath() {
 
 // Глобальная переменная для хранения текущего referal_id
 let currentReferalId = null;
+// Глобальная переменная для хранения данных реферала
+let currentReferalData = null;
 
 /**
  * Открывает модальное окно с договорами реферала
@@ -115,6 +117,9 @@ function loadDealsData(referalId) {
 function displayDealsData(data) {
     console.log('📊 displayDealsData called with:', data);
     
+    // Сохраняем данные реферала глобально для проверки при создании строк
+    currentReferalData = data;
+    
     // Список всех необходимых элементов
     const elementIds = [
         'deals-referal-name-header',
@@ -206,24 +211,48 @@ function createDealRow(deal, index) {
     const statusId = deal.status_id ?? 0; // Если null/undefined, считаем что 0
     const canSendForReview = statusId === 0;
     
+    // Проверяем заполненность всех обязательных данных реферала
+    const isReferalDataComplete = currentReferalData && 
+                                  currentReferalData.referal_name && currentReferalData.referal_name.trim() &&
+                                  currentReferalData.referal_phone && currentReferalData.referal_phone.trim() &&
+                                  currentReferalData.passport_number && currentReferalData.passport_number.trim() &&
+                                  currentReferalData.passport_giver && currentReferalData.passport_giver.trim() &&
+                                  currentReferalData.passport_date;
+    
+    console.log('🔍 Referal data complete:', isReferalDataComplete, currentReferalData);
+    
     tr.innerHTML = `
         <td>${index + 1}</td>
         <td><strong>${deal.agreement_number || '—'}</strong></td>
         <td>${(deal.withdrawal_amount || 0).toLocaleString('ru-RU')} ₽</td>
         <td class="deal-actions">
-            <a href="${basePath}/get_deal_act/${deal.referal_deal_id}" 
-               class="btn-icon btn-download" 
-               title="Скачать акт"
-               target="_blank">
-                <i class="fas fa-download"></i> Скачать акт
-            </a>
-            ${canSendForReview ? `
+            ${isReferalDataComplete ? `
+                <a href="${basePath}/get_deal_act/${deal.referal_deal_id}" 
+                   class="btn-icon btn-download" 
+                   title="Скачать акт"
+                   target="_blank">
+                    <i class="fas fa-download"></i> Скачать акт
+                </a>
+            ` : `
+                <button class="btn-icon btn-download disabled" 
+                        disabled
+                        title="Заполните все обязательные поля реферала для скачивания акта">
+                    <i class="fas fa-download"></i> Скачать акт
+                </button>
+            `}
+            ${canSendForReview ? (isReferalDataComplete ? `
                 <button class="btn-icon btn-send" 
                         onclick="sendDealForReview(${deal.referal_deal_id})"
                         title="Отправить на проверку">
                     <i class="fas fa-paper-plane"></i> На проверку
                 </button>
             ` : `
+                <button class="btn-icon btn-send disabled" 
+                        disabled
+                        title="Заполните все обязательные поля реферала для отправки на проверку">
+                    <i class="fas fa-paper-plane"></i> На проверку
+                </button>
+            `) : `
                 <span class="deal-status-badge status-${statusId}">
                     ${deal.status_name || 'Статус неизвестен'}
                 </span>

@@ -67,18 +67,25 @@ class UserData(db.Model):
     first_name = db.Column(db.String(100), nullable=True)
     last_name = db.Column(db.String(100), nullable=True)
     middle_name = db.Column(db.String(100), nullable=True)
-    passport_number = db.Column(db.String(50), nullable=True)
-    passport_giver = db.Column(db.String(100), nullable=True)
-    passport_date = db.Column(db.DateTime, nullable=True)
-    passport_adress = db.Column(db.String(255), nullable=True)
+    # DEPRECATED: Document fields - use Auth-Service API instead
+    # Documents should be fetched from Auth-Service in real-time:
+    # - Via API: /api/users/{user_id}/documents/for-service/referal
+    # - Via headers: X-User-Passport-*, X-User-PINFL, X-User-Bank-*
+    # See: app_with_auth_connector.py:get_user_documents_from_auth_service()
+    passport_number = db.Column(db.String(50), nullable=True)  # DEPRECATED
+    passport_giver = db.Column(db.String(100), nullable=True)  # DEPRECATED
+    passport_date = db.Column(db.DateTime, nullable=True)  # DEPRECATED
+    passport_adress = db.Column(db.String(255), nullable=True)  # DEPRECATED
     # mail_adress = db.Column(db.String(255), nullable=True)
-    #Finance docs
-    pinfl = db.Column(db.String(50), nullable=True)
-    bank_name = db.Column(db.String(100), nullable=True)
-    trans_schet = db.Column(db.String(50), nullable=True)
-    card_number = db.Column(db.String(50), nullable=True)
-    mfo = db.Column(db.String(50), nullable=True)
-    #Contact data
+    
+    # DEPRECATED: Financial document fields - use Auth-Service API instead
+    pinfl = db.Column(db.String(50), nullable=True)  # DEPRECATED
+    bank_name = db.Column(db.String(100), nullable=True)  # DEPRECATED
+    trans_schet = db.Column(db.String(50), nullable=True)  # DEPRECATED
+    card_number = db.Column(db.String(50), nullable=True)  # DEPRECATED
+    mfo = db.Column(db.String(50), nullable=True)  # DEPRECATED
+    
+    # Contact data (still valid - not documents)
     phone = db.Column(db.String(20), nullable=True)
     e_mail = db.Column(db.String(50), nullable=True)
 

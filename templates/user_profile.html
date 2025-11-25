@@ -47,7 +47,8 @@
                         <div class="info-card card">
                             <div class="info-header">
                                 <h3><i class="fas fa-user"></i> Основная информация</h3>
-                                {% set user_data_complete = current_user!=None and current_user.user_data!=None and current_user.user_data.full_name!=None and current_user.user_data.full_name!='' and current_user.user_data.passport_number!=None and current_user.user_data.passport_number!='' and current_user.user_data.passport_giver!=None and current_user.user_data.passport_giver!='' and current_user.user_data.passport_date!=None and current_user.user_data.passport_adress!=None and current_user.user_data.passport_adress!='' and current_user.user_data.pinfl!=None and current_user.user_data.pinfl!='' and current_user.user_data.bank_name!=None and current_user.user_data.bank_name!='' and current_user.user_data.trans_schet!=None and current_user.user_data.trans_schet!='' and current_user.user_data.card_number!=None and current_user.user_data.card_number!='' and current_user.user_data.mfo!=None and current_user.user_data.mfo!='' and current_user.user_data.phone!=None and current_user.user_data.phone!=''%}
+                                {% set auth_user = get_auth_user_data() %}
+                                {% set user_data_complete = auth_user and auth_user.full_name and auth_user.passport_number and auth_user.passport_giver and auth_user.passport_date and auth_user.passport_address and auth_user.pinfl and auth_user.bank_name and auth_user.bank_account and auth_user.bank_card and auth_user.bank_mfo and auth_user.phone %}
                                 {% if current_user.role=='referer' %}
                                 <div class="download-act-container">
                                     {% if user_data_complete %}
@@ -197,7 +198,7 @@
                                                        id="pinfl" 
                                                        name="pinfl" 
                                                        class="form-input input"
-                                                       value="{{ auth_user.pinfl if auth_user and auth_user.pinfl else (current_user.user_data.pinfl if current_user.user_data else '')|clean_none }}"
+                                                       value="{{ (auth_user.pinfl if auth_user else '')|clean_none }}"
                                                        placeholder="1 234567 890 123 4"
                                                        maxlength="18"
                                                        readonly>
@@ -210,7 +211,7 @@
                                                            id="passport_number" 
                                                            name="passport_number" 
                                                            class="form-input input"
-                                                           value="{{ auth_user.passport_number if auth_user and auth_user.passport_number else (current_user.user_data.passport_number if current_user.user_data else '')|clean_none }}"
+                                                           value="{{ (auth_user.passport_number if auth_user else '')|clean_none }}"
                                                            placeholder="AA1234567"
                                                            readonly>
                                                 </div>
@@ -222,7 +223,7 @@
                                                            id="passport_date" 
                                                            name="passport_date" 
                                                            class="form-input input"
-                                                           value="{{ auth_user.passport_date if auth_user and auth_user.passport_date else (current_user.user_data.passport_date.strftime('%Y-%m-%d') if current_user.user_data and current_user.user_data.passport_date else '') }}"
+                                                           value="{{ auth_user.passport_date if auth_user else '' }}"
                                                            readonly>
                                                 </div>
                                             </div>
@@ -234,7 +235,7 @@
                                                        id="passport_giver" 
                                                        name="passport_giver" 
                                                        class="form-input input"
-                                                       value="{{ auth_user.passport_giver if auth_user and auth_user.passport_giver else (current_user.user_data.passport_giver if current_user.user_data else '')|clean_none }}"
+                                                       value="{{ (auth_user.passport_giver if auth_user else '')|clean_none }}"
                                                        placeholder="Орган выдачи"
                                                        readonly>
                                             </div>
@@ -247,7 +248,7 @@
                                                            id="passport_adress" 
                                                            name="passport_adress" 
                                                            class="form-input input"
-                                                           value="{{ auth_user.passport_address if auth_user and auth_user.passport_address else (current_user.user_data.passport_adress if current_user.user_data else '')|clean_none }}"
+                                                           value="{{ (auth_user.passport_address if auth_user else '')|clean_none }}"
                                                            placeholder="Адрес регистрации"
                                                            readonly>
                                                 </div>
@@ -270,40 +271,43 @@
                                                            id="card_number" 
                                                            name="card_number" 
                                                            class="form-input input"
-                                                           value="{{ auth_user.bank_card if auth_user and auth_user.bank_card else (current_user.user_data.card_number if current_user.user_data else '')|clean_none }}"
+                                                           value="{{ (auth_user.bank_card if auth_user else '')|clean_none }}"
                                                            placeholder="8600 XXXX XXXX XXXX"
                                                            readonly>
                                                 </div>
 
                                                 <div class="form-group">
                                                     <label for="bank_name">Банк:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="text" 
                                                            id="bank_name" 
                                                            name="bank_name" 
                                                            class="form-input input"
-                                                           value="{{ auth_user.bank_name if auth_user and auth_user.bank_name else (current_user.user_data.bank_name if current_user.user_data else '')|clean_none }}"
+                                                           value="{{ (auth_user.bank_name if auth_user else '')|clean_none }}"
                                                            placeholder="Название банка"
                                                            readonly>
                                                 </div>
 
                                                 <div class="form-group">
                                                     <label for="trans_schet">Транзитный счет:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="text" 
                                                            id="trans_schet" 
                                                            name="trans_schet" 
                                                            class="form-input input"
-                                                           value="{{ auth_user.bank_account if auth_user and auth_user.bank_account else (current_user.user_data.trans_schet if current_user.user_data else '')|clean_none }}"
+                                                           value="{{ (auth_user.bank_account if auth_user else '')|clean_none }}"
                                                            placeholder="12345678901234567890"
                                                            readonly>
                                                 </div>
 
                                                 <div class="form-group">
                                                     <label for="mfo">МФО:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="text" 
                                                            id="mfo" 
                                                            name="mfo" 
                                                            class="form-input input"
-                                                           value="{{ auth_user.bank_mfo if auth_user and auth_user.bank_mfo else (current_user.user_data.mfo if current_user.user_data else '')|clean_none }}"
+                                                           value="{{ (auth_user.bank_mfo if auth_user else '')|clean_none }}"
                                                            placeholder="01234"
                                                            readonly>
                                                 </div>

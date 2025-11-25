@@ -1,6 +1,6 @@
 """Маршруты для администрирования"""
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from sqlalchemy import or_, cast, String, func, Date
 from services import fetch_data_from_mysql
 from services import notification_service
@@ -693,6 +693,56 @@ def admin_panel():
     
     print(f"✅ Synchronized {len(synced_users)} users")
     
+    # Загружаем документы для каждого пользователя из Auth-Service
+    print(f"📄 Loading documents for users from Auth-Service...")
+    user_documents = {}  # {user_id: {documents: [], download_urls: {}}}
+    
+    from app_with_auth_connector import get_user_documents_from_auth_service
+    import os
+    
+    # Собираем уникальных пользователей из рефералов и договоров
+    users_to_load = set()
+    if referals:
+        for referal in referals:
+            if referal.user and referal.user.auth_user_id:
+                users_to_load.add((referal.user.id, referal.user.auth_user_id))
+    
+    if deals:
+        for deal in deals:
+            if deal.referal and deal.referal.user and deal.referal.user.auth_user_id:
+                users_to_load.add((deal.referal.user.id, deal.referal.user.auth_user_id))
+    
+    # Загружаем документы для каждого пользователя
+    for user_id, auth_user_id in users_to_load:
+        try:
+            docs = get_user_documents_from_auth_service(auth_user_id)
+            
+            # Формируем URL для скачивания документов
+            auth_service_url = current_app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
+            download_urls = {
+                'pinfl': f"{auth_service_url}/api/users/{auth_user_id}/documents/pinfl/download",
+                'passport': f"{auth_service_url}/api/users/{auth_user_id}/documents/passport/download",
+                'bank_details': f"{auth_service_url}/api/users/{auth_user_id}/documents/bank_details/download",
+                'employment_certificate': f"{auth_service_url}/api/users/{auth_user_id}/documents/employment_certificate/download"
+            }
+            
+            user_documents[user_id] = {
+                'documents': docs,
+                'download_urls': download_urls,
+                'auth_user_id': auth_user_id
+            }
+            print(f"  📄 Loaded documents for user {user_id} (auth_user_id: {auth_user_id}): {docs}")
+        except Exception as e:
+            print(f"  ❌ Failed to load documents for user {user_id}: {e}")
+            user_documents[user_id] = {
+                'documents': {},
+                'download_urls': {},
+                'auth_user_id': auth_user_id,
+                'error': str(e)
+            }
+    
+    print(f"✅ Loaded documents for {len(user_documents)} users")
+    
     print(f"📋 Rendering template with selected_statuses: {selected_statuses}")
     print(f"📋 filter_statuses count: {len(statuses)}")
     
@@ -703,6 +753,7 @@ def admin_panel():
                           view_mode=view_mode,
                           deals=deals,
                           deals_pagination=deals_pagination,
+                          user_documents=user_documents,  # Документы пользователей из Auth-Service
                           all_statuses_in_db=all_statuses_in_db,  # Добавляем все статусы для фильтра
                           current_filters={
                               'status': status_filter,

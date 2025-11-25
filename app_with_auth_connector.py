@@ -126,30 +126,36 @@ app.jinja_env.filters['format_number'] = format_number_filter
 def get_user_documents_from_auth_service(user_id):
     """Получение документов пользователя из auth-service через API для сервиса referal
     Новая логика:
-    1) Получаем все документы пользователя для сервиса 'referal' 
-    2) Из каждой группы берем документ, который используется для данного сервиса
-    3) Если несколько документов в группе используются для сервиса - берем последний добавленный
+    1) Получаем ВСЕ документы пользователя
+    2) Фильтруем только те что разрешены для сервиса 'referal' 
+    3) Обрабатываем каждый документ и извлекаем поля
     """
     try:
         auth_service_url = app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
-        url = f"{auth_service_url}/api/users/{user_id}/documents/for-service/referal"
+        url = f"{auth_service_url}/api/users/{user_id}/documents"
         
-        print(f"🔍 Запрашиваю документы пользователя для сервиса referal: {url}")
+        print(f"🔍 Запрашиваю ВСЕ документы пользователя: {url}")
         
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            documents_for_service = data.get('documents_for_service', {})
-            print(f"📄 Получено {len(documents_for_service)} групп документов для пользователя {user_id}")
+            all_documents = data.get('documents', [])
+            
+            # Фильтруем только документы доступные для сервиса referal
+            referal_documents = [
+                doc for doc in all_documents 
+                if 'referal' in doc.get('allowed_services', [])
+            ]
+            
+            print(f"📄 Получено {len(all_documents)} документов, из них {len(referal_documents)} для referal")
             
             # Преобразуем документы в удобный формат
             result = {}
             
-            # Обрабатываем группу identity (паспорт, ПИНФЛ и т.д.)
-            if 'identity' in documents_for_service:
-                identity_doc = documents_for_service['identity']['document']
-                doc_type = identity_doc.get('document_type', '').lower()
-                fields = identity_doc.get('fields', {})
+            # Обрабатываем каждый документ
+            for doc in referal_documents:
+                doc_type = doc.get('document_type', '').lower()
+                fields = doc.get('fields', {})
                 
                 if doc_type == 'passport':
                     result.update({
@@ -158,33 +164,26 @@ def get_user_documents_from_auth_service(user_id):
                         'passport_date': fields.get('passport_date'),
                         'passport_address': fields.get('passport_address')
                     })
+                    print(f"🆔 Паспорт УЗ: {fields}")
                 elif doc_type == 'passport_ru':
                     result.update({
-                        'passport_number': f"{fields.get('series', '')} {fields.get('number', '')}".strip(),
-                        'passport_giver': fields.get('issued_by'),
-                        'passport_date': fields.get('issued_date'),
-                        'passport_address': fields.get('address', '')  # Может отсутствовать в РФ паспорте
+                        'passport_number': fields.get('passport_number'),
+                        'passport_giver': fields.get('passport_giver'),
+                        'passport_date': fields.get('passport_date'),
+                        'passport_address': fields.get('passport_address')
                     })
+                    print(f"🆔 Паспорт РФ: {fields}")
                 elif doc_type == 'pinfl':
                     result['pinfl'] = fields.get('pinfl')
-                
-                print(f"🆔 Документ удостоверения личности: {doc_type} - {fields}")
-            
-            # Обрабатываем группу financial (банковские данные)
-            if 'financial' in documents_for_service:
-                financial_doc = documents_for_service['financial']['document']
-                doc_type = financial_doc.get('document_type', '').lower()
-                fields = financial_doc.get('fields', {})
-                
-                if doc_type == 'bank_details':
+                    print(f"🆔 ПИНФЛ: {fields.get('pinfl')}")
+                elif doc_type == 'bank_details':
                     result.update({
                         'bank_name': fields.get('bank_name'),
                         'bank_card': fields.get('card_number'),
                         'bank_account': fields.get('trans_schet'),
                         'bank_mfo': fields.get('mfo')
                     })
-                
-                print(f"💳 Финансовый документ: {doc_type} - {fields}")
+                    print(f"💳 Банковские данные: {fields}")
             
             print(f"📋 Итоговые обработанные документы: {result}")
             return result

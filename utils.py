@@ -488,22 +488,17 @@ def sync_user_data_from_auth_service(user, force_sync=False, headers=None):
         
         user_data.full_name = ' '.join(name_parts) if name_parts else profile_data.get('full_name', '')
         
-        # Синхронизируем остальные данные профиля
+        # Синхронизируем только основные данные профиля (НЕ документы)
         user_data.phone = profile_data.get('phone') or profile_data.get('phone_number', '')
         user_data.e_mail = profile_data.get('email') or profile_data.get('e_mail', '')
-        user_data.passport_number = profile_data.get('passport_number', '')
-        user_data.passport_giver = profile_data.get('passport_issued_by', '')
-        user_data.passport_adress = profile_data.get('address', '')
         
-        # Парсим даты если они есть
-        if profile_data.get('passport_issued_date'):
-            try:
-                user_data.passport_date = datetime.fromisoformat(
-                    profile_data['passport_issued_date'].replace('Z', '+00:00')
-                ).date()
-            except (ValueError, AttributeError):
-                pass
-                
+        # ❌ DEPRECATED: Documents are NOT synced to local DB anymore
+        # Documents should be fetched from Auth-Service API in real-time:
+        # - Via headers (X-User-Passport-*, X-User-Bank-*, X-User-PINFL)
+        # - Via API: /api/users/{user_id}/documents/for-service/referal
+        # See app_with_auth_connector.py:get_user_documents_from_auth_service()
+        
+        # Parse birth_date if present
         if profile_data.get('birth_date'):
             try:
                 user_data.birth_date = datetime.fromisoformat(
@@ -511,52 +506,6 @@ def sync_user_data_from_auth_service(user, force_sync=False, headers=None):
                 ).date()
             except (ValueError, AttributeError):
                 pass
-        
-        # Получаем документы из auth-service
-        documents_url = f"/api/users/{user.auth_user_id}/documents"
-        documents_response = requests.get(
-            f"{auth_client.auth_service_url.rstrip('/')}{documents_url}",
-            timeout=10
-        )
-        
-        if documents_response.status_code == 200:
-            documents_data = documents_response.json()
-            documents = documents_data.get('documents', [])
-            
-            # Обновляем данные на основе документов
-            for doc in documents:
-                if doc.get('document_type') == 'pinfl':
-                    fields = doc.get('fields', {})
-                    if 'pinfl' in fields and fields['pinfl']:
-                        user_data.pinfl = fields['pinfl']
-                        
-                elif doc.get('document_type') == 'passport':
-                    fields = doc.get('fields', {})
-                    if 'passport_number' in fields and fields['passport_number']:
-                        user_data.passport_number = fields['passport_number']
-                    if 'passport_giver' in fields and fields['passport_giver']:
-                        user_data.passport_giver = fields['passport_giver']
-                    if 'passport_address' in fields and fields['passport_address']:
-                        user_data.passport_adress = fields['passport_address']
-                    if 'passport_date' in fields and fields['passport_date']:
-                        try:
-                            from datetime import datetime
-                            user_data.passport_date = datetime.strptime(
-                                fields['passport_date'], '%Y-%m-%d'
-                            ).date()
-                        except (ValueError, AttributeError):
-                            pass
-                            
-                elif doc.get('document_type') == 'bank_details':
-                    fields = doc.get('fields', {})
-                    if 'bank_name' in fields and fields['bank_name']:
-                        user_data.bank_name = fields['bank_name']
-                    if 'card_number' in fields and fields['card_number']:
-                        user_data.card_number = fields['card_number']
-                    if 'trans_schet' in fields and fields['trans_schet']:
-                        user_data.trans_schet = fields['trans_schet']
-                    if 'mfo' in fields and fields['mfo']:
-                        user_data.mfo = fields['mfo']
         
         # Fallback на заголовки если данные не пришли из API
         if headers and not user_data.phone:
@@ -728,11 +677,8 @@ def sync_user_profile_always(user):
         
         user_data.full_name = ' '.join(name_parts) if name_parts else profile_data.get('full_name', '')
         
-        # Дополнительные поля если есть
-        if 'passport_number' in profile_data:
-            user_data.passport_number = profile_data.get('passport_number', '')
-        if 'pinfl' in profile_data:
-            user_data.pinfl = profile_data.get('pinfl', '')
+        # ❌ DEPRECATED: Documents NOT synced to local DB
+        # Documents are fetched from Auth-Service in real-time only
         
         db.session.commit()
         print(f"✅ Successfully synced user data for {user.login}")
@@ -743,10 +689,7 @@ def sync_user_profile_always(user):
         print(f"   ➡️ FULL NAME (constructed): {user_data.full_name}")
         print(f"   Phone: {user_data.phone}")
         print(f"   Email: {user_data.e_mail}")
-        if user_data.pinfl:
-            print(f"   PINFL: {user_data.pinfl}")
-        if user_data.passport_number:
-            print(f"   Passport: {user_data.passport_number}")
+        print(f"   📄 Documents: NOT synced (fetch from Auth-Service API)")
         
         return True
         
