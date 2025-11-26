@@ -114,7 +114,7 @@ def fetch_data_from_mysql():
                         print(f"    ⏭️ Deal {deal.agreement_number}: No agreement date")
                         continue
                     
-                    if deal.agreement_date <= referal_date:
+                    if deal.agreement_date < referal_date:
                         print(f"    ⏭️ Deal {deal.agreement_number}: Date {deal.agreement_date} <= referal date {referal_date}")
                         continue
                     
