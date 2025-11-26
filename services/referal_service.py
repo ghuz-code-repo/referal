@@ -219,7 +219,7 @@ def update_deal_and_balance(referal, user):
                 print(f"  ❌ SKIPPED: No agreement date")
                 continue
             
-            if deal_date <= referal_date:
+            if deal_date < referal_date:
                 print(f"  ❌ SKIPPED: Deal date ({deal_date}) <= Referal date ({referal_date})")
                 continue
             
