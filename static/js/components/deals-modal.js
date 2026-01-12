@@ -224,7 +224,7 @@ function createDealRow(deal, index) {
     tr.innerHTML = `
         <td>${index + 1}</td>
         <td><strong>${deal.agreement_number || '—'}</strong></td>
-        <td>${(deal.withdrawal_amount || 0).toLocaleString('ru-RU')} ₽</td>
+        <td>${(deal.withdrawal_amount || 0).toLocaleString('ru-RU')} сум</td>
         <td class="deal-actions">
             ${isReferalDataComplete ? `
                 <a href="${basePath}/get_deal_act/${deal.referal_deal_id}" 
