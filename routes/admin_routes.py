@@ -1112,9 +1112,55 @@ def update_withdrawal_stage(referal_id):
     else:
         return redirect(url_for('admin.admin_panel'))
 
+# Глобальное состояние синхронизации (для отслеживания прогресса)
+import threading
+from datetime import datetime as dt
+
+_sync_status = {
+    'is_running': False,
+    'started_at': None,
+    'started_by': None,
+    'completed_at': None,
+    'last_error': None,
+    'last_result': None
+}
+_sync_lock = threading.Lock()
+
+
+def _run_sync_in_background(app, username):
+    """Выполняет синхронизацию в фоновом потоке"""
+    global _sync_status
+    
+    with app.app_context():
+        try:
+            print(f"🔄 Background sync STARTED by {username}")
+            fetch_data_from_mysql()
+            
+            with _sync_lock:
+                _sync_status['completed_at'] = dt.now()
+                _sync_status['is_running'] = False
+                _sync_status['last_result'] = 'success'
+                _sync_status['last_error'] = None
+            
+            print(f"✅ Background sync COMPLETED by {username}")
+            
+        except Exception as e:
+            with _sync_lock:
+                _sync_status['completed_at'] = dt.now()
+                _sync_status['is_running'] = False
+                _sync_status['last_result'] = 'error'
+                _sync_status['last_error'] = str(e)
+            
+            print(f"❌ Background sync FAILED by {username} | Error: {str(e)}")
+
+
 @admin_bp.route('/force_update', methods=['GET'])
 def force_update():
-    """Принудительное обновление всех рефералов. ТОЛЬКО для администраторов!"""
+    """Принудительное обновление всех рефералов. ТОЛЬКО для администраторов!
+    Запускает синхронизацию в фоновом режиме и сразу возвращает ответ.
+    """
+    global _sync_status
+    
     user = get_current_user()
     
     # Проверяем что пользователь существует
@@ -1134,19 +1180,55 @@ def force_update():
         flash('Доступ запрещен - недостаточно прав для принудительной синхронизации', 'error')
         return redirect(url_for('admin.admin_panel'))
     
-    # Логируем начало принудительной синхронизации
     username = request.headers.get('X-User-Name', user.login if hasattr(user, 'login') else 'Unknown')
-    print(f"🔄 Force update STARTED by admin | User: {username} | Role: {user_role}")
     
-    try:
-        fetch_data_from_mysql()
-        print(f"✅ Force update COMPLETED by {username}")
-        flash('Данные успешно обновлены из MySQL', 'success')
-    except Exception as e:
-        print(f"❌ Force update FAILED by {username} | Error: {str(e)}")
-        flash(f'Ошибка при обновлении данных: {str(e)}', 'error')
+    # Проверяем, не запущена ли уже синхронизация
+    with _sync_lock:
+        if _sync_status['is_running']:
+            started_at = _sync_status['started_at']
+            started_by = _sync_status['started_by']
+            flash(f'Синхронизация уже выполняется (запущена {started_by} в {started_at.strftime("%H:%M:%S")}). Дождитесь завершения.', 'warning')
+            return redirect(url_for('admin.admin_panel'))
+        
+        # Устанавливаем статус "выполняется"
+        _sync_status['is_running'] = True
+        _sync_status['started_at'] = dt.now()
+        _sync_status['started_by'] = username
+        _sync_status['completed_at'] = None
+        _sync_status['last_error'] = None
+        _sync_status['last_result'] = None
     
+    # Запускаем синхронизацию в фоновом потоке
+    print(f"🔄 Force update QUEUED by admin | User: {username} | Role: {user_role}")
+    
+    app = current_app._get_current_object()
+    sync_thread = threading.Thread(
+        target=_run_sync_in_background,
+        args=(app, username),
+        daemon=True
+    )
+    sync_thread.start()
+    
+    flash('Синхронизация запущена в фоновом режиме. Проверьте статус через несколько минут.', 'info')
     return redirect(url_for('admin.admin_panel'))
+
+
+@admin_bp.route('/sync_status', methods=['GET'])
+def sync_status():
+    """Возвращает текущий статус синхронизации (JSON)"""
+    global _sync_status
+    
+    with _sync_lock:
+        status = {
+            'is_running': _sync_status['is_running'],
+            'started_at': _sync_status['started_at'].isoformat() if _sync_status['started_at'] else None,
+            'started_by': _sync_status['started_by'],
+            'completed_at': _sync_status['completed_at'].isoformat() if _sync_status['completed_at'] else None,
+            'last_result': _sync_status['last_result'],
+            'last_error': _sync_status['last_error']
+        }
+    
+    return jsonify(status)
 
 @admin_bp.route('/debug_my_permissions')
 def debug_my_permissions():

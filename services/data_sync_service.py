@@ -182,8 +182,8 @@ def fetch_data_from_mysql():
                         referal.withdrawal_amount = withdrawal_amount  # ВСЕГДА обновляем выплату
                     
                     suitable_deals_found = True
-                    # Берём первый подходящий договор (можно убрать break если нужны все)
-                    break
+                    # ИСПРАВЛЕНО: НЕ прерываем цикл, чтобы обработать ВСЕ подходящие договора
+                    # break  # Удалено - теперь обрабатываются все договора
                 
                 if suitable_deals_found:
                     updated_referals += 1

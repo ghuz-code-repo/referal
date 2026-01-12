@@ -499,22 +499,59 @@ else:
 # Add scheduled tasks
 @scheduler.task('cron', id='update_deals', hour=10, minute=30)
 def update_deals_task():
-    """Обновление информации о сделках"""
+    """Обновление информации о сделках - полная синхронизация с MySQL.
+    Выполняется в фоновом режиме через APScheduler, не блокирует HTTP запросы.
+    """
     with app.app_context():
-        print("Starting scheduled deal update task...")
+        print("Starting scheduled deal update task (full sync)...")
+        
+        # Импортируем статус синхронизации из admin_routes для интеграции
         try:
-            # Получаем всех пользователей и обновляем их данные
-            users = User.query.all()
-            for user in users:
-                try:
-                    services.referal_service.update_deal_info(user)
-                    print(f"Updated deals for user: {user.login}")
-                except Exception as e:
-                    print(f"Error updating deals for user {user.login}: {str(e)}")
+            from routes.admin_routes import _sync_status, _sync_lock
+            from datetime import datetime as dt
             
-            print("Scheduled deal update task completed successfully")
+            with _sync_lock:
+                if _sync_status['is_running']:
+                    print("⚠️ Scheduled sync skipped - another sync is already running")
+                    return
+                
+                _sync_status['is_running'] = True
+                _sync_status['started_at'] = dt.now()
+                _sync_status['started_by'] = 'scheduler (cron)'
+                _sync_status['completed_at'] = None
+                _sync_status['last_error'] = None
+                _sync_status['last_result'] = None
+        except ImportError:
+            pass  # Fallback если admin_routes не загружен
+        
+        try:
+            from services import fetch_data_from_mysql
+            fetch_data_from_mysql()
+            
+            print("Scheduled deal update task completed successfully (full sync)")
+            
+            # Обновляем статус
+            try:
+                with _sync_lock:
+                    _sync_status['completed_at'] = dt.now()
+                    _sync_status['is_running'] = False
+                    _sync_status['last_result'] = 'success'
+                    _sync_status['last_error'] = None
+            except:
+                pass
+                
         except Exception as e:
             print(f"Error in scheduled deal update task: {str(e)}")
+            
+            # Обновляем статус ошибки
+            try:
+                with _sync_lock:
+                    _sync_status['completed_at'] = dt.now()
+                    _sync_status['is_running'] = False
+                    _sync_status['last_result'] = 'error'
+                    _sync_status['last_error'] = str(e)
+            except:
+                pass
 
 @app.before_request
 def before_request():

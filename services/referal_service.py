@@ -260,11 +260,16 @@ def update_deal_and_balance(referal, user):
                 deal_obj.referal_id = referal.id
                 print(f"  ✅ Set MacroDeal.referal_id={referal.id}")
             
-            referal.referal_data.contract_number = deal_obj.agreement_number
-            referal.deal_metr = deal_obj.deal_metr
-            print(f"  ✅ Set contract_number='{deal_obj.agreement_number}', deal_metr={deal_obj.deal_metr}")
+            # ИСПРАВЛЕНО: Обновляем contract_number только если ещё не установлен (для первого договора)
+            if not referal.referal_data.contract_number:
+                referal.referal_data.contract_number = deal_obj.agreement_number
+                referal.deal_metr = deal_obj.deal_metr
+                print(f"  ✅ Set contract_number='{deal_obj.agreement_number}', deal_metr={deal_obj.deal_metr}")
+            else:
+                print(f"  ✅ Additional deal linked: {deal_obj.agreement_number}")
             suitable_deal_found = True
-            break  # Берём первый подходящий договор
+            # ИСПРАВЛЕНО: НЕ прерываем цикл, чтобы обработать ВСЕ подходящие договора
+            # break  # Удалено - теперь обрабатываются все договора
 
         if not suitable_deal_found:
             print(f"❌ No suitable deals found for contact {contact.contacts_id}:")
