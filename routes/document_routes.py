@@ -379,7 +379,8 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             'floor': real_deal.floor or '',
             'max_floor': real_deal.max_floor or '',
             'appartment_area': real_deal.deal_metr,
-            'contract_price': '{:,}'.format(int(float(real_deal.agreement_price or 0))).replace(',', ' ') if real_deal.agreement_price else '',
+            # ИСПРАВЛЕНО: Используем agreement_price (цена договора), а если пустая - то total_payments (сумма оплат)
+            'contract_price': '{:,}'.format(int(float(real_deal.total_payments or 0))).replace(',', ' ') if (real_deal.total_payments) else '',
             'withdrawal_amount': '{:,}'.format(
                 int(round((withdrawal_amount or 0)/(1-float(os.getenv('NDS_PERCENT'))/100) + float(os.getenv('NDS_ROUNDING_ADJUSTMENT', '1'))))
             ).replace(',', ' '),
