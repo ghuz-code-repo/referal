@@ -1,5 +1,7 @@
 """Маршруты для администрирования"""
 
+import logging
+import sys
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from sqlalchemy import or_, cast, String, func, Date
 from services import fetch_data_from_mysql
@@ -28,6 +30,9 @@ from status_permissions import (
 import utils
 import os
 import requests
+
+# Настраиваем логирование для gunicorn
+logger = logging.getLogger('gunicorn.error')
 
 
 def get_user_email_from_auth_service(auth_user_id):
@@ -698,8 +703,7 @@ def admin_panel():
     user_documents = {}  # {user_id: {documents: [], download_urls: {}}}
     
     from app_with_auth_connector import get_user_documents_from_auth_service
-    import os
-    
+
     # Собираем уникальных пользователей из рефералов и договоров
     users_to_load = set()
     if referals:
@@ -861,22 +865,37 @@ def update_deal_status(deal_id):
 def add_deal_to_referal(referal_id):
     """Вручную добавляет договор к рефералу по номеру договора"""
     try:
+        print(f"🔍 add_deal_to_referal called for referal_id={referal_id}")
+        
         user = get_current_user()
-        if not user or not requires_admin_access():
+        print(f"🔍 get_current_user returned: {user}")
+        
+        has_access = requires_admin_access()
+        print(f"🔍 requires_admin_access returned: {has_access}")
+        
+        if not user or not has_access:
+            print(f"❌ Access denied: user={user}, has_access={has_access}")
             return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
         
         # Получаем номер договора из запроса
         data = request.get_json()
+        print(f"🔍 Request data: {data}")
+        
+        if not data:
+            return jsonify({'success': False, 'message': 'Не получены данные запроса'}), 400
+            
         agreement_number = data.get('agreement_number', '').strip()
         
         if not agreement_number:
             return jsonify({'success': False, 'message': 'Не указан номер договора'}), 400
         
+        print(f"🔍 Looking for referal with id={referal_id}")
         # Находим реферала
         referal = Referal.query.get(referal_id)
         if not referal:
             return jsonify({'success': False, 'message': 'Реферал не найден'}), 404
         
+        print(f"🔍 Looking for deal with agreement_number={agreement_number}")
         # Находим договор по номеру
         deal = MacroDeal.query.filter_by(agreement_number=agreement_number).first()
         if not deal:
@@ -884,6 +903,8 @@ def add_deal_to_referal(referal_id):
                 'success': False, 
                 'message': f'Договор с номером "{agreement_number}" не найден в базе данных'
             }), 404
+        
+        print(f"🔍 Found deal: id={deal.id}, agreement_number={deal.agreement_number}, deal_metr={deal.deal_metr}, total_payments={deal.total_payments}")
         
         # Проверяем не добавлен ли уже этот договор
         existing_link = ReferalDeal.query.filter_by(
@@ -897,13 +918,61 @@ def add_deal_to_referal(referal_id):
                 'message': f'Договор "{agreement_number}" уже привязан к этому рефералу'
             }), 400
         
+        # Рассчитываем сумму выплаты по площади квартиры (та же логика что и при автоматическом добавлении)
+        withdrawal_amount = 0
+        logger.error(f"🔥🔥🔥 НАЧИНАЕМ РАСЧЁТ ВЫПЛАТЫ для deal_id={deal.id}, deal_metr={deal.deal_metr}, total_payments={deal.total_payments}")
+        try:
+            # Проверяем есть ли оплата больше брони (3млн)
+            if deal.total_payments and deal.total_payments >= 3000000:
+                deal_metr = deal.deal_metr or 0
+                logger.error(f"🔥 УСЛОВИЕ 1 ВЫПОЛНЕНО: total_payments={deal.total_payments} >= 3000000")
+                
+                # Логика расчёта по площади из referal_service.py
+                if 20.0 <= deal_metr < 40.0:
+                    withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_40M', 300000))
+                    logger.error(f"🔥 ВЕТКА 20-40м²: withdrawal_amount={withdrawal_amount}")
+                elif 40.0 <= deal_metr < 60.0:
+                    withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_60M', 400000))
+                    logger.error(f"🔥 ВЕТКА 40-60м²: withdrawal_amount={withdrawal_amount}")
+                elif 60.0 <= deal_metr < 80.0:
+                    withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_80M', 500000))
+                    logger.error(f"🔥 ВЕТКА 60-80м²: withdrawal_amount={withdrawal_amount}")
+                elif deal_metr >= 80.0:
+                    withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_81M', 600000))
+                    logger.error(f"🔥 ВЕТКА 80+м²: withdrawal_amount={withdrawal_amount}")
+                elif deal_metr > 0:
+                    # Для квартир меньше 20м² - минимальная выплата
+                    withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_40M', 300000))
+                    logger.error(f"🔥 ВЕТКА <20м²: withdrawal_amount={withdrawal_amount}")
+                else:
+                    logger.error(f"🔥 НИ ОДНА ВЕТКА НЕ СРАБОТАЛА! deal_metr={deal_metr}")
+                
+                logger.error(f"💰 Calculated withdrawal_amount: {withdrawal_amount} for deal {deal.agreement_number} (deal_metr={deal_metr})")
+            else:
+                logger.error(f"⚠️ Deal {deal.agreement_number} has insufficient payments: {deal.total_payments}")
+        except Exception as calc_error:
+            import traceback
+            logger.error(f"❌ Error calculating withdrawal: {calc_error}")
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        
+        logger.error(f"🔥🔥🔥 ИТОГО withdrawal_amount={withdrawal_amount}")
+        sys.stdout.flush()
+        
+        # Обновляем contact_id (macro_id) у реферала из договора
+        if deal.contacts_buy_id and not referal.contact_id:
+            referal.contact_id = deal.contacts_buy_id
+            print(f"📋 Updated referal.contact_id = {deal.contacts_buy_id} from deal")
+        elif deal.contacts_buy_id and referal.contact_id != deal.contacts_buy_id:
+            # Если contact_id уже есть но отличается - логируем предупреждение
+            print(f"⚠️ Referal already has contact_id={referal.contact_id}, deal has contacts_buy_id={deal.contacts_buy_id}")
+        
         # Создаем связь
         referal_deal = ReferalDeal(
             referal_id=referal_id,
             deal_id=deal.id,
             status_id=0,  # Начальный статус "Ждет проверки"
-            is_within_window=False,  # Ручное добавление - помечаем что вне окна
-            withdrawal_amount=0,
+            is_within_window=True,  # Ручное добавление админом - считаем в окне
+            withdrawal_amount=withdrawal_amount,
             payment_processed=False,
             deal_status='pending',
             days_from_referal_creation=None  # Не рассчитываем для ручного добавления
@@ -912,11 +981,10 @@ def add_deal_to_referal(referal_id):
         db.session.add(referal_deal)
         db.session.commit()
         
-        print(f"✅ Admin manually added deal {agreement_number} to referal {referal_id} | User: {user.login}")
+        print(f"✅ Admin manually added deal {agreement_number} to referal {referal_id} | User: {user.login} | withdrawal_amount: {withdrawal_amount} | contact_id: {referal.contact_id}")
         
         # Отправляем уведомление менеджеру КЦ о новом договоре
         try:
-            import os
             from notification_client import get_notification_client
             
             notification_client = get_notification_client()
@@ -969,6 +1037,12 @@ def add_deal_to_referal(referal_id):
             'message': f'Договор "{agreement_number}" успешно привязан к рефералу',
             'deal_id': deal.id,
             'referal_deal_id': referal_deal.id,
+            'withdrawal_amount': withdrawal_amount,
+            'debug_info': {
+                'deal_metr': deal.deal_metr,
+                'total_payments': deal.total_payments,
+                'calculated_withdrawal': withdrawal_amount
+            },
             'deal_info': {
                 'agreement_number': deal.agreement_number,
                 'contacts_buy_id': deal.contacts_buy_id,

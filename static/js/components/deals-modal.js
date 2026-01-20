@@ -502,15 +502,16 @@ function openAddDealModalFromMenu() {
         return;
     }
     
-    // Получаем имя реферала из заголовка
+    // Сохраняем ID и имя ПЕРЕД закрытием модала
+    const referalId = currentReferalId;
     const referalNameElement = document.getElementById('deals-referal-name-header');
     const referalName = referalNameElement ? referalNameElement.textContent : 'Неизвестно';
     
-    console.log('🔧 Открываем добавление договора для реферала:', currentReferalId, referalName);
+    console.log('🔧 Открываем добавление договора для реферала:', referalId, referalName);
     
-    // Закрываем меню реферала
+    // Закрываем меню реферала (это обнулит currentReferalId)
     closeDealsModal();
     
-    // Открываем модал добавления договора
-    openAddDealModal(currentReferalId, referalName);
+    // Открываем модал добавления договора с сохранёнными данными
+    openAddDealModal(referalId, referalName);
 }

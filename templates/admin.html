@@ -658,6 +658,9 @@
                     <!-- Модальное окно списка договоров реферала (один раз для всей страницы) -->
                     {% include 'modals/deals_list_modal.html' %}
                     
+                    <!-- Модальное окно добавления договора вручную -->
+                    {% include 'modals/add_deal_modal.html' %}
+                    
                     <!-- Пагинация под таблицей -->
                     {% set base_pagination_url = url_for('admin.admin_panel') %}
                     {% if view_mode == 'deals' and deals_pagination %}
@@ -1124,18 +1127,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     </script>
-    </script>
 
     <script src="{{ url_for('static', filename='js/components/rejection_reason_opener.js') }}"></script>
-
-    <!-- Модальное окно для добавления договора -->
-    {% include 'modals/add_deal_modal.html' %}
-</script>
-
-</body>
-</html>
-
-</script>
 
 </body>
 </html>

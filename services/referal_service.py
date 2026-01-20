@@ -358,6 +358,10 @@ def update_deal_info(user):
 def check_contact_history_before_adding(phone_number, full_name, days_threshold=45):
     """
     Проверяет, были ли взаимодействия клиента с CRM в течение N дней до текущей даты.
+    Проверяет:
+    1. Наличие контакта в MacroContact и его договора
+    2. ПРЯМОЙ поиск по MacroDeal (независимо от MacroContact)
+    3. Дату последней сделки (last_deal_date) в MacroContact
     
     Args:
         phone_number: Номер телефона клиента
@@ -373,7 +377,8 @@ def check_contact_history_before_adding(phone_number, full_name, days_threshold=
             'first_interaction': datetime or None  # Дата первого взаимодействия
         }
     """
-    from datetime import timedelta
+    from datetime import timedelta, date
+    from sqlalchemy import or_
     
     # Форматируем телефон
     formatted_phone = utils.format_phone_number(phone_number)
@@ -382,74 +387,121 @@ def check_contact_history_before_adding(phone_number, full_name, days_threshold=
     
     # Определяем граничную дату
     threshold_date = datetime.now() - timedelta(days=days_threshold)
+    threshold_date_only = threshold_date.date()  # Для сравнения с date полями
     
-    print(f"DEBUG check_contact_history: Checking for phone={formatted_phone}, name={full_name}, threshold={threshold_date}")
+    print(f"🔍 CHECK HISTORY: phone={formatted_phone}, name={full_name}, threshold={threshold_date_only}")
     
-    # Ищем контакт в MacroContact
+    # ============================================
+    # ПРОВЕРКА 0: ПРЯМОЙ поиск в MacroDeal по ФИО
+    # Это КРИТИЧЕСКАЯ проверка - ищем договора напрямую!
+    # ============================================
+    if full_name:
+        # Ищем контакты в MacroContact по ФИО
+        contacts_by_name = MacroContact.query.filter_by(full_name=full_name.strip()).all()
+        print(f"🔍 Found {len(contacts_by_name)} contacts by name '{full_name}'")
+        
+        for contact in contacts_by_name:
+            deals = MacroDeal.query.filter_by(contacts_buy_id=contact.contacts_id).all()
+            print(f"🔍 Contact {contact.contacts_id} has {len(deals)} deals")
+            
+            for deal in deals:
+                if deal.agreement_date:
+                    deal_date = deal.agreement_date
+                    if hasattr(deal_date, 'date'):
+                        deal_date = deal_date.date()
+                    
+                    days_ago = (date.today() - deal_date).days
+                    print(f"🔍 Deal {deal.agreement_number}: date={deal_date}, days_ago={days_ago}")
+                    
+                    if deal_date >= threshold_date_only:
+                        print(f"❌ BLOCKED: Deal {deal.agreement_number} is within {days_threshold} days!")
+                        return {
+                            'can_add': False,
+                            'reason': f'У клиента есть договор №{deal.agreement_number} от {days_ago} дней назад',
+                            'contact': contact,
+                            'deals': deals,
+                            'first_interaction': datetime.combine(deal_date, datetime.min.time())
+                        }
+    
+    # ============================================
+    # ПРОВЕРКА 1: Ищем контакт в MacroContact по телефону
+    # ============================================
     contact = MacroContact.query.filter_by(phone_number=formatted_phone).first()
     
-    # Если контакта нет, также ищем по имени
     if not contact and full_name:
+        # Ищем по имени если не нашли по телефону
         contact = MacroContact.query.filter_by(full_name=full_name.strip()).first()
         if contact:
-            print(f"DEBUG check_contact_history: Found contact by name match: {contact.full_name}")
+            print(f"🔍 Found contact by name match: {contact.full_name}, contacts_id={contact.contacts_id}")
     
-    if not contact:
-        # Контакт не найден в CRM - можно добавлять
-        print(f"DEBUG check_contact_history: Contact not found in CRM - OK to add")
-        return {
-            'can_add': True,
-            'reason': 'Contact not found in CRM',
-            'contact': None,
-            'deals': [],
-            'first_interaction': None
-        }
-    
-    # Контакт найден - проверяем дату ПОСЛЕДНЕЙ СДЕЛКИ (не date_modified!)
-    # Используем last_deal_date - дата последней сделки клиента
-    last_interaction = contact.last_deal_date
-    
-    # Конвертируем date в datetime для сравнения с threshold_date
-    if last_interaction:
-        from datetime import datetime
-        last_interaction = datetime.combine(last_interaction, datetime.min.time())
-    
-    if not last_interaction:
-        # Нет данных о сделках - разрешаем добавление
-        print(f"DEBUG check_contact_history: No deal date found for contact - OK to add")
-        return {
-            'can_add': True,
-            'reason': 'No deal date found',
-            'contact': contact,
-            'deals': [],
-            'first_interaction': None
-        }
-    
-    # Проверяем, было ли взаимодействие в пределах threshold_date
-    if last_interaction >= threshold_date:
-        # Последняя сделка была недавно - ЗАПРЕЩАЕМ добавление
-        days_ago = (datetime.now() - last_interaction).days
+    if contact:
+        print(f"🔍 Found MacroContact: id={contact.id}, contacts_id={contact.contacts_id}, phone={contact.phone_number}")
         
-        # Ищем все договора этого контакта
+        # Проверяем договора этого контакта
         deals = MacroDeal.query.filter_by(contacts_buy_id=contact.contacts_id).all()
         
-        print(f"DEBUG check_contact_history: Contact had recent deal ({days_ago} days ago) - CANNOT add")
-        return {
-            'can_add': False,
-            'reason': f'У клиента была сделка {days_ago} дней назад (в пределах {days_threshold} дней)',
-            'contact': contact,
-            'deals': deals,
-            'first_interaction': last_interaction
-        }
+        if deals:
+            print(f"🔍 Found {len(deals)} deals for contacts_id={contact.contacts_id}")
+            
+            for deal in deals:
+                deal_date = deal.agreement_date
+                if deal_date:
+                    if hasattr(deal_date, 'date'):
+                        deal_date = deal_date.date()
+                    
+                    days_ago = (date.today() - deal_date).days
+                    print(f"🔍 Deal {deal.agreement_number}: date={deal_date}, days_ago={days_ago}")
+                    
+                    if deal_date >= threshold_date_only:
+                        print(f"❌ BLOCKED: Deal {deal.agreement_number} is within {days_threshold} days!")
+                        return {
+                            'can_add': False,
+                            'reason': f'У клиента есть договор №{deal.agreement_number} от {days_ago} дней назад',
+                            'contact': contact,
+                            'deals': deals,
+                            'first_interaction': datetime.combine(deal_date, datetime.min.time())
+                        }
+        
+        # Проверяем last_deal_date в MacroContact
+        if contact.last_deal_date:
+            last_deal = contact.last_deal_date
+            if isinstance(last_deal, date) and not isinstance(last_deal, datetime):
+                last_deal_dt = datetime.combine(last_deal, datetime.min.time())
+            else:
+                last_deal_dt = last_deal
+            
+            if last_deal_dt >= threshold_date:
+                days_ago = (datetime.now() - last_deal_dt).days
+                print(f"❌ BLOCKED: last_deal_date is within {days_threshold} days ({days_ago} days ago)")
+                return {
+                    'can_add': False,
+                    'reason': f'У клиента была сделка {days_ago} дней назад',
+                    'contact': contact,
+                    'deals': deals if deals else [],
+                    'first_interaction': last_deal_dt
+                }
+        
+        # Проверяем first_interaction_date
+        if contact.first_interaction_date:
+            if contact.first_interaction_date >= threshold_date:
+                days_ago = (datetime.now() - contact.first_interaction_date).days
+                print(f"❌ BLOCKED: first_interaction_date is within {days_threshold} days ({days_ago} days ago)")
+                return {
+                    'can_add': False,
+                    'reason': f'Клиент обращался {days_ago} дней назад',
+                    'contact': contact,
+                    'deals': deals if deals else [],
+                    'first_interaction': contact.first_interaction_date
+                }
     
-    # Последняя сделка была давно - разрешаем
-    print(f"DEBUG check_contact_history: Last deal was outside threshold - OK to add")
+    # Контакт не найден или нет недавней активности
+    print(f"✅ OK TO ADD: No recent activity found")
     return {
         'can_add': True,
-        'reason': 'Last interaction was outside threshold window',
+        'reason': 'No recent activity found',
         'contact': contact,
         'deals': [],
-        'first_interaction': last_interaction
+        'first_interaction': None
     }
 
 

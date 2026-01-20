@@ -5,6 +5,7 @@ Shows how to migrate from simple role checks to permission-based authorization
 
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, g, current_app, flash
 from sqlalchemy import or_, not_
+from datetime import datetime
 import services.referal_service as referal_service
 from models import User, Referal, ReferalData, MacroContact, Status, ReferalDeal, MacroDeal, db
 import re
@@ -341,12 +342,31 @@ def add_referal():
                 'message': f'Реферал с именем {full_name} уже добавлен'
             })
         
-        # Check if this person is already a MacroContact
-        macro_contact = MacroContact.query.filter_by(phone_number=formatted_phone).first()
-        if macro_contact:
+        # CRITICAL: Check contact history in CRM for the last 45 days
+        # This prevents registering clients who already have deals/applications
+        check_result = referal_service.check_contact_history_before_adding(
+            phone_number=formatted_phone,
+            full_name=full_name,
+            days_threshold=45
+        )
+        
+        if not check_result['can_add']:
+            # Contact has recent activity in CRM - cannot register as referral
+            reason = check_result.get('reason', 'Контакт имеет недавнюю активность в CRM')
+            contact = check_result.get('contact')
+            
+            # Build detailed error message
+            if contact:
+                error_msg = f'Данный человек не может являться рефералом. {reason}'
+                if contact.last_deal_date:
+                    days_ago = (datetime.now() - datetime.combine(contact.last_deal_date, datetime.min.time())).days
+                    error_msg = f'Данный клиент уже имеет сделку в нашей системе ({days_ago} дней назад). Регистрировать как реферала можно только клиентов без заявок и сделок за последние 45 дней.'
+            else:
+                error_msg = f'Данный человек не может являться рефералом. {reason}'
+            
             return jsonify({
                 'success': False,
-                'message': 'Данный человек не может являться рефералом'
+                'message': error_msg
             })
         
         # Get initial status (should be the first status or status with is_start=True)
@@ -945,9 +965,12 @@ def send_deal_for_review(deal_id):
         
         print(f"👤 Local user found: ID={local_user.id}, Login={local_user.login}")
         
-        # Проверяем права - пользователь должен быть владельцем реферала
-        if referal_deal.referal.user_id != local_user.id:
-            print(f"🚫 Send for review: Access denied. Referal user_id={referal_deal.referal.user_id}, Local user id={local_user.id}")
+        # Проверяем права - пользователь должен быть владельцем реферала ИЛИ админом
+        is_admin = user.has_any_permission(['referal.admin.view', 'referal.admin.full_access', 'referal.admin.change_status'])
+        print(f"🔐 Is admin: {is_admin}")
+        
+        if referal_deal.referal.user_id != local_user.id and not is_admin:
+            print(f"🚫 Send for review: Access denied. Referal user_id={referal_deal.referal.user_id}, Local user id={local_user.id}, is_admin={is_admin}")
             return jsonify({'success': False, 'message': 'Нет прав для этой операции'}), 403
         
         # Проверяем текущий статус - можно отправить только со статусом 0
@@ -1097,6 +1120,185 @@ def get_rejection_reason(deal_id):
         
     except Exception as e:
         print(f"Error getting rejection reason: {str(e)}")
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+# ========================================
+# DEAL MANAGEMENT ROUTES
+# ========================================
+
+@referal_bp.route('/add_referal_deal/<int:referal_id>', methods=['POST'])
+@require_permission('referal.referrals.edit')
+def add_referal_deal(referal_id):
+    """Добавление нового договора к рефералу вручную"""
+    try:
+        user_context = get_user()
+        if not user_context:
+            return jsonify({'success': False, 'message': 'Пользователь не авторизован'}), 401
+        
+        referal = Referal.query.get_or_404(referal_id)
+        
+        # Проверяем доступ - пользователь должен быть владельцем реферала или админом
+        local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
+        is_admin = user_context.has_any_permission(['referal.admin.view', 'referal.admin.full_access'])
+        
+        if not local_user:
+            return jsonify({'success': False, 'message': 'Пользователь не найден в системе'}), 403
+        
+        if referal.user_id != local_user.id and not is_admin:
+            return jsonify({'success': False, 'message': 'Нет доступа к этому рефералу'}), 403
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Не переданы данные'}), 400
+            
+        contact_id = data.get('contact_id')
+        deal_id = data.get('deal_id')
+        deal_status = data.get('deal_status', 'pending')
+        
+        deal = None
+        
+        # Ищем договор по deal_id или contact_id
+        if deal_id:
+            deal = MacroDeal.query.get(deal_id)
+        elif contact_id:
+            deal = MacroDeal.query.filter_by(contacts_buy_id=contact_id).first()
+        
+        if not deal:
+            return jsonify({'success': False, 'message': 'Договор не найден. Укажите корректный deal_id или contact_id'}), 404
+        
+        # Проверяем, не существует ли уже такая связь
+        existing = ReferalDeal.query.filter_by(referal_id=referal_id, deal_id=deal.id).first()
+        if existing:
+            return jsonify({'success': False, 'message': f'Договор {deal.agreement_number} уже связан с этим рефералом'}), 400
+        
+        # Рассчитываем дни от создания реферала до договора
+        days_from_creation = None
+        if referal.created_at and deal.agreement_date:
+            deal_date = deal.agreement_date
+            if hasattr(deal_date, 'date'):
+                deal_date = deal_date
+            else:
+                deal_date = datetime.combine(deal_date, datetime.min.time())
+            
+            referal_date = referal.created_at
+            if isinstance(deal_date, datetime):
+                days_from_creation = (deal_date - referal_date).days
+        
+        # Определяем, попадает ли в 45-дневное окно
+        is_within_window = True
+        if days_from_creation is not None:
+            is_within_window = days_from_creation <= referal.days_window
+        
+        # Создаем новую связь
+        referal_deal = ReferalDeal(
+            referal_id=referal_id,
+            deal_id=deal.id,
+            deal_status=deal_status,
+            days_from_referal_creation=days_from_creation,
+            is_within_window=is_within_window,
+            linked_at=datetime.now()
+        )
+        
+        db.session.add(referal_deal)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Договор {deal.agreement_number} успешно добавлен к рефералу',
+            'referal_deal_id': referal_deal.id,
+            'deal': {
+                'id': deal.id,
+                'agreement_number': deal.agreement_number,
+                'project_name': deal.project_name,
+                'deal_status_name': deal.deal_status_name
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in add_referal_deal: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+@referal_bp.route('/update_deal_status/<int:referal_deal_id>', methods=['POST'])
+@require_permission('referal.referrals.edit')
+def update_deal_status(referal_deal_id):
+    """Обновление статуса связи реферал-договор"""
+    try:
+        user_context = get_user()
+        if not user_context:
+            return jsonify({'success': False, 'message': 'Пользователь не авторизован'}), 401
+        
+        referal_deal = ReferalDeal.query.get_or_404(referal_deal_id)
+        referal = referal_deal.referal
+        
+        # Проверяем доступ
+        local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
+        is_admin = user_context.has_any_permission(['referal.admin.view', 'referal.admin.full_access'])
+        
+        if not local_user:
+            return jsonify({'success': False, 'message': 'Пользователь не найден в системе'}), 403
+        
+        if referal.user_id != local_user.id and not is_admin:
+            return jsonify({'success': False, 'message': 'Нет доступа'}), 403
+        
+        data = request.get_json()
+        new_status = data.get('deal_status')
+        
+        if not new_status:
+            return jsonify({'success': False, 'message': 'Статус обязателен'}), 400
+        
+        valid_statuses = ['pending', 'sent_for_review', 'approved', 'rejected', 'paid']
+        if new_status not in valid_statuses:
+            return jsonify({'success': False, 'message': f'Неверный статус. Допустимые: {", ".join(valid_statuses)}'}), 400
+        
+        referal_deal.deal_status = new_status
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Статус успешно обновлен'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+@referal_bp.route('/remove_referal_deal/<int:referal_deal_id>', methods=['DELETE'])
+@require_permission('referal.referrals.edit')
+def remove_referal_deal(referal_deal_id):
+    """Удаление связи между рефералом и договором"""
+    try:
+        user_context = get_user()
+        if not user_context:
+            return jsonify({'success': False, 'message': 'Пользователь не авторизован'}), 401
+        
+        referal_deal = ReferalDeal.query.get_or_404(referal_deal_id)
+        referal = referal_deal.referal
+        
+        # Проверяем доступ
+        local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
+        is_admin = user_context.has_any_permission(['referal.admin.view', 'referal.admin.full_access'])
+        
+        if not local_user:
+            return jsonify({'success': False, 'message': 'Пользователь не найден в системе'}), 403
+        
+        if referal.user_id != local_user.id and not is_admin:
+            return jsonify({'success': False, 'message': 'Нет доступа'}), 403
+        
+        deal_number = referal_deal.deal.agreement_number if referal_deal.deal else 'N/A'
+        
+        db.session.delete(referal_deal)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Договор {deal_number} отвязан от реферала'
+        })
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
 
 
