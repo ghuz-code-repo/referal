@@ -63,67 +63,42 @@ admin_bp = Blueprint('admin', __name__)
 
 
 def send_admin_deal_status_notification(referal_deal, admin_user, old_status_id, new_status_id, new_status_name, rejection_reason=None):
-    """Send notification about deal status change by admin to appropriate recipient"""
+    """Send notification about deal status change by admin to users with appropriate permissions.
+    
+    Использует permission-based систему из notification_utils для определения получателей.
+    Для статуса 500 (Отказ) дополнительно уведомляет самого пользователя-реферала.
+    """
     try:
-        # Определяем получателя на основе нового статуса
-        # Status mapping:
-        # 1 -> Проверка отделом аналитики (MAIN_ADMIN_EMAIL)
-        # 10 -> Проверка колл центром (CALL_CENTER_MANAGER_EMAIL)
-        # 20 -> Проверка Коммерческим Директором (MAIN_ADMIN_EMAIL)
-        # 200 -> Акцептовано к оплате (PAYMENT_MANAGER_EMAIL)
-        # 300 -> Оплачено (PAYMENT_MANAGER_EMAIL)
-        # 500 -> Отказано (уведомить пользователя-реферала)
-        
-        recipient_email = None
-        subject_prefix = ""
-        notify_user = False
-        
-        if new_status_id == 1:
-            # Проверка отделом аналитики
-            recipient_email = os.getenv('MAIN_ADMIN_EMAIL')
-            subject_prefix = "передан на проверку отделом аналитики"
-        elif new_status_id == 10:
-            # Проверка колл-центром
-            recipient_email = os.getenv('CALL_CENTER_MANAGER_EMAIL')
-            subject_prefix = "передан на проверку колл-центром"
-        elif new_status_id == 20:
-            # Проверка КД
-            recipient_email = os.getenv('MAIN_ADMIN_EMAIL')
-            subject_prefix = f"передан на проверку Коммерческим Директором"
-        elif new_status_id in [200, 300]:
-            # Акцептовано к оплате или Оплачено - менеджеру по платежам
-            recipient_email = os.getenv('PAYMENT_MANAGER_EMAIL')
-            subject_prefix = f"изменён на '{new_status_name}'"
-        elif new_status_id == 500:
-            # Отказано - уведомить пользователя-реферала + администраторов
-            notify_user = True
+        from notification_utils import get_notification_recipients_for_status, get_status_display_name
+
+        # Получаем общие данные о договоре
+        agreement_number = referal_deal.deal.agreement_number if referal_deal.deal else 'Неизвестно'
+        referal_name = referal_deal.referal.referal_data.full_name if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
+        referal_phone = referal_deal.referal.referal_data.phone_number if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
+        withdrawal_amount = referal_deal.withdrawal_amount or 0
+        admin_name = get_user_full_name_from_auth(admin_user)
+        status_display = get_status_display_name(new_status_id)
+        old_status_display = get_status_display_name(old_status_id) if old_status_id is not None else 'Неизвестно'
+
+        notification_client = get_notification_client()
+
+        # --- Специальная логика для статуса 500 (Отказ): уведомляем самого пользователя ---
+        if new_status_id == 500:
             user_email = None
-            
-            # Получаем актуальный email из auth-service
             if referal_deal.referal and referal_deal.referal.user and referal_deal.referal.user.auth_user_id:
                 user_email = get_user_email_from_auth_service(referal_deal.referal.user.auth_user_id)
-            
-            # Получаем данные о договоре
-            agreement_number = referal_deal.deal.agreement_number if referal_deal.deal else 'Неизвестно'
-            referal_name = referal_deal.referal.referal_data.full_name if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
-            referal_phone = referal_deal.referal.referal_data.phone_number if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
-            withdrawal_amount = referal_deal.withdrawal_amount or 0
-            admin_name = get_user_full_name_from_auth(admin_user)
-            
-            notification_client = get_notification_client()
-            
-            # 1. Отправляем письмо пользователю об отказе
+
             if user_email:
                 subject = f'Отказ по договору №{agreement_number}'
                 body = f"""Уважаемый(ая) {referal_name},
 
 К сожалению, ваш договор №{agreement_number} был отклонён."""
-                
+
                 if rejection_reason:
                     body += f"\n\nПричина отказа: {rejection_reason}"
-                
+
                 body += "\n\nЕсли у вас есть вопросы, пожалуйста, свяжитесь с нами."
-                
+
                 notification_client.send_email(
                     recipient=user_email,
                     subject=subject,
@@ -132,105 +107,57 @@ def send_admin_deal_status_notification(referal_deal, admin_user, old_status_id,
                 print(f"✅ Rejection notification sent to user {user_email} for deal {referal_deal.id}")
             else:
                 print(f"⚠️ Cannot send rejection notification: user email not found for deal {referal_deal.id}")
-            
-            # 2. Отправляем уведомление MAIN_ADMIN
-            main_admin_email = os.getenv('MAIN_ADMIN_EMAIL')
-            if main_admin_email:
-                subject = f'Договор №{agreement_number} отклонён'
-                body = f"""Администратор {admin_name} отклонил договор.
+
+        # --- Permission-based уведомления для всех ответственных сотрудников ---
+        recipients = get_notification_recipients_for_status(new_status_id)
+
+        if not recipients:
+            print(f"⚠️ No users with notification permissions found for status {new_status_id} ({status_display}), skipping staff notification")
+            return
+
+        # Формируем тело письма для ответственных
+        subject = f'Договор №{agreement_number} — статус: {status_display}'
+        body = f"""Администратор {admin_name} изменил статус договора.
 
 Детали договора:
 - Номер договора: {agreement_number}
 - Реферал: {referal_name} ({referal_phone})
 - Сумма вывода: {withdrawal_amount:,.0f} сум
-- Статус: Отказано"""
-                
-                if rejection_reason:
-                    body += f"\n- Причина отказа: {rejection_reason}"
-                
-                if user_email:
-                    body += f"\n\n✅ Пользователь уведомлён на email: {user_email}"
-                else:
-                    body += f"\n\n⚠️ Email пользователя не найден, уведомление не отправлено"
-                
+- Предыдущий статус: {old_status_display}
+- Новый статус: {status_display}"""
+
+        if new_status_id == 500 and rejection_reason:
+            body += f"\n- Причина отказа: {rejection_reason}"
+
+        body += "\n\nТребуется ваша проверка."
+
+        # Отправляем уведомление каждому получателю с нужным разрешением
+        sent_count = 0
+        for recipient in recipients:
+            recipient_email = recipient.get('email')
+            recipient_name = recipient.get('full_name', recipient.get('username', 'Сотрудник'))
+
+            if not recipient_email:
+                print(f"⚠️ Recipient has no email, skipping: {recipient}")
+                continue
+
+            try:
                 notification_client.send_email(
-                    recipient=main_admin_email,
+                    recipient=recipient_email,
                     subject=subject,
                     body=body
                 )
-                print(f"✅ Rejection notification sent to MAIN_ADMIN {main_admin_email} for deal {referal_deal.id}")
-            
-            # 3. Отправляем уведомление PAYMENT_MANAGER
-            payment_manager_email = os.getenv('PAYMENT_MANAGER_EMAIL')
-            if payment_manager_email and payment_manager_email != main_admin_email:
-                subject = f'Договор №{agreement_number} отклонён'
-                body = f"""Администратор {admin_name} отклонил договор.
+                sent_count += 1
+                print(f"📧 Status change notification sent to: {recipient_name} ({recipient_email}) for status {status_display}")
+            except Exception as e:
+                print(f"❌ Failed to send email to {recipient_email}: {str(e)}")
 
-Детали договора:
-- Номер договора: {agreement_number}
-- Реферал: {referal_name} ({referal_phone})
-- Сумма вывода: {withdrawal_amount:,.0f} сум
-- Статус: Отказано"""
-                
-                if rejection_reason:
-                    body += f"\n- Причина отказа: {rejection_reason}"
-                
-                notification_client.send_email(
-                    recipient=payment_manager_email,
-                    subject=subject,
-                    body=body
-                )
-                print(f"✅ Rejection notification sent to PAYMENT_MANAGER {payment_manager_email} for deal {referal_deal.id}")
-        
-        # Отправляем уведомление администраторам/ответственным
-        if recipient_email and not notify_user:
-            # Получаем данные о договоре и реферале
-            agreement_number = referal_deal.deal.agreement_number if referal_deal.deal else 'Неизвестно'
-            referal_name = referal_deal.referal.referal_data.full_name if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
-            referal_phone = referal_deal.referal.referal_data.phone_number if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
-            withdrawal_amount = referal_deal.withdrawal_amount or 0
-            admin_name = get_user_full_name_from_auth(admin_user)
-            
-            # Формируем тело письма
-            subject = f'Договор №{agreement_number} {subject_prefix}'
-            body = f"""Администратор {admin_name} изменил статус договора.
+        print(f"✅ Admin status change notification process completed. Sent to {sent_count}/{len(recipients)} recipients for status {old_status_id} -> {new_status_id}")
 
-Детали договора:
-- Номер договора: {agreement_number}
-- Реферал: {referal_name} ({referal_phone})
-- Сумма вывода: {withdrawal_amount:,.0f} сум
-- Предыдущий статус: {Status.query.get(old_status_id).name if old_status_id and Status.query.get(old_status_id) else 'Неизвестно'}
-- Новый статус: {new_status_name}"""
-            
-            # Добавляем причину отказа если есть
-            if new_status_id == 500 and rejection_reason:
-                body += f"\n- Причина отказа: {rejection_reason}"
-            
-            body += "\n\nТребуется ваша проверка."
-            
-            # Получаем notification client
-            notification_client = get_notification_client()
-            
-            # Отправляем уведомление основному получателю
-            notification_client.send_email(
-                recipient=recipient_email,
-                subject=subject,
-                body=body
-            )
-            print(f"✅ Admin status change notification sent to {recipient_email} for deal {referal_deal.id}, status {old_status_id} -> {new_status_id}")
-            
-            # Дублируем письмо на MAIN_ADMIN_EMAIL если это не он был основным получателем
-            main_admin_email = os.getenv('MAIN_ADMIN_EMAIL')
-            if main_admin_email and recipient_email != main_admin_email and new_status_id != 1:
-                notification_client.send_email(
-                    recipient=main_admin_email,
-                    subject=f"[Копия] {subject}",
-                    body=body
-                )
-                print(f"✅ Copy sent to MAIN_ADMIN_EMAIL: {main_admin_email}")
-        
     except Exception as e:
         print(f"❌ Failed to send admin status change notification: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
 @admin_bp.route('/debug/current-user', methods=['GET'])
