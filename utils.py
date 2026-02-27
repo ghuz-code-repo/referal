@@ -11,6 +11,17 @@ from typing import List, Optional, Tuple
 from flask import current_app, logging
 import requests
 
+
+def _get_api_headers():
+    """Get headers with X-API-Key for auth-service /api/* calls"""
+    from flask import current_app
+    auth_client = getattr(current_app, 'auth_client', None)
+    if auth_client and hasattr(auth_client, 'api_headers'):
+        return auth_client.api_headers
+    api_key = os.getenv('INTERNAL_API_KEY', '')
+    return {'X-API-Key': api_key} if api_key else {}
+
+
 # Вспомогательная функция для запуска задач в отдельном потоке с контекстом Flask
 def run_async_task(func, *args, **kwargs):
     app_context = None
@@ -443,6 +454,7 @@ def sync_user_data_from_auth_service(user, force_sync=False, headers=None):
         try:
             profile_response = requests.get(
                 f"{auth_client.auth_service_url.rstrip('/')}{profile_url}",
+                headers=_get_api_headers(),
                 timeout=5
             )
             
@@ -565,6 +577,7 @@ def get_user_full_name_from_auth(user):
         profile_url = f"/api/users/{user.auth_user_id}/profile"
         profile_response = requests.get(
             f"{auth_client.auth_service_url.rstrip('/')}{profile_url}",
+            headers=_get_api_headers(),
             timeout=3  # Короткий timeout для быстрого ответа
         )
         
@@ -631,6 +644,7 @@ def sync_user_profile_always(user):
         
         profile_response = requests.get(
             f"{auth_client.auth_service_url.rstrip('/')}{profile_url}",
+            headers=_get_api_headers(),
             timeout=5
         )
         
@@ -722,7 +736,7 @@ def get_call_center_users_from_auth():
         
         print(f"📡 Fetching notification recipients from: {full_url}")
         
-        response = requests.get(full_url, timeout=5)
+        response = requests.get(full_url, headers=_get_api_headers(), timeout=5)
         
         if response.status_code == 200:
             users = response.json()

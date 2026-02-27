@@ -49,7 +49,8 @@ def get_users_with_permission(permission_name):
         
         logger.info(f"📡 Fetching users with permission '{permission_name}' from: {users_url}")
         
-        response = requests.get(users_url, timeout=5)
+        api_headers = {'X-API-Key': os.getenv('INTERNAL_API_KEY', '')}
+        response = requests.get(users_url, headers=api_headers, timeout=5)
         
         if response.status_code == 200:
             users = response.json()

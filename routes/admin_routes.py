@@ -41,7 +41,8 @@ def get_user_email_from_auth_service(auth_user_id):
         auth_service_url = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:80')
         profile_url = f"{auth_service_url}/api/users/{auth_user_id}/profile"
         
-        response = requests.get(profile_url, timeout=5)
+        api_headers = {'X-API-Key': os.getenv('INTERNAL_API_KEY', '')}
+        response = requests.get(profile_url, headers=api_headers, timeout=5)
         
         if response.status_code == 200:
             profile_data = response.json()

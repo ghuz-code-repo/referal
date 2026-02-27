@@ -36,7 +36,8 @@ def get_agreement(user_id):
         from app_with_auth_connector import app
         auth_service_url = app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
         import requests
-        profile_response = requests.get(f"{auth_service_url}/api/users/{user.auth_user_id}/profile", timeout=5)
+        api_headers = {'X-API-Key': os.getenv('INTERNAL_API_KEY', '')}
+        profile_response = requests.get(f"{auth_service_url}/api/users/{user.auth_user_id}/profile", headers=api_headers, timeout=5)
         
         if profile_response.status_code != 200:
             flash('Ошибка получения данных пользователя из auth-service', 'error')
@@ -177,7 +178,8 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             
             user_documents = get_user_documents_from_auth_service(user.auth_user_id)
             auth_service_url = app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
-            profile_response = requests.get(f"{auth_service_url}/api/users/{user.auth_user_id}/profile", timeout=5)
+            api_headers = {'X-API-Key': os.getenv('INTERNAL_API_KEY', '')}
+            profile_response = requests.get(f"{auth_service_url}/api/users/{user.auth_user_id}/profile", headers=api_headers, timeout=5)
             
             if profile_response.status_code != 200:
                 flash('Ошибка получения данных реферера из auth-service', 'error')
@@ -242,7 +244,8 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             
             user_documents = get_user_documents_from_auth_service(user.auth_user_id)
             auth_service_url = app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
-            profile_response = requests.get(f"{auth_service_url}/api/users/{user.auth_user_id}/profile", timeout=5)
+            api_headers = {'X-API-Key': os.getenv('INTERNAL_API_KEY', '')}
+            profile_response = requests.get(f"{auth_service_url}/api/users/{user.auth_user_id}/profile", headers=api_headers, timeout=5)
             
             if profile_response.status_code != 200:
                 flash('Ошибка получения данных реферера из auth-service', 'error')

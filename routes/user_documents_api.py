@@ -1,5 +1,6 @@
 """API для работы с документами пользователя из auth-service"""
 
+import os
 from flask import Blueprint, request, jsonify, current_app
 from .auth_routes import get_current_user
 import requests
@@ -39,7 +40,8 @@ def get_user_documents_api():
             'X-Original-URI': request.path,
             'X-Real-IP': request.environ.get('HTTP_X_REAL_IP', request.remote_addr),
             'User-Agent': 'Referal-Service/1.0',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'X-API-Key': os.getenv('INTERNAL_API_KEY', '')
         }
         
         # Копируем важные заголовки из текущего запроса

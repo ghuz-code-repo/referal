@@ -23,8 +23,10 @@ def send_deal_available_notification(user, referal, deal, withdrawal_amount):
                 try:
                     import requests
                     auth_service_url = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:80')
+                    api_headers = {'X-API-Key': os.getenv('INTERNAL_API_KEY', '')}
                     response = requests.get(
                         f"{auth_service_url}/api/users/{user.auth_user_id}",
+                        headers=api_headers,
                         timeout=5
                     )
                     if response.status_code == 200:

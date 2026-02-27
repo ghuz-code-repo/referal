@@ -136,7 +136,7 @@ def get_user_documents_from_auth_service(user_id):
         
         print(f"🔍 Запрашиваю ВСЕ документы пользователя: {url}")
         
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, headers=auth_client.api_headers, timeout=5)
         if response.status_code == 200:
             data = response.json()
             all_documents = data.get('documents', [])
@@ -222,7 +222,9 @@ def inject_auth_user_data():
         avatar_path = request.headers.get('X-User-Avatar')
         email = request.headers.get('X-User-Email')
         user_id = request.headers.get('X-User-ID')
-        permissions = request.headers.get('X-User-Permissions', '').split(',') if request.headers.get('X-User-Permissions') else []
+        # Use X-User-Service-Permissions (set by verifyHandler), fallback to legacy X-User-Permissions
+        permissions_header = request.headers.get('X-User-Service-Permissions') or request.headers.get('X-User-Permissions', '')
+        permissions = [p.strip() for p in permissions_header.split(',') if p.strip()]
         
         # Получаем документы через API
         documents_data = {}

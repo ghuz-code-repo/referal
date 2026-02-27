@@ -1,5 +1,6 @@
 """Маршруты для аутентификации и работы с пользователями"""
 
+import os
 from flask import Blueprint, request, g, jsonify
 from header_utils import decode_header_full_name
 from models import User, UserData, db
@@ -170,7 +171,8 @@ def debug_documents():
             result['api_request_details']['method'] = 'GET'
             result['api_request_details']['timeout'] = 5
             
-            response = requests.get(api_url, timeout=5)
+            api_headers = {'X-API-Key': os.getenv('INTERNAL_API_KEY', '')}
+            response = requests.get(api_url, headers=api_headers, timeout=5)
             result['api_request_details']['status_code'] = response.status_code
             result['api_request_details']['response_headers'] = dict(response.headers)
             

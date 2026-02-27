@@ -29,6 +29,10 @@ def get_user_permissions():
     permissions = [p.strip() for p in permissions_str.split(',') if p.strip()] if permissions_str else []
     
     # FALLBACK: If no permissions but user has role, grant role-specific permissions
+    # WARNING: These hardcoded mappings may drift from the canonical definitions in
+    # auth-service. If roles/permissions change in auth-service, update these too.
+    # TODO: Remove this fallback once all users have proper permissions assigned
+    # via auth-service roles with PermissionDef entries.
     if not permissions:
         service_roles_str = request.headers.get('X-User-Service-Roles', '')
         service_roles = [role.strip() for role in service_roles_str.split(',') if role.strip()]

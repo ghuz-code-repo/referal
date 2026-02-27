@@ -1,5 +1,6 @@
 """Маршруты для работы с документами пользователя из auth-service"""
 
+import os
 from flask import Blueprint, request, redirect, url_for, flash, current_app, render_template, Response
 from .auth_routes import get_current_user as get_local_user
 
@@ -143,7 +144,8 @@ def get_user_documents_api(user_id):
         headers = {
             'X-Original-URI': request.path,
             'X-Real-IP': request.environ.get('HTTP_X_REAL_IP', request.remote_addr),
-            'User-Agent': 'Referal-Service/1.0'
+            'User-Agent': 'Referal-Service/1.0',
+            'X-API-Key': os.getenv('INTERNAL_API_KEY', '')
         }
         
         current_app.logger.info(f"Requesting documents from: {api_url}")
@@ -255,7 +257,8 @@ def download_all_user_documents(user_id):
         headers = {
             'X-Original-URI': request.path,
             'X-Real-IP': request.environ.get('HTTP_X_REAL_IP', request.remote_addr),
-            'User-Agent': 'Referal-Service/1.0'
+            'User-Agent': 'Referal-Service/1.0',
+            'X-API-Key': os.getenv('INTERNAL_API_KEY', '')
         }
         
         response = requests.get(api_url, cookies=cookies, headers=headers, timeout=30)
@@ -387,7 +390,8 @@ def download_document_type(user_id, document_type):
         headers = {
             'X-Original-URI': request.path,
             'X-Real-IP': request.environ.get('HTTP_X_REAL_IP', request.remote_addr),
-            'User-Agent': 'Referal-Service/1.0'
+            'User-Agent': 'Referal-Service/1.0',
+            'X-API-Key': os.getenv('INTERNAL_API_KEY', '')
         }
         
         response = requests.get(api_url, cookies=cookies, headers=headers, timeout=30)
