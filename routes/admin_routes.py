@@ -161,94 +161,6 @@ def send_admin_deal_status_notification(referal_deal, admin_user, old_status_id,
         traceback.print_exc()
 
 
-@admin_bp.route('/debug/current-user', methods=['GET'])
-def debug_current_user():
-    """Отладочный маршрут для проверки текущего пользователя"""
-    from flask import jsonify
-    
-    # Выводим все заголовки
-    print("=== ALL HEADERS ===")
-    for header, value in request.headers:
-        print(f"{header}: {value}")
-    print("==================")
-    
-    try:
-        user = get_current_user()
-        
-        if not user:
-            return jsonify({
-                'status': 'no_user',
-                'message': 'Пользователь не найден',
-                'headers': dict(request.headers)
-            })
-        
-        # Получаем тип роли на основе permissions
-        role_type = get_user_role_type()
-        
-        user_info = {
-            'status': 'user_found',
-            'user': {
-                'id': user.id,
-                'login': user.login,
-                'role_type': role_type,  # Роль определяется из permissions
-                'legacy_role': user.role,  # DEPRECATED: старое поле для совместимости
-                'auth_user_id': user.auth_user_id,
-                'full_name': get_user_full_name_from_auth(user)
-            },
-            'headers': dict(request.headers),
-            'admin_access': requires_admin_access()  # Проверка через permissions
-        }
-        
-        return jsonify(user_info)
-        
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e),
-            'headers': dict(request.headers)
-        })
-
-
-@admin_bp.route('/debug/permissions', methods=['GET'])
-def debug_permissions():
-    """Отладочный маршрут для проверки разрешений пользователя"""
-    from permission_utils import get_user_permissions
-    
-    permissions_summary = get_user_status_summary()
-    role_type = get_user_role_type()
-    user_permissions = get_user_permissions()
-    
-    # Получаем все доступные разрешения для справки
-    all_permissions = get_all_status_permissions()
-    
-    return jsonify({
-        'user_role_type': role_type,
-        'raw_permissions': user_permissions,
-        'detailed_summary': permissions_summary,
-        'all_available_permissions': all_permissions,
-        'formatted_permissions': {perm: format_permission_name(perm) for perm in all_permissions},
-        'role_presets': ROLE_PERMISSION_PRESETS
-    })
-
-
-@admin_bp.route('/debug/permissions-ui', methods=['GET'])
-def debug_permissions_ui():
-    """UI для отладки разрешений"""
-    permissions_summary = get_user_status_summary()
-    role_type = get_user_role_type()
-    
-    # Получаем все доступные разрешения для справки
-    all_permissions = get_all_status_permissions()
-    formatted_permissions = {perm: format_permission_name(perm) for perm in all_permissions}
-    
-    return render_template('debug_permissions.html',
-                         role_type=role_type,
-                         permissions_summary=permissions_summary,
-                         all_permissions=all_permissions,
-                         formatted_permissions=formatted_permissions,
-                         role_presets=ROLE_PERMISSION_PRESETS)
-
-
 @admin_bp.route('/admin', methods=['GET'])
 def admin_panel():
     """Административная панель для управления рефералами и договорами."""
@@ -257,12 +169,12 @@ def admin_panel():
     
     if not user:
         flash('Доступ запрещен - пользователь не найден', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
         
     # Проверка доступа через permissions (новая система)
     if not requires_admin_access():
         flash('Доступ запрещен - недостаточно прав', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
     
     
     # Get user role type based on permissions
@@ -993,7 +905,7 @@ def update_withdrawal_stage(referal_id):
     current_user = get_current_user()
     if not current_user or not requires_admin_access():
         flash('Доступ запрещен', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
 
     referal = Referal.query.get_or_404(referal_id)
     withdrawal_stage = int(request.form.get('withdrawal_stage'))
@@ -1169,7 +1081,7 @@ def force_update():
     if not user:
         print("⛔ Force update access DENIED - No user found")
         flash('Доступ запрещен - пользователь не найден', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
     
     # Проверяем права: только админ системы или админ сервиса
     user_role = get_user_role_type()
@@ -1218,6 +1130,9 @@ def force_update():
 @admin_bp.route('/sync_status', methods=['GET'])
 def sync_status():
     """Возвращает текущий статус синхронизации (JSON)"""
+    if not requires_admin_access():
+        return jsonify({'error': 'Доступ запрещен'}), 403
+    
     global _sync_status
     
     with _sync_lock:
@@ -1231,41 +1146,3 @@ def sync_status():
         }
     
     return jsonify(status)
-
-@admin_bp.route('/debug_my_permissions')
-def debug_my_permissions():
-    """Debug endpoint - показывает разрешения текущего пользователя"""
-    user = get_current_user()
-    user_role = get_user_role_type()
-    has_force_update = has_permission('referal.admin.force_update')
-    has_admin_panel = has_permission('referal.admin.panel')
-    
-    # Получаем все заголовки
-    headers = dict(request.headers)
-    
-    # Получаем permissions из заголовков
-    permissions_header = request.headers.get('X-User-Permissions', '')
-    service_roles_header = request.headers.get('X-User-Service-Roles', '')
-    
-    return f"""
-    <h1>Debug: Your Permissions</h1>
-    <h2>User Info</h2>
-    <p>Username: {headers.get('X-User-Name', 'Unknown')}</p>
-    <p>Email: {headers.get('X-User-Email', 'Unknown')}</p>
-    <p>User Role Type: {user_role}</p>
-    
-    <h2>Permission Checks</h2>
-    <p>has_permission('referal.admin.force_update'): <b>{has_force_update}</b></p>
-    <p>has_permission('referal.admin.panel'): <b>{has_admin_panel}</b></p>
-    
-    <h2>Headers</h2>
-    <p>X-User-Service-Roles: {service_roles_header}</p>
-    <p>X-User-Permissions: {permissions_header[:500]}...</p>
-    
-    <h2>All Headers</h2>
-    <pre>{chr(10).join(f'{k}: {v}' for k, v in headers.items() if 'User' in k or 'Auth' in k)}</pre>
-    
-    <hr>
-    <a href="/referal/force_update">Try Force Update</a> | 
-    <a href="/referal/admin">Back to Admin Panel</a>
-    """

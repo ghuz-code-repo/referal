@@ -36,15 +36,19 @@ function showFlashMessage(type, message) {
 }
 
 /**
- * Обработка flash сообщений
+ * Обработка flash сообщений (серверных и динамических)
  */
 function hideFlashMessage() {
-    var flashMessage = document.getElementById('flash-message');
-    if (flashMessage) {
+    // Auto-dismiss all server-rendered flash messages after 8 seconds
+    var flashMessages = document.querySelectorAll('.flash-messages .flash-message');
+    flashMessages.forEach(function(msg) {
         setTimeout(function() {
-            flashMessage.style.display = 'none';
-        }, 3000);
-    }
+            msg.style.opacity = '0';
+            setTimeout(function() {
+                msg.remove();
+            }, 300);
+        }, 8000);
+    });
 }
 
 /**

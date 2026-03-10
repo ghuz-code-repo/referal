@@ -1,12 +1,14 @@
 <!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\components\header.html -->
 <header class="header">
     <div class="header_name">
-        <img src="{{ url_for('static', filename='img/logo-dark.svg')}}" 
-             alt="Golden House Logo" 
-             class="logo" 
-             id="dynamic-logo"
-             data-light-logo="{{ url_for('static', filename='img/logo-dark.svg') }}"
-             data-dark-logo="{{ url_for('static', filename='img/logo-light.svg') }}">
+        <a href="/menu" title="Меню сервисов">
+            <img src="{{ url_for('static', filename='img/logo-dark.svg')}}" 
+                 alt="Golden House Logo" 
+                 class="logo" 
+                 id="dynamic-logo"
+                 data-light-logo="{{ url_for('static', filename='img/logo-dark.svg') }}"
+                 data-dark-logo="{{ url_for('static', filename='img/logo-light.svg') }}">
+        </a>
     </div>
     
     <!-- Кнопка гамбургер для мобильной версии -->
@@ -18,23 +20,17 @@
     
     <nav class="nav" id="mobileNav">
         <div class="nav__list">
-            {# Ссылка на профиль - показываем всегда, кроме страницы профиля #}
-            {% if request.path != '/profile' %}
+            {# Скачать своё соглашение - показываем если есть право на скачивание документов #}
+            {% if check_permission('referal.profile.documents.download') %}
             <div class="nav__item">
-                <a href="{{ url_for('referal.profile') }}" class="nav__link"><i class="fas fa-user"></i>Мой профиль</a>
+                <a href="{{ url_for('document.my_agreement') }}" class="nav__link"><i class="fas fa-file-download"></i> Скачать соглашение</a>
             </div>
             {% endif %}
-            {# Управление рефералами - показываем в зависимости от прав #}
+            {# Управление рефералами - показываем админам #}
             {% if check_permission('referal.admin.panel') and request.path != '/admin' %}
             <div class="nav__item">
                 <a href="{{ url_for('admin.admin_panel') }}" class="nav__link">
                     <i class="fas fa-cog"></i> Управление рефералами
-                </a>
-            </div>
-            {% elif (check_permission('referal.referrals.view') or check_permission('referal.referrals.list')) and request.path != '/my_referrals' %}
-            <div class="nav__item">
-                <a href="{{ url_for('referal.my_referrals') }}" class="nav__link">
-                    <i class="fas fa-users"></i> Мои рефералы
                 </a>
             </div>
             {% endif %}
@@ -49,7 +45,7 @@
             {% if current_user %}
             <!-- Добавляем ссылку на главный профиль -->
             <div class="nav__item profile-link">
-                <a href=" https://analytics.gh.uz/profile" target="_blank" class="nav__link profile-nav-link" title="Перейти в основной профиль">
+                <a href="https://analytics.gh.uz/profile" target="_blank" class="nav__link profile-nav-link" title="Перейти в основной профиль">
                     <div class="profile-mini">
                         <!-- Получаем данные пользователя напрямую из auth-service заголовков -->
                         {% set auth_user = get_auth_user_data() %}

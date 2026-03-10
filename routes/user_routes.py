@@ -13,7 +13,7 @@ def user_profile():
     user = get_current_user()
     if not user:
         flash('Пожалуйста, войдите в систему', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
     
     # Получаем или создаем данные пользователя
     if not user.user_data:
@@ -35,7 +35,7 @@ def update_user_info():
     user = get_current_user()
     if not user:
         flash('Пожалуйста, войдите в систему', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
     
     # ❌ DEPRECATED: Documents are READ-ONLY from Auth-Service
     # Do not save documents to local database

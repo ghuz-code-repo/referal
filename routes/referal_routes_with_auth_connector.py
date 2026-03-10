@@ -107,174 +107,14 @@ def get_user():
 
 @referal_bp.route('/profile', methods=['GET'])
 def profile():
-    """User profile page - requires referral access"""
-    user = get_user()
-    
-    print(f"🔍 Profile route | User: {user} | Type: {type(user).__name__ if user else 'None'}")
-    if user:
-        print(f"   has_id: {hasattr(user, 'id')} | has_user_id: {hasattr(user, 'user_id')} | username: {user.username if hasattr(user, 'username') else 'N/A'}")
-    
-    if not user:
-        return render_template('access_denied.html',
-                             service_name='Реферальная программа',
-                             required_permissions=['referal.referrals.list', 'referal.referrals.create']), 403
-    
-    # Check if user has any referral access
-    has_referral_access = False
-    if AUTH_CONNECTOR_AVAILABLE:
-        # Получаем все права пользователя для проверки
-        user_perms = request.headers.get('X-User-Service-Permissions', '').split(',')
-        
-        # Администратор с правами на админ-панель также имеет доступ к профилю
-        has_admin_access = user.has_any_permission(['referal.admin.panel', 'referal.admin.manage_users'])
-        
-        # Проверяем разрешения на просмотр профиля или рефералов
-        required_perms = [
-            'referal.profile.view',      # Основное разрешение на просмотр профиля
-            'referal.referrals.list',    # Список рефералов
-            'referal.referrals.view',    # Просмотр рефералов
-            'referal.referrals.create',  # Создание рефералов
-            'referal.referrals.add'      # Альтернативное название для создания
-        ]
-        has_referral_access = user.has_any_permission(required_perms) or has_admin_access
-        
-        print(f"🔐 Profile access check | User: {user.username} | Admin: {has_admin_access} | Referral: {user.has_any_permission(required_perms)} | Perms: {user_perms}")
-        
-        if not has_referral_access:
-            print(f"⚠️ Profile access DENIED")
-    else:
-        # Legacy fallback - if no auth-connector, allow access for backward compatibility
-        has_referral_access = True
-    
-    if not has_referral_access:
-        return render_template('access_denied.html',
-                             service_name='Реферальная программа',
-                             required_permissions=['referal.profile.view', 'referal.referrals.list', 'referal.referrals.view']), 403
-    
-    # Legacy user handling for backward compatibility
-    # Keep the original user object (UserContext from auth-connector) for permission checks
-    # but get db_user for profile data and sync
-    db_user = None
-    if not hasattr(user, 'id') and hasattr(user, 'user_id'):
-        # This is auth-connector user (UserContext), need to get from DB for profile data
-        db_user = User.query.filter_by(login=user.username).first()
-        print(f"👤 Looking up database user for {user.username}: {'Found' if db_user else 'Not found'}")
-        if db_user:
-            print(f"   DB user has auth_user_id: {db_user.auth_user_id if hasattr(db_user, 'auth_user_id') else 'N/A'}")
-            # Синхронизируем ВСЕ данные из auth-service (телефон, email, паспорт, ПИНФЛ, банк)
-            from utils import sync_user_data_from_auth_service
-        # ПРИНУДИТЕЛЬНО синхронизируем данные пользователя из auth-service при каждом запросе
-        from utils import sync_user_profile_always
-        sync_user_profile_always(db_user)
-    elif user and hasattr(user, 'id'):
-        # This is legacy user from database
-        db_user = user
-        # ПРИНУДИТЕЛЬНО синхронизируем данные пользователя из auth-service при каждом запросе
-        from utils import sync_user_profile_always
-        sync_user_profile_always(db_user)
-    
-    # Check available permissions
-    can_view_referrals = False
-    can_add_referrals = False
-    
-    if AUTH_CONNECTOR_AVAILABLE and user:
-        # Check SPECIFIC referral permissions (not admin.panel!)
-        can_view_referrals = user.has_any_permission([
-            'referal.referrals.list',
-            'referal.referrals.view'
-        ])
-        can_add_referrals = user.has_any_permission([
-            'referal.referrals.create',
-            'referal.referrals.add'
-        ])
-    
-    # Get user balance info if available
-    current_balance = 0
-    pending_withdrawal = 0
-    total_withdrawal = 0
-    
-    if db_user:
-        current_balance = getattr(db_user, 'current_balance', 0)
-        pending_withdrawal = getattr(db_user, 'pending_withdrawal', 0)
-        total_withdrawal = getattr(db_user, 'total_withdrawal', 0)
-    
-    # Show profile page with user information and available actions
-    return render_template('profile.html',
-                         user=db_user if db_user else user,
-                         can_view_referrals=can_view_referrals,
-                         can_add_referrals=can_add_referrals,
-                         current_balance=current_balance,
-                         pending_withdrawal=pending_withdrawal,
-                         total_withdrawal=total_withdrawal)
+    """Redirect to auth-service profile page"""
+    return redirect('https://analytics.gh.uz/profile')
+
 
 @referal_bp.route('/limited_profile', methods=['GET'])
-@require_permission('referal.profile.view')
 def limited_profile():
-    """Limited profile page for users without referral access"""
-    user = get_user()
-    
-    if not user:
-        return render_template('limited_profile.html', 
-                             error="Пользователь не найден. Обратитесь к администратору.")
-    
-    # Legacy user handling for backward compatibility
-    if not hasattr(user, 'id') and hasattr(user, 'user_id'):
-        # This is auth-connector user, need to get from DB
-        db_user = User.query.filter_by(login=user.username).first()
-        if db_user:
-            user = db_user
-    
-    # Синхронизируем данные пользователя с auth-service
-    if user and hasattr(user, 'id'):
-        try:
-            from utils import sync_user_data_from_auth_service
-            sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
-        except Exception as e:
-            print(f"Warning: Failed to sync user data from auth-service: {e}")
-    
-    # Check available permissions for this user
-    available_actions = []
-    
-    if AUTH_CONNECTOR_AVAILABLE and user:
-        # Добавить реферала
-        if user.has_permission('referal.referrals.create'):
-            available_actions.append({
-                'title': 'Добавить реферала',
-                'url': url_for('referal.add_referal_form'),
-                'icon': 'fas fa-user-plus',
-                'description': 'Добавить нового реферала в систему'
-            })
-        
-        # Просмотр своих рефералов
-        if user.has_permission('referal.referrals.list'):
-            available_actions.append({
-                'title': 'Мои рефералы',
-                'url': url_for('referal.my_referrals'),
-                'icon': 'fas fa-users',
-                'description': 'Просмотр списка моих рефералов'
-            })
-        
-        # Административная панель
-        if user.has_permission('referal.admin.panel'):
-            available_actions.append({
-                'title': 'Панель администратора',
-                'url': url_for('admin.admin_panel'),
-                'icon': 'fas fa-cog',
-                'description': 'Управление системой и пользователями'
-            })
-        
-        # Платежи
-        if user.has_permission('referal.payments.view'):
-            available_actions.append({
-                'title': 'Платежи и выплаты',
-                'url': url_for('referal.payments'),
-                'icon': 'fas fa-credit-card',
-                'description': 'Просмотр информации о платежах и балансе'
-            })
-    
-    return render_template('limited_profile.html', 
-                         user=user,
-                         available_actions=available_actions)
+    """Redirect to auth-service profile page"""
+    return redirect('https://analytics.gh.uz/profile')
 
 @referal_bp.route('/add_referal', methods=['POST'])
 @require_permission('referal.referrals.create')
@@ -438,14 +278,14 @@ def my_referrals():
     user_context = get_user()
     
     if not user_context:
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
     
     # Get local user from database
     local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
     
     if not local_user:
         flash('Пользователь не найден в системе. Обратитесь к администратору.', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
     
     # Check permissions
     can_add_referrals = user_context.has_any_permission(['referal.referrals.create', 'referal.referrals.add'])
@@ -699,7 +539,7 @@ def payments():
     user = get_user()
     
     if not user:
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
     
     return render_template('payments.html', user=user)
 
@@ -967,7 +807,7 @@ def send_deal_for_review(deal_id):
         print(f"👤 Local user found: ID={local_user.id}, Login={local_user.login}")
         
         # Проверяем права - пользователь должен быть владельцем реферала ИЛИ админом
-        is_admin = user.has_any_permission(['referal.admin.view', 'referal.admin.full_access', 'referal.admin.change_status'])
+        is_admin = user.has_any_permission(['referal.admin.panel', 'referal.admin.change_status'])
         print(f"🔐 Is admin: {is_admin}")
         
         if referal_deal.referal.user_id != local_user.id and not is_admin:
@@ -1141,7 +981,7 @@ def add_referal_deal(referal_id):
         
         # Проверяем доступ - пользователь должен быть владельцем реферала или админом
         local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
-        is_admin = user_context.has_any_permission(['referal.admin.view', 'referal.admin.full_access'])
+        is_admin = user_context.has_permission('referal.admin.panel')
         
         if not local_user:
             return jsonify({'success': False, 'message': 'Пользователь не найден в системе'}), 403
@@ -1237,7 +1077,7 @@ def update_deal_status(referal_deal_id):
         
         # Проверяем доступ
         local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
-        is_admin = user_context.has_any_permission(['referal.admin.view', 'referal.admin.full_access'])
+        is_admin = user_context.has_permission('referal.admin.panel')
         
         if not local_user:
             return jsonify({'success': False, 'message': 'Пользователь не найден в системе'}), 403
@@ -1281,7 +1121,7 @@ def remove_referal_deal(referal_deal_id):
         
         # Проверяем доступ
         local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
-        is_admin = user_context.has_any_permission(['referal.admin.view', 'referal.admin.full_access'])
+        is_admin = user_context.has_permission('referal.admin.panel')
         
         if not local_user:
             return jsonify({'success': False, 'message': 'Пользователь не найден в системе'}), 403
@@ -1302,31 +1142,3 @@ def remove_referal_deal(referal_deal_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
 
-
-# PERMISSION DEMONSTRATION ROUTE
-@referal_bp.route('/debug/permissions')
-def debug_permissions():
-    """Debug route to show current user permissions"""
-    if not current_app.debug:
-        return "Debug mode only", 404
-        
-    user = get_user()
-    
-    if not user:
-        return "No user found"
-    
-    debug_info = {
-        'user_id': getattr(user, 'user_id', 'N/A'),
-        'username': getattr(user, 'username', 'N/A'), 
-        'full_name': getattr(user, 'full_name', 'N/A'),
-        'is_admin': getattr(user, 'is_admin', False),
-        'auth_connector_available': AUTH_CONNECTOR_AVAILABLE,
-    }
-    
-    if AUTH_CONNECTOR_AVAILABLE and user:
-        debug_info['permissions'] = user.permissions
-        debug_info['roles'] = user.roles
-        debug_info['has_view_permission'] = user.has_permission('referal.profile.view')
-        debug_info['has_admin_permission'] = user.has_permission('referal.admin.export_data')
-    
-    return f"<pre>{debug_info}</pre>"

@@ -17,6 +17,31 @@ import re
 document_bp = Blueprint('document', __name__)
 
 
+@document_bp.route('/my_agreement', methods=['GET'])
+def my_agreement():
+    """Скачать соглашение для текущего пользователя"""
+    try:
+        from auth_connector import get_current_user as get_auth_user
+        auth_user = get_auth_user()
+    except Exception:
+        auth_user = None
+
+    if not auth_user:
+        flash('Пользователь не авторизован', 'error')
+        return redirect(request.referrer or '/')
+
+    # Находим пользователя в БД по auth_user_id
+    db_user = User.query.filter_by(auth_user_id=auth_user.user_id).first()
+    if not db_user:
+        db_user = User.query.filter_by(login=auth_user.username).first()
+
+    if not db_user:
+        flash('Пользователь не найден в системе', 'error')
+        return redirect(request.referrer or '/')
+
+    return redirect(url_for('document.get_agreement', user_id=db_user.id))
+
+
 @document_bp.route('/get_agreement/<int:user_id>', methods=['GET'])
 def get_agreement(user_id):
     """Генерация соглашения для пользователя"""
@@ -26,7 +51,7 @@ def get_agreement(user_id):
         
         if not user.auth_user_id:
             flash('Пользователь не связан с auth-service', 'error')
-            return redirect(url_for('referal.profile'))
+            return redirect(request.referrer or '/')
         
         # Получаем документы пользователя из Auth-Service
         from app_with_auth_connector import get_user_documents_from_auth_service
@@ -41,7 +66,7 @@ def get_agreement(user_id):
         
         if profile_response.status_code != 200:
             flash('Ошибка получения данных пользователя из auth-service', 'error')
-            return redirect(url_for('referal.profile'))
+            return redirect(request.referrer or '/')
         
         profile = profile_response.json()
         
@@ -112,7 +137,7 @@ def get_agreement(user_id):
         if missing_fields:
             error_message = f"Невозможно сгенерировать соглашение. Отсутствуют обязательные поля: {', '.join(missing_fields)}"
             flash(error_message, 'error')
-            return redirect(url_for('referal.profile'))
+            return redirect(request.referrer or '/')
 
 
         # Заменяем плейсхолдеры в документе
@@ -137,7 +162,7 @@ def get_agreement(user_id):
     except Exception as e:
         current_app.logger.error(f"Error generating agreement: {str(e)}")
         flash('Ошибка при генерации соглашения', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
 
 
 @document_bp.route('/get_referal_act/<int:referal_id>', methods=['GET'])
@@ -147,7 +172,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
     current_user = get_current_user()
     if not current_user:
         flash('Пользователь не найден', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
     
     # Проверяем права админа
     from permission_utils import has_permission
@@ -164,13 +189,13 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             # Проверяем доступ: либо владелец, либо админ
             if not is_admin and referal.user_id != current_user.id:
                 flash('Доступ запрещен', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
             
             user = referal.user
             
             if not user or not user.auth_user_id:
                 flash('Пользователь не связан с auth-service', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
             
             # Получаем документы реферера из Auth-Service
             from app_with_auth_connector import get_user_documents_from_auth_service, app
@@ -183,7 +208,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             
             if profile_response.status_code != 200:
                 flash('Ошибка получения данных реферера из auth-service', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
             
             user_profile = profile_response.json()
             
@@ -200,20 +225,20 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             
             if not referal_data:
                 flash('Не найдены данные реферала', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
             
             # Проверяем наличие паспортных данных реферера из Auth-Service
             if not user_full_name or not user_documents.get('passport_number'):
                 flash('❌ Отсутствуют паспортные данные реферера. Пожалуйста, заполните ФИО и номер паспорта в профиле перед генерацией акта.', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
                 
             if not referal_data:
                 flash('Не найдены данные реферала', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
             
             if not deal:
                 flash('Договор не найден', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
             
             real_deal = deal
             withdrawal_amount = referal_deal.withdrawal_amount
@@ -221,7 +246,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             # Проверяем что withdrawal_amount не None
             if withdrawal_amount is None:
                 flash('Сумма выплаты не рассчитана для данного договора. Обратитесь к администратору.', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
             
         else:
             # Старая логика: генерация для первого найденного договора (для обратной совместимости)
@@ -230,13 +255,13 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             # Проверяем доступ: либо владелец, либо админ
             if not is_admin and referal.user_id != current_user.id:
                 flash('Доступ запрещен', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
             
             user = referal.user
             
             if not user or not user.auth_user_id:
                 flash('Пользователь не связан с auth-service', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
             
             # Получаем документы реферера из Auth-Service
             from app_with_auth_connector import get_user_documents_from_auth_service, app
@@ -249,7 +274,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             
             if profile_response.status_code != 200:
                 flash('Ошибка получения данных реферера из auth-service', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
             
             user_profile = profile_response.json()
             
@@ -266,12 +291,12 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
                 
             if not referal_data:
                 flash('Не найдены данные реферала', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
 
             deals = MacroDeal.query.filter_by(contacts_buy_id=referal.contact_id)
             if not deals:
                 flash('Deal not found', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
         
             # Находим подходящую сделку (приоритет - проведенная, иначе любая с валидным платежом)
             real_deal = None
@@ -296,7 +321,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             # Проверяем что withdrawal_amount не None
             if withdrawal_amount is None:
                 flash('Сумма выплаты не рассчитана для данного реферала. Обратитесь к администратору.', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
         
         # Определяем путь к шаблону
         template_path = os.path.join(current_app.root_path, 'documents', f"{os.getenv('ACT_DOC_NAME')}.docx")
@@ -308,7 +333,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
         # Проверяем что дата договора заполнена
         if agreement_date_raw is None:
             flash('❌ Дата договора не заполнена. Невозможно сгенерировать акт без даты договора.', 'error')
-            return redirect(url_for('referal.profile'))
+            return redirect(request.referrer or '/')
         
         if isinstance(agreement_date_raw, str):
             if agreement_date_raw:
@@ -323,11 +348,11 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
                     except ValueError:
                         # Если не получилось, показываем ошибку
                         flash(f'❌ Неверный формат даты договора: {agreement_date_raw}. Обратитесь к администратору.', 'error')
-                        return redirect(url_for('referal.profile'))
+                        return redirect(request.referrer or '/')
             else:
                 # Пустая строка
                 flash('❌ Дата договора пустая. Невозможно сгенерировать акт без даты договора.', 'error')
-                return redirect(url_for('referal.profile'))
+                return redirect(request.referrer or '/')
         elif hasattr(agreement_date_raw, 'date'):
             # Это datetime/pandas Timestamp объект
             agreement_date = agreement_date_raw.date()
@@ -337,7 +362,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
         else:
             # Неизвестный тип
             flash(f'❌ Неизвестный тип даты договора: {type(agreement_date_raw)}. Обратитесь к администратору.', 'error')
-            return redirect(url_for('referal.profile'))
+            return redirect(request.referrer or '/')
             
         print(f"Agreement date: {agreement_date}")
         # Загружаем шаблон
@@ -429,7 +454,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
             error_message = "❌ Невозможно сгенерировать акт. Отсутствуют обязательные данные:\n" + '\n'.join(missing_fields)
             error_message += "\n\nПожалуйста, заполните недостающие данные в профиле или обратитесь к администратору для проверки данных сделки."
             flash(error_message, 'error')
-            return redirect(url_for('referal.profile'))
+            return redirect(request.referrer or '/')
 
         # Заменяем плейсхолдеры в документе
         _replace_text_in_document(doc, replacements)
@@ -453,7 +478,7 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
     except Exception as e:
         current_app.logger.error(f"Error generating referal act: {str(e)}")
         flash(f'Ошибка при генерации акта {e}', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
 
 
 def _replace_text_in_document(doc, replacements):

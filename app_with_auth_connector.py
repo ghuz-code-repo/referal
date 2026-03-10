@@ -394,7 +394,7 @@ def home():
             
             # Admin panel access for admin roles
             has_admin_panel = auth_user.has_permission('referal.admin.panel')
-            has_manage_users = auth_user.has_any_permission(['referal.admin.manage_users', 'referal.users.manage'])
+            has_manage_users = auth_user.has_permission('referal.admin.manage_users')
             
             # LEGACY FALLBACK: Check service roles from headers if no permissions found
             if not (has_admin_panel or has_manage_users):
@@ -443,7 +443,7 @@ def home():
         except Exception as e:
             pass
     
-    return redirect(url_for('referal.profile'))
+    return redirect(url_for('admin.admin_panel'))
 
 # Register all blueprints WITHOUT URL prefixes
 app.register_blueprint(auth_bp)

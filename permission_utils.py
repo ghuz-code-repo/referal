@@ -24,6 +24,9 @@ def get_user_permissions():
     
     if not permissions_str:
         # Fallback to legacy header if needed
+        # TODO: Убрать этот fallback после полной миграции. X-User-Permissions содержит
+        # ГЛОБАЛЬНЫЕ разрешения, которые могут случайно совпасть с именами сервисных.
+        # Только X-User-Service-Permissions содержит разрешения, скопированные для referal.
         permissions_str = request.headers.get('X-User-Permissions', '')
     
     permissions = [p.strip() for p in permissions_str.split(',') if p.strip()] if permissions_str else []
@@ -57,15 +60,22 @@ def get_user_permissions():
             all_perms.update([
                 'referal.admin.panel',
                 'referal.admin.manage_users',
-                'referal.users.view',
-                'referal.users.create',
-                'referal.users.edit',
-                'referal.users.delete',
+                'referal.admin.change_status',
+                'referal.admin.view_reports',
+                'referal.admin.export_data',
+                'referal.admin.force_update',
+                'referal.reports.view',
+                'referal.stats.view',
                 'referal.referrals.list',
                 'referal.referrals.view',
                 'referal.referrals.create',
                 'referal.referrals.edit',
-                'referal.referrals.delete'
+                'referal.referrals.add',
+                'referal.payments.view',
+                'referal.payments.request',
+                'referal.profile.view',
+                'referal.profile.documents',
+                'referal.profile.documents.download'
             ])
             permissions = list(all_perms)
             print(f"🔓 LEGACY FALLBACK: Granted {len(permissions)} admin permissions")
@@ -180,17 +190,17 @@ def get_user_role_type():
     service_roles_str = request.headers.get('X-User-Service-Roles', '')
     global_roles_str = request.headers.get('X-User-Roles', '')
     
-    # Проверяем сервисные роли
+    # Проверяем сервисные роли (включая legacy-имена с префиксом referal-)
     if service_roles_str:
         service_roles = [role.strip() for role in service_roles_str.split(',')]
         # ВАЖНО: проверяем admin первым!
-        if 'admin' in service_roles:
+        if 'admin' in service_roles or 'referal-admin' in service_roles:
             return 'admin'
-        if 'analytic' in service_roles or 'analytics' in service_roles:
+        if 'analytic' in service_roles or 'analytics' in service_roles or 'referal-analytics' in service_roles:
             return 'analytics'
-        if 'manager' in service_roles:
+        if 'manager' in service_roles or 'referal-manager' in service_roles:
             return 'manager'
-        if 'call-center' in service_roles:
+        if 'call-center' in service_roles or 'referal-call-center' in service_roles:
             return 'call-center'
     
     # Проверяем глобальные роли
@@ -200,6 +210,10 @@ def get_user_role_type():
             return 'admin'
         if 'analytic' in global_roles or 'analytics' in global_roles:
             return 'analytics'
+        if 'manager' in global_roles:
+            return 'manager'
+        if 'call-center' in global_roles:
+            return 'call-center'
     
     # Fallback: определяем по разрешениям (если роли в заголовках не найдены)
     
@@ -214,44 +228,12 @@ def get_user_role_type():
         return 'manager'
     
     # Проверяем колл-центр (может просматривать и обрабатывать рефералов)
-    if has_any_permission(['referal.admin.reports', 'referal.admin.export']):
+    if has_any_permission(['referal.admin.view_reports', 'referal.admin.export_data']):
         return 'call-center'
     
     # Обычный пользователь (может добавлять рефералов)
     if has_permission('referal.referrals.add'):
         return 'referer'
-    
-    # Fallback: если разрешений нет, проверяем роли из заголовков
-    print("DEBUG: Determined role type from permissions: none")
-    service_roles_str = request.headers.get('X-User-Service-Roles', '')
-    global_roles_str = request.headers.get('X-User-Roles', '')
-    
-    print(f"DEBUG: Fallback to legacy roles - X-User-Service-Roles: {service_roles_str}, X-User-Roles: {global_roles_str}")
-    
-    if service_roles_str:
-        service_roles = [role.strip() for role in service_roles_str.split(',')]
-        if 'referal-manager' in service_roles or 'manager' in service_roles:
-            print("DEBUG: Final determined role: manager")
-            return 'manager'
-        if 'referal-call-center' in service_roles or 'call-center' in service_roles:
-            print("DEBUG: Final determined role: call-center")
-            return 'call-center'
-        if 'referal-analytics' in service_roles or 'analytics' in service_roles or 'analytic' in service_roles:
-            print("DEBUG: Final determined role: analytics")
-            return 'analytics'
-        if 'referal-admin' in service_roles:
-            return 'admin'
-    
-    if global_roles_str:
-        global_roles = [role.strip() for role in global_roles_str.split(',')]
-        if 'system.admin' in global_roles or 'admin' in global_roles:
-            return 'admin'
-        if 'manager' in global_roles:
-            return 'manager'
-        if 'call-center' in global_roles:
-            return 'call-center'
-        if 'analytics' in global_roles or 'analytic' in global_roles:
-            return 'analytics'
     
     return 'none'
 
@@ -450,8 +432,8 @@ def requires_admin_access():
     has_permissions = has_any_permission([
         'referal.admin.panel',
         'referal.admin.change_status', 
-        'referal.admin.reports',
-        'referal.admin.export'
+        'referal.admin.view_reports',
+        'referal.admin.export_data'
     ])
     
     if has_permissions:
