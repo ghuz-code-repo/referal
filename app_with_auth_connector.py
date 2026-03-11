@@ -12,7 +12,7 @@ import sys
 from flask import Flask, request, g, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 import pymysql
-from models import MacroContact, MacroDeal, db, User, Referal, Status
+from models import MacroContact, MacroDeal, db, User, UserData, Referal, Status
 
 # Импортируем все Blueprint'ы из папки routes
 from routes import auth_bp, referal_bp, admin_bp, document_bp, user_bp, sync_bp
@@ -566,6 +566,36 @@ def before_request():
     username = request.headers.get('X-User-Name', 'Anonymous')
     user_id = request.headers.get('X-User-ID', 'N/A')
     print(f"[{request.method}] {request.path} | User: {username} (ID: {user_id})")
+
+    # Auto-create local user if authenticated via gateway but not yet in local DB
+    user_context = getattr(g, 'user', None)
+    if user_context and user_context.user_id:
+        try:
+            local_user = User.query.filter_by(auth_user_id=user_context.user_id).first()
+            if not local_user:
+                # Create local user record from auth context
+                login = user_context.username or f"user_{user_context.user_id}"
+                # Check if login already taken (e.g. legacy user without auth_user_id)
+                existing_by_login = User.query.filter_by(login=login).first()
+                if existing_by_login:
+                    # Link existing user to auth_user_id
+                    existing_by_login.auth_user_id = user_context.user_id
+                    db.session.commit()
+                    print(f"🔗 Linked existing local user '{login}' to auth_user_id={user_context.user_id}")
+                else:
+                    new_user = User(login=login, auth_user_id=user_context.user_id, role='user')
+                    db.session.add(new_user)
+                    db.session.flush()  # Get the new user ID
+
+                    # Create UserData with full name from auth context
+                    full_name = user_context.full_name or login
+                    user_data = UserData(user_id=new_user.id, full_name=full_name)
+                    db.session.add(user_data)
+                    db.session.commit()
+                    print(f"✅ Auto-created local user '{login}' (auth_user_id={user_context.user_id}, full_name={full_name})")
+        except Exception as e:
+            db.session.rollback()
+            print(f"⚠️ Failed to auto-create local user: {e}")
 
 if __name__ == '__main__':
     # This block is only for local development/debugging
