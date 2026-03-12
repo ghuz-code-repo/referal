@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мои рефералы - {{ current_user.login }}</title>
+    <title>Мои рефералы - {{ user.login }}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
     <!-- ИСПРАВЛЕНИЕ: Загружаем базовые стили с переменными ПЕРВЫМИ -->
@@ -32,6 +32,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/table-filters.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/footer.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/referals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/profile.css') }}">
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 
 
@@ -46,18 +47,65 @@
         {% include 'components/flash_messages.html' %}
         
         <!-- Основной контент -->
-        <main class="main">
+        <main class="main" style="width: 80%;">
             <div class="container">
-                {# <!-- 
-                <h1 class="main__title">Профиль</h1>
-                 <div class="profile__balance">
-                    <p>Бонусные баллы<a href="https://gh.uz" class="rikroll">:</a> {{current_balance}}</p>
-                </div>
-                <br>
+                <h1 class="main__title">Профиль пользователя</h1>
                 
-                <button id="open_agreement" class="button">Форма скачивания договора</button>
-                {% include 'modals/agreement_modal.html' %} --> #}
-                 {% include 'components/referals_table.html' %}
+                <div class="profile-section">
+                    <div class="profile-card">
+                        <h2><i class="fas fa-user"></i> Личные данные</h2>
+                        <div class="profile-info">
+                            <div class="info-row">
+                                <span class="info-label">ФИО:</span>
+                                <span class="info-value">{{ user.full_name if user.full_name else 'Не указано' }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Логин:</span>
+                                <span class="info-value">{{ user.login if user.login is defined else (user.username if user.username is defined else 'Не указано') }}</span>
+                            </div>
+                            {% if user.user_data is defined and user.user_data %}
+                            <div class="info-row">
+                                <span class="info-label">Телефон:</span>
+                                <span class="info-value">{{ user.user_data.phone if user.user_data.phone else 'Не указано' }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Email:</span>
+                                <span class="info-value">{{ user.user_data.e_mail if user.user_data.e_mail else 'Не указано' }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% if current_balance is defined %}
+                    <div class="profile-card">
+                        <h2><i class="fas fa-wallet"></i> Баланс</h2>
+                        <div class="balance-info">
+                            <div class="balance-item">
+                                <span class="balance-label">Текущий баланс:</span>
+                                <span class="balance-value">{{ current_balance }} сум</span>
+                            </div>
+                            <div class="balance-item">
+                                <span class="balance-label">На выводе:</span>
+                                <span class="balance-value">{{ pending_withdrawal }} сум</span>
+                            </div>
+                            <div class="balance-item">
+                                <span class="balance-label">Всего выведено:</span>
+                                <span class="balance-value">{{ total_withdrawal }} сум</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="profile-card">
+                        <h2><i class="fas fa-list"></i> Доступные действия</h2>
+                        <div class="actions-grid">
+                            <a href="{{ url_for('referal.profile') }}" class="action-card">
+                                <i class="fas fa-file-download"></i>
+                                <span>Скачать документы</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
 
             </div>
         </main>
@@ -66,7 +114,6 @@
     </div>
 
 <!-- Подключение JavaScript файлов в правильном порядке -->
-<script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
 <script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
 <script src="{{ url_for('static', filename='js/validation/pinfl-validation.js') }}"></script>
 <script src="{{ url_for('static', filename='js/validation/email-validation.js') }}"></script>

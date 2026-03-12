@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/footer.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/validation.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/user-profile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/user-documents.css') }}">
 
 
     <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
@@ -46,7 +47,8 @@
                         <div class="info-card card">
                             <div class="info-header">
                                 <h3><i class="fas fa-user"></i> Основная информация</h3>
-                                {% set user_data_complete = current_user!=None and current_user.user_data!=None and current_user.user_data.full_name!=None and current_user.user_data.full_name!='' and current_user.user_data.passport_number!=None and current_user.user_data.passport_number!='' and current_user.user_data.passport_giver!=None and current_user.user_data.passport_giver!='' and current_user.user_data.passport_date!=None and current_user.user_data.passport_adress!=None and current_user.user_data.passport_adress!='' and current_user.user_data.pinfl!=None and current_user.user_data.pinfl!='' and current_user.user_data.bank_name!=None and current_user.user_data.bank_name!='' and current_user.user_data.trans_schet!=None and current_user.user_data.trans_schet!='' and current_user.user_data.card_number!=None and current_user.user_data.card_number!='' and current_user.user_data.mfo!=None and current_user.user_data.mfo!='' and current_user.user_data.phone!=None and current_user.user_data.phone!=''%}
+                                {% set auth_user = get_auth_user_data() %}
+                                {% set user_data_complete = auth_user and auth_user.full_name and auth_user.passport_number and auth_user.passport_giver and auth_user.passport_date and auth_user.passport_address and auth_user.pinfl and auth_user.bank_name and auth_user.bank_account and auth_user.bank_card and auth_user.bank_mfo and auth_user.phone %}
                                 {% if current_user.role=='referer' %}
                                 <div class="download-act-container">
                                     {% if user_data_complete %}
@@ -79,6 +81,16 @@
                                         </div>
                                     {% endif %}
 
+                                    <!-- Ссылка на документы пользователя -->
+                                    {% set user_auth = get_auth_user_data() %}
+                                    {% if user_auth and user_auth.permissions and 'profile.documents' in user_auth.permissions %}
+                                        <a href="{{ url_for('user_documents.list_user_documents') }}" class="download-act-btn download-act-link">
+                                            <button type="button" class="download-agreement-btn">
+                                                <i class="fas fa-file-alt"></i> Мои документы
+                                            </button>
+                                        </a>
+                                    {% endif %}
+
                                 </div>
                                 {% endif %}
                             </div>
@@ -86,6 +98,13 @@
                                 <span class="info-label">Логин:</span>
                                 <span class="info-value">{{ current_user.login }}</span>
                             </div>
+                            {% set auth_user = get_auth_user_data() %}
+                            {% if auth_user and auth_user.email %}
+                            <div class="info-row">
+                                <span class="info-label">Email:</span>
+                                <span class="info-value">{{ auth_user.email }}</span>
+                            </div>
+                            {% endif %}
                             <div class="info-row">
                                 <span class="info-label">Роль:</span>
                                 <span class="info-value">{{ current_user.role or 'Не указана' }}</span>
@@ -109,12 +128,13 @@
                         <div class="form-card card">
 
                             
-                            <form method="POST" action="{{ url_for('user.update_user_info') }}" class="user-form">
+                            <div class="user-form">
                                 <div class="form-header">
-                                    <h3><i class="fas fa-edit"></i> Редактирование данных</h3>
-                                    <button type="submit" class="btn button button--primary">
-                                        <i class="fas fa-save"></i> Сохранить
-                                    </button>
+                                    <h3><i class="fas fa-eye"></i> Просмотр данных</h3>
+                                    <div class="info-message">
+                                        <i class="fas fa-info-circle"></i>
+                                        <span>Данные теперь управляются через <a href=" https://analytics.gh.uz/profile" target="_blank">основной профиль</a></span>
+                                    </div>
                                 </div>
                                 <div class="form-sections-container">
                                     <!-- Личные данные -->
@@ -131,7 +151,8 @@
                                                        name="name" 
                                                        class="form-input input"
                                                        value="{{ (current_user.user_data.full_name if current_user.user_data else '')|clean_none }}"
-                                                       placeholder="Введите полное имя">
+                                                       placeholder="Введите полное имя"
+                                                       readonly>
                                             </div>
 
                                             <div class="passport-grid">
@@ -142,17 +163,20 @@
                                                            name="phone" 
                                                            class="form-input input"
                                                            value="{{ (current_user.user_data.phone if current_user.user_data else '')|clean_none }}"
-                                                           placeholder="+998 XX XXX XX XX">
+                                                           placeholder="+998 XX XXX XX XX"
+                                                           readonly>
                                                 </div>
 
                                                 <div class="form-group">
                                                     <label for="e_mail">Email:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="email" 
                                                            id="e_mail" 
                                                            name="e_mail" 
                                                            class="form-input input"
-                                                           value="{{ (current_user.user_data.e_mail if current_user.user_data else '')|clean_none }}"
-                                                           placeholder="example@email.com">
+                                                           value="{{ auth_user.email if auth_user and auth_user.email else (current_user.user_data.e_mail if current_user.user_data else '')|clean_none }}"
+                                                           placeholder="example@email.com"
+                                                           readonly>
                                                 </div>
                                             </div>
 
@@ -169,54 +193,64 @@
                                         <div class="section-content" id="passport-data" style="display: none;">
                                             <div class="form-group">
                                                 <label for="pinfl">ПИНФЛ:</label>
+                                                {% set auth_user = get_auth_user_data() %}
                                                 <input type="text" 
                                                        id="pinfl" 
                                                        name="pinfl" 
                                                        class="form-input input"
-                                                       value="{{ (current_user.user_data.pinfl if current_user.user_data else '')|clean_none }}"
+                                                       value="{{ (auth_user.pinfl if auth_user else '')|clean_none }}"
                                                        placeholder="1 234567 890 123 4"
-                                                       maxlength="18">
+                                                       maxlength="18"
+                                                       readonly>
                                             </div>
                                             <div class="passport-grid">
                                                 <div class="form-group">
                                                     <label for="passport_number">Серия и номер:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="text" 
                                                            id="passport_number" 
                                                            name="passport_number" 
                                                            class="form-input input"
-                                                           value="{{ (current_user.user_data.passport_number if current_user.user_data else '')|clean_none }}"
-                                                           placeholder="AA1234567">
+                                                           value="{{ (auth_user.passport_number if auth_user else '')|clean_none }}"
+                                                           placeholder="AA1234567"
+                                                           readonly>
                                                 </div>
 
                                                 <div class="form-group">
                                                     <label for="passport_date">Дата выдачи:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="text" 
                                                            id="passport_date" 
                                                            name="passport_date" 
                                                            class="form-input input"
-                                                           value="{{ current_user.user_data.passport_date.strftime('%Y-%m-%d') if current_user.user_data and current_user.user_data.passport_date else '' }}">
+                                                           value="{{ auth_user.passport_date if auth_user else '' }}"
+                                                           readonly>
                                                 </div>
                                             </div>
 
                                             <div class="form-group">
                                                 <label for="passport_giver">Кем выдан:</label>
+                                                {% set auth_user = get_auth_user_data() %}
                                                 <input type="text" 
                                                        id="passport_giver" 
                                                        name="passport_giver" 
                                                        class="form-input input"
-                                                       value="{{ (current_user.user_data.passport_giver if current_user.user_data else '')|clean_none }}"
-                                                       placeholder="Орган выдачи">
+                                                       value="{{ (auth_user.passport_giver if auth_user else '')|clean_none }}"
+                                                       placeholder="Орган выдачи"
+                                                       readonly>
                                             </div>
 
                                             <div class="passport-grid">
                                                 <div class="form-group full-width">
                                                     <label for="passport_adress">Адрес регистрации:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="text" 
                                                            id="passport_adress" 
                                                            name="passport_adress" 
                                                            class="form-input input"
-                                                           value="{{ (current_user.user_data.passport_adress if current_user.user_data else '')|clean_none }}"
-                                                           placeholder="Адрес регистрации">
+                                                           value="{{ (auth_user.passport_address if auth_user else '')|clean_none }}"
+                                                           placeholder="Адрес регистрации"
+                                                           readonly>
                                                 </div>
                                             </div>
                                         </div>
@@ -232,48 +266,90 @@
                                             <div class="bank-grid">
                                                 <div class="form-group">
                                                     <label for="card_number">Номер карты:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="text" 
                                                            id="card_number" 
                                                            name="card_number" 
                                                            class="form-input input"
-                                                           value="{{ (current_user.user_data.card_number if current_user.user_data else '')|clean_none }}"
-                                                           placeholder="8600 XXXX XXXX XXXX">
+                                                           value="{{ (auth_user.bank_card if auth_user else '')|clean_none }}"
+                                                           placeholder="8600 XXXX XXXX XXXX"
+                                                           readonly>
                                                 </div>
 
                                                 <div class="form-group">
                                                     <label for="bank_name">Банк:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="text" 
                                                            id="bank_name" 
                                                            name="bank_name" 
                                                            class="form-input input"
-                                                           value="{{ (current_user.user_data.bank_name if current_user.user_data else '')|clean_none }}"
-                                                           placeholder="Название банка">
+                                                           value="{{ (auth_user.bank_name if auth_user else '')|clean_none }}"
+                                                           placeholder="Название банка"
+                                                           readonly>
                                                 </div>
 
                                                 <div class="form-group">
                                                     <label for="trans_schet">Транзитный счет:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="text" 
                                                            id="trans_schet" 
                                                            name="trans_schet" 
                                                            class="form-input input"
-                                                           value="{{ (current_user.user_data.trans_schet if current_user.user_data else '')|clean_none }}"
-                                                           placeholder="12345678901234567890">
+                                                           value="{{ (auth_user.bank_account if auth_user else '')|clean_none }}"
+                                                           placeholder="12345678901234567890"
+                                                           readonly>
                                                 </div>
 
                                                 <div class="form-group">
                                                     <label for="mfo">МФО:</label>
+                                                    {% set auth_user = get_auth_user_data() %}
                                                     <input type="text" 
                                                            id="mfo" 
                                                            name="mfo" 
                                                            class="form-input input"
-                                                           value="{{ (current_user.user_data.mfo if current_user.user_data else '')|clean_none }}"
-                                                           placeholder="01234">
+                                                           value="{{ (auth_user.bank_mfo if auth_user else '')|clean_none }}"
+                                                           placeholder="01234"
+                                                           readonly>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
+
+                                    <!-- Документы из Auth-Service -->
+                                    {% set auth_user = get_auth_user_data() %}
+                                    {% if auth_user and auth_user.permissions and 'profile.documents' in auth_user.permissions %}
+                                    <div class="form-section">
+                                        <h4 class="section-toggle" data-target="documents-data">
+                                            <span>Мои документы</span>
+                                            <i class="fas fa-chevron-down toggle-icon"></i>
+                                        </h4>
+                                        <div class="section-content" id="documents-data" style="display: none;">
+                                            <div class="documents-info">
+                                                <small class="auth-data-note">
+                                                    <i class="fas fa-info-circle"></i>
+                                                    Документы управляются через <a href="http:// https://analytics.gh.uz/profile" target="_blank">основной профиль</a> (только для чтения)
+                                                </small>
+                                            </div>
+                                            
+                                            <div class="documents-container" id="user-documents-container">
+                                                <div class="loading-message">
+                                                    <i class="fas fa-spinner fa-spin"></i>
+                                                    Загрузка документов...
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="documents-actions">
+                                                <a href="{{ url_for('user_documents.list_user_documents') }}" class="download-act-btn download-act-link">
+                                                    <button type="button" class="download-agreement-btn">
+                                                        <i class="fas fa-file-alt"></i> Просмотр всех документов
+                                                    </button>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
                                 </div>
-                            </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -284,7 +360,6 @@
     </div>
     
     <!-- Подключение JavaScript файлов -->
-    <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/validation/phone-validation.js') }}"></script>
     <script src="{{ url_for('static', filename='js/validation/pinfl-validation.js') }}"></script>
     <script src="{{ url_for('static', filename='js/validation/email-validation.js') }}"></script>
@@ -294,12 +369,144 @@
     <script src="{{ url_for('static', filename='js/components/flash-messages.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/accordion.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/form-change-detector.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/date-picker.js')}}"></script>
+    <script src="{{ url_for('static', filename='js/deal-actions.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
     <script>
     particlesJS('particles-js', {
         "particles": { "number": { "value": 50, "density": { "enable": true, "value_area": 800 } }, "color": { "value": "#c4a668" }, "shape": { "type": "polygon", "stroke": { "width": 1, "color": "#c4a668" }, "polygon": { "nb_sides": 6 } }, "opacity": { "value": 0.2, "random": true, "anim": { "enable": true, "speed": 0.5, "opacity_min": 0.05, "sync": false } }, "size": { "value": 4, "random": true }, "line_linked": { "enable": true, "distance": 180, "color": "#c4a668", "opacity": 0.15, "width": 1 }, "move": { "enable": true, "speed": 0.8, "direction": "none", "random": true, "straight": false, "out_mode": "out" } }, "interactivity": { "detect_on": "canvas", "events": { "onhover": { "enable": true, "mode": "bubble" } }, "modes": { "bubble": { "distance": 200, "size": 6, "duration": 2, "opacity": 0.6 } } }, "retina_detect": true
+    });
+
+    // Функция для загрузки документов пользователя
+    function loadUserDocuments() {
+        const documentsContainer = document.getElementById('user-documents-container');
+        const documentsSection = document.getElementById('documents-data');
+        
+        // Проверяем, видима ли секция документов
+        if (!documentsSection || documentsSection.style.display === 'none') {
+            return; // Не загружаем, если секция не открыта
+        }
+        
+        fetch('/api/user_documents', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.documents) {
+                displayUserDocuments(data.documents);
+            } else {
+                documentsContainer.innerHTML = `
+                    <div class="no-documents-message">
+                        <i class="fas fa-inbox"></i>
+                        <p>Документы не найдены</p>
+                        <small>Добавьте документы через <a href=" https://analytics.gh.uz/profile" target="_blank">основной профиль</a></small>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка загрузки документов:', error);
+            documentsContainer.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Ошибка загрузки документов</p>
+                    <small>Попробуйте позже или обратитесь к администратору</small>
+                </div>
+            `;
+        });
+    }
+
+    // Функция для отображения документов
+    function displayUserDocuments(documents) {
+        const documentsContainer = document.getElementById('user-documents-container');
+        
+        if (documents.length === 0) {
+            documentsContainer.innerHTML = `
+                <div class="no-documents-message">
+                    <i class="fas fa-inbox"></i>
+                    <p>Документы не найдены</p>
+                    <small>Добавьте документы через <a href="https://analytics.gh.uz/profile" target="_blank">основной профиль</a></small>
+                </div>
+            `;
+            return;
+        }
+
+        const documentsHtml = documents.slice(0, 3).map(doc => `
+            <div class="document-item">
+                <div class="document-icon">
+                    <i class="fas fa-file-${getDocumentIcon(doc.type)}"></i>
+                </div>
+                <div class="document-info">
+                    <div class="document-title">${doc.title || 'Документ'}</div>
+                    <div class="document-type">${doc.type || 'Неизвестный тип'}</div>
+                    <div class="document-date">
+                        <i class="fas fa-calendar"></i>
+                        ${new Date(doc.created_at).toLocaleDateString('ru-RU')}
+                    </div>
+                </div>
+                <div class="document-status">
+                    <span class="status-badge status-${doc.status || 'unknown'}">
+                        ${getDocumentStatusText(doc.status)}
+                    </span>
+                </div>
+            </div>
+        `).join('');
+
+        documentsContainer.innerHTML = `
+            <div class="documents-list">
+                ${documentsHtml}
+            </div>
+            ${documents.length > 3 ? `
+                <div class="more-documents-info">
+                    <small>
+                        <i class="fas fa-info-circle"></i>
+                        Показано ${Math.min(3, documents.length)} из ${documents.length} документов
+                    </small>
+                </div>
+            ` : ''}
+        `;
+    }
+
+    // Вспомогательные функции для отображения документов
+    function getDocumentIcon(type) {
+        const iconMap = {
+            'passport': 'id-card',
+            'license': 'id-badge',
+            'certificate': 'certificate',
+            'contract': 'handshake',
+            'photo': 'image',
+            'pdf': 'file-pdf',
+            'image': 'file-image',
+            'document': 'file-alt'
+        };
+        return iconMap[type] || 'file-alt';
+    }
+
+    function getDocumentStatusText(status) {
+        const statusMap = {
+            'approved': 'Одобрен',
+            'pending': 'На рассмотрении',
+            'rejected': 'Отклонен',
+            'draft': 'Черновик'
+        };
+        return statusMap[status] || 'Неизвестен';
+    }
+
+    // Загружаем документы при открытии секции
+    document.addEventListener('DOMContentLoaded', function() {
+        const documentToggle = document.querySelector('[data-target="documents-data"]');
+        if (documentToggle) {
+            documentToggle.addEventListener('click', function() {
+                setTimeout(() => {
+                    loadUserDocuments();
+                }, 100); // Небольшая задержка для анимации
+            });
+        }
     });
     </script>
 </body>

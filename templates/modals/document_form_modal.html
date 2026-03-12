@@ -3,9 +3,24 @@
     <div class="modal-content">
         <div class="modal-header">
             <h1>Заполнение документов реферала</h1>
-            {% set user_data_complete = referal.user!=None and referal.user.user_data!=None and referal.user.user_data.full_name!='' and referal.user.user_data.phone_number!='' and referal.user.user_data.pinfl!='' and referal.user.user_data.passport_address!='' %}
-            {% set referal_data_complete = referal.referal_data!=None and referal.referal_data.full_name!='' and referal.referal_data.phone_number!='' and referal.referal_data.passport_number!='' and referal.referal_data.passport_date!=None and referal.referal_data.passport_giver!='' and referal.referal_data.contract_number!='' and referal.referal_data.contract_number!=None %}
-            {% set can_download_act = user_data_complete and referal_data_complete%}
+            {# Проверяем данные пользователя из Auth-Service через user_documents #}
+            {% if referal.user and referal.user.id in user_documents %}
+                {% set docs = user_documents[referal.user.id].documents %}
+                {% set auth_user = user_documents[referal.user.id] %}
+                {% set user_data_complete = docs.passport_number and docs.passport_address and docs.pinfl and auth_user.get('phone') %}
+            {% else %}
+                {% set user_data_complete = false %}
+            {% endif %}
+            
+            {# Проверяем данные реферала - все поля должны быть заполнены #}
+            {% set referal_data_complete = referal.referal_data and 
+                                          referal.referal_data.full_name and referal.referal_data.full_name.strip() and
+                                          referal.referal_data.phone_number and referal.referal_data.phone_number.strip() and
+                                          referal.referal_data.passport_number and referal.referal_data.passport_number.strip() and
+                                          referal.referal_data.passport_date and
+                                          referal.referal_data.passport_giver and referal.referal_data.passport_giver.strip() and
+                                          referal.referal_data.contract_number and referal.referal_data.contract_number.strip() %}
+            {% set can_download_act = user_data_complete and referal_data_complete %}
 
             <div class="download-act-container">
                 {%if can_download_act%}
@@ -46,6 +61,80 @@
         </div>
 
         <div class="modal-body">
+            <!-- Секция со списком договоров -->
+            {% set deals_count = referal.get_deals_count() %}
+            {% if deals_count > 0 %}
+            <div class="deals-list-section">
+                <div class="deals-header">
+                    <h3><i class="fas fa-file-contract"></i> Договоры реферала ({{ deals_count }})</h3>
+                    <span class="total-amount">
+                        Общая сумма: <strong>{{ referal.get_total_withdrawal_amount()|default(0)|int|format_number }} сум</strong>
+                    </span>
+                </div>
+                
+                <div class="deals-compact-list">
+                    {% for referal_deal in referal.referal_deals %}
+                    {% set deal = referal_deal.deal %}
+                    <div class="deal-compact-item" data-deal-id="{{ referal_deal.id }}" data-status-id="{{ referal_deal.status_id }}">
+                        <div class="deal-info">
+                            <span class="deal-number">
+                                <i class="fas fa-file-alt"></i>
+                                {{ deal.agreement_number if deal else '—' }}
+                            </span>
+                            
+                            <!-- Статус договора -->
+                            <span class="deal-status-badge status-{{ referal_deal.status_id }}">
+                                {{ referal_deal.status_name }}
+                            </span>
+                            
+                            <span class="deal-amount">{{ referal_deal.withdrawal_amount|default(0)|int|format_number }} сум</span>
+                        </div>
+                        
+                        <div class="deal-actions">
+                            <!-- Кнопка "Отправить на проверку" только для статуса 0 -->
+                            {% if referal_deal.status_id == 0 %}
+                                {% if can_download_act %}
+                                <button type="button" 
+                                        class="deal-send-review-btn" 
+                                        data-deal-id="{{ referal_deal.id }}"
+                                        title="Отправить на проверку">
+                                    <i class="fas fa-paper-plane"></i>
+                                    <span>Отправить</span>
+                                </button>
+                                {% else %}
+                                <button type="button" 
+                                        class="deal-send-review-btn disabled" 
+                                        disabled
+                                        title="Заполните все обязательные поля для отправки на проверку">
+                                    <i class="fas fa-paper-plane"></i>
+                                    <span>Отправить</span>
+                                </button>
+                                {% endif %}
+                            {% endif %}
+                            
+                            <!-- Кнопка скачать акт -->
+                            {% if can_download_act %}
+                            <a href="/get_deal_act/{{ referal_deal.id }}" 
+                               class="deal-download-btn" 
+                               target="_blank"
+                               title="Скачать акт">
+                                <i class="fas fa-download"></i>
+                            </a>
+                            {% else %}
+                            <button type="button"
+                                    class="deal-download-btn disabled"
+                                    disabled
+                                    title="Заполните все обязательные поля для скачивания акта">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
             <form method="POST" action="{{ url_for('referal.update_referal_documents', referal_id=referal.id) }}">
                 
                 <!-- Контейнер для двух карточек -->

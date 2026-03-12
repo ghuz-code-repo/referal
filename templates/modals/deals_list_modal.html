@@ -1,0 +1,139 @@
+<!-- Модальное окно меню реферала -->
+<div id="dealsListModal" class="modal deals-modal" style="display: none;">
+    <div class="modal-content deals-modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-bars"></i> Меню реферала</h2>
+            <button type="button" class="close-modal" onclick="closeDealsModal()">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+            <!-- Контейнер для двух панелей -->
+            <div class="deals-panels-container">
+                
+                <!-- Левая панель: Информация о реферале -->
+                <div class="referal-info-panel">
+                    <h3><i class="fas fa-user"></i> Данные реферала</h3>
+                    <h4 style="margin-top: 10px; color: #666;">Обязательные данные</h4>
+                    
+                    <div id="referal-info-content">
+                        <!-- ФИО с валидацией -->
+                        <div class="info-field">
+                            <label>ФИО: <span style="font-size: 12px; color: #666;">Минимум 2 слова</span> <span class="field-error" id="deals-name-error" style="color: red; margin-left: 10px;"></span></label>
+                            <input type="text" 
+                                   id="referal-full-name" 
+                                   name="full_name"
+                                   class="referal-input editable-input" 
+                                   placeholder="Введите ФИО реферала (минимум 2 слова)">
+                        </div>
+                        
+                        <!-- Телефон с валидацией и форматированием -->
+                        <div class="info-field">
+                            <label>Телефон: <span style="font-size: 12px; color: #666;">Формат: +998 XX XXX XX XX</span> <span class="field-error" id="deals-phone-error" style="color: red; margin-left: 10px;"></span></label>
+                            <input type="tel" 
+                                   id="referal-phone" 
+                                   name="phone_number"
+                                   class="referal-input editable-input" 
+                                   placeholder="+998 XX XXX XX XX">
+                        </div>
+                        
+                        <!-- ID (только для чтения) -->
+                        <div class="info-field">
+                            <label>Macro ID:</label>
+                            <input type="text" 
+                                   id="referal-contact-id" 
+                                   name="contact_id"
+                                   class="referal-input" 
+                                   disabled 
+                                   placeholder="ID из MacroCRM">
+                        </div>
+                    </div>
+                    
+                    <h3 class="passport-section-title"><i class="fas fa-passport"></i> Паспортная информация (обязательны для проверки)</h3>
+                    
+                    <div class="passport-info-section" id="passport-info-content">
+                        <!-- Серия и номер паспорта с валидацией -->
+                        <div class="info-field">
+                            <label>Серия и номер паспорта: <span class="field-error" id="deals-passport-error" style="color: red; margin-left: 10px;"></span></label>
+                            <input type="text" 
+                                   id="referal-passport-number" 
+                                   name="passport_number"
+                                   class="referal-input editable-input" 
+                                   placeholder="AA1234567"
+                                   maxlength="9">
+                        </div>
+                        
+                        <!-- Кем выдан -->
+                        <div class="info-field">
+                            <label>Кем выдан паспорт:</label>
+                            <input type="text" 
+                                   id="referal-passport-giver" 
+                                   name="passport_giver"
+                                   class="referal-input editable-input" 
+                                   placeholder="Название органа">
+                        </div>
+                        
+                        <!-- Дата выдачи с datepicker -->
+                        <div class="info-field">
+                            <label>Дата выдачи паспорта:</label>
+                            <input type="text" 
+                                   id="referal_passport_date_deals_modal" 
+                                   name="passport_date"
+                                   class="referal-input editable-input datepicker-input" 
+                                   placeholder="Выберите дату"
+                                   autocomplete="off"
+                                   readonly>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn-primary save-referal-btn" id="save-referal-data-btn">
+                        <i class="fas fa-save"></i> Сохранить данные реферала
+                    </button>
+                </div>
+                
+                <!-- Правая панель: Договоры реферала -->
+                <div class="deals-list-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;"><i class="fas fa-file-contract"></i> Договоры реферала (<span id="deals-referal-name-header"></span>)</h3>
+                        <button type="button" class="btn-primary" onclick="openAddDealModalFromMenu()" style="padding: 8px 15px; font-size: 14px;">
+                            <i class="fas fa-plus"></i> Добавить договор
+                        </button>
+                    </div>
+                    
+                    <div class="deals-summary-compact">
+                        <div class="summary-item-compact">
+                            <i class="fas fa-file-alt"></i>
+                            <span>Всего договоров: <strong id="total-deals-count">0</strong></span>
+                        </div>
+                        <div class="summary-item-compact">
+                            <i class="fas fa-money-bill-wave"></i>
+                            <span>Общая сумма: <strong id="total-withdrawal-amount">0</strong> сум</span>
+                        </div>
+                    </div>
+                    
+                    <div class="deals-table-container">
+                        <table class="deals-table-compact">
+                            <thead>
+                                <tr>
+                                    <th>№</th>
+                                    <th>Номер договора</th>
+                                    <th>Сумма выплаты</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deals-table-body">
+                                <!-- Строки будут добавлены через JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="closeDealsModal()">
+                <i class="fas fa-times"></i> Закрыть
+            </button>
+        </div>
+    </div>
+</div>

@@ -51,7 +51,7 @@
             <button type="submit" class="btn filter-btn">
                 <i class="fas fa-search"></i> Применить
             </button>
-            <a href="{{ url_for('referal.profile') }}" class="btn filter-clear-btn">
+            <a href="{{ request.path }}" class="btn filter-clear-btn">
                 <i class="cancel_sort fas fa-times"></i> Сбросить
             </a>
         </div>

@@ -1,12 +1,14 @@
 <!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\components\header.html -->
 <header class="header">
     <div class="header_name">
-        <img src="{{ url_for('static', filename='img/logo-light.svg')}}" 
-             alt="Golden House Logo" 
-             class="logo" 
-             id="dynamic-logo"
-             data-light-logo="{{ url_for('static', filename='img/logo-dark.svg') }}"
-             data-dark-logo="{{ url_for('static', filename='img/logo-light.svg') }}">
+        <a href="/menu" title="Меню сервисов">
+            <img src="{{ url_for('static', filename='img/logo-dark.svg')}}" 
+                 alt="Golden House Logo" 
+                 class="logo" 
+                 id="dynamic-logo"
+                 data-light-logo="{{ url_for('static', filename='img/logo-dark.svg') }}"
+                 data-dark-logo="{{ url_for('static', filename='img/logo-light.svg') }}">
+        </a>
     </div>
     
     <!-- Кнопка гамбургер для мобильной версии -->
@@ -18,19 +20,18 @@
     
     <nav class="nav" id="mobileNav">
         <div class="nav__list">
-            {% if request.path != '/' and current_user and current_user.role == 'referer' %}
+            {# Скачать своё соглашение - показываем если есть право на скачивание документов #}
+            {% if check_permission('referal.profile.documents.download') %}
             <div class="nav__item">
-                <a href="{{ url_for('referal.profile') }}" class="nav__link"><i class="fas fa-users"></i>Мои рефералы</a>
+                <a href="{{ url_for('document.my_agreement') }}" class="nav__link"><i class="fas fa-file-download"></i> Скачать соглашение</a>
             </div>
             {% endif %}
-            {% if current_user and request.path != '/profile' %}
+            {# Управление рефералами - показываем админам #}
+            {% if check_permission('referal.admin.panel') and request.path != '/admin' %}
             <div class="nav__item">
-                <a href="{{ url_for('user.user_profile') }}" class="nav__link"><i class="fas fa-user"></i>Мой профиль</a>
-            </div>
-            {% endif %}
-            {% if current_user and (current_user.role=='admin' or current_user.role=='manager' or current_user.role=='call-center') and request.path != '/admin' %}
-            <div class="nav__item">
-                <a href="{{ url_for('admin.admin_panel') }}" class="nav__link">Управление рефералами</a>
+                <a href="{{ url_for('admin.admin_panel') }}" class="nav__link">
+                    <i class="fas fa-cog"></i> Управление рефералами
+                </a>
             </div>
             {% endif %}
             <div class="nav__item">
@@ -41,6 +42,35 @@
                     Тёмная тема
                 </button>
             </div>
+            {% if current_user %}
+            <!-- Добавляем ссылку на главный профиль -->
+            <div class="nav__item profile-link">
+                <a href="https://analytics.gh.uz/profile" target="_blank" class="nav__link profile-nav-link" title="Перейти в основной профиль">
+                    <div class="profile-mini">
+                        <!-- Получаем данные пользователя напрямую из auth-service заголовков -->
+                        {% set auth_user = get_auth_user_data() %}
+                        {% if auth_user %}
+                            <!-- Используем данные из auth-service -->
+                            <div class="user-avatar">
+                                {% if auth_user.avatar_path %}
+                                    <img src="{{ auth_user.avatar_path }}" alt="Avatar" class="avatar-img">
+                                {% else %}
+                                    <i class="fas fa-user-circle"></i>
+                                {% endif %}
+                            </div>
+                            <div class="user-info">
+                                <span class="user-name">{{ auth_user.short_name }}</span>
+                                <span class="user-login">({{ auth_user.username }})</span>
+                            </div>
+                        {% else %}
+                            <!-- Fallback -->
+                            <i class="fas fa-user-cog"></i>
+                            <span>Основной профиль</span>
+                        {% endif %}
+                    </div>
+                </a>
+            </div>
+            {% endif %}
         </div>
     </nav>
 </header>

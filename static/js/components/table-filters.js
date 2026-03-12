@@ -1,17 +1,64 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Определяем текущий режим просмотра
+    function getCurrentViewMode() {
+        const url = new URL(window.location);
+        return url.searchParams.get('view_mode') || 'deals';
+    }
+    
+    // Получаем префикс для параметров в зависимости от режима
+    function getParamPrefix() {
+        const viewMode = getCurrentViewMode();
+        return viewMode === 'referals' ? 'r_' : 'd_';
+    }
+    
     // Обработка фильтров в шапке таблицы
     const filterInputs = document.querySelectorAll('.header-filter');
     let filterTimeout;
     
     filterInputs.forEach(input => {
-        input.addEventListener('input', function() {
-            clearTimeout(filterTimeout);
-            filterTimeout = setTimeout(() => {
-                applyFilters();
-            }, 300); // Задержка 300мс для избежания лишних запросов
-        });
+        // Убираем автоматическое применение по вводу - только по Enter и blur
+        // input.addEventListener('input', function() {
+        //     clearTimeout(filterTimeout);
+        //     filterTimeout = setTimeout(() => {
+        //         applyFilters();
+        //     }, 300); // Задержка 300мс для избежания лишних запросов
+        // });
         
         input.addEventListener('change', function() {
+            applyFilters();
+        });
+        
+        // Добавляем обработчик на Enter
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                clearTimeout(filterTimeout);
+                applyFilters();
+            }
+        });
+        
+        // Добавляем обработчик на потерю фокуса
+        input.addEventListener('blur', function() {
+            clearTimeout(filterTimeout);
+            applyFilters();
+        });
+    });
+    
+    // Обработка фильтров в таблице договоров (table-filter)
+    const tableFilterInputs = document.querySelectorAll('.table-filter');
+    tableFilterInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            applyFilters();
+        });
+        
+        // Добавляем обработчик на Enter
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                applyFilters();
+            }
+        });
+        
+        // Добавляем обработчик на потерю фокуса
+        input.addEventListener('blur', function() {
             applyFilters();
         });
     });
@@ -55,19 +102,47 @@ document.addEventListener('DOMContentLoaded', function() {
     function applyFilters() {
         const url = new URL(window.location);
         const params = new URLSearchParams(url.search);
+        const prefix = getParamPrefix();
         
         // Сбрасываем страницу на первую при применении фильтров
         params.set('page', '1');
         
-        // Собираем значения фильтров
+        // Очищаем старые параметры фильтров для текущего режима
+        const currentViewMode = getCurrentViewMode();
+        if (currentViewMode === 'referals') {
+            params.delete('r_name');
+            params.delete('r_phone');
+            params.delete('r_contract');
+            params.delete('r_contact_id');
+            params.delete('r_user');
+        } else {
+            params.delete('d_name');
+            params.delete('d_contract');
+            params.delete('d_user');
+            params.delete('d_amount');
+        }
+        
+        // Собираем значения фильтров с правильным префиксом
+        // Обрабатываем header-filter (для referals)
         filterInputs.forEach(input => {
-            const filterName = input.dataset.filter;
+            const filterName = input.dataset.filter; // например, 'name' или 'phone'
+            const paramName = prefix + filterName;  // 'r_name' или 'd_name'
             const value = input.value.trim();
             
             if (value) {
-                params.set(filterName, value);
-            } else {
-                params.delete(filterName);
+                params.set(paramName, value);
+            }
+        });
+        
+        // Обрабатываем table-filter (для deals)
+        const tableFilterInputs = document.querySelectorAll('.table-filter');
+        tableFilterInputs.forEach(input => {
+            const filterName = input.dataset.filter; // например, 'name' или 'contract'
+            const paramName = prefix + filterName;  // 'd_name' или 'd_contract'
+            const value = input.value.trim();
+            
+            if (value) {
+                params.set(paramName, value);
             }
         });
         
@@ -84,9 +159,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function addSort(field) {
         const url = new URL(window.location);
         const params = new URLSearchParams(url.search);
+        const prefix = getParamPrefix();
+        const sortParam = prefix + 'sort'; // 'r_sort' или 'd_sort'
         
         // Получаем текущую сортировку
-        let currentSort = params.get('sort') || '';
+        let currentSort = params.get(sortParam) || '';
         let sortFields = [];
         
         if (currentSort) {
@@ -114,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Формируем новую строку сортировки
         const sortString = sortFields.map(s => `${s.field}:${s.order}`).join(',');
-        params.set('sort', sortString);
+        params.set(sortParam, sortString);
         
         params.set('page', '1'); // Сбрасываем на первую страницу
         
@@ -125,9 +202,17 @@ document.addEventListener('DOMContentLoaded', function() {
     function clearFilter(filterName) {
         const url = new URL(window.location);
         const params = new URLSearchParams(url.search);
+        const prefix = getParamPrefix();
+        const paramName = prefix + filterName;
         
-        params.delete(filterName);
+        params.delete(paramName);
         params.set('page', '1');
+        
+        // Также очищаем поле ввода
+        const input = document.querySelector(`[data-filter="${filterName}"]`);
+        if (input) {
+            input.value = '';
+        }
         
         url.search = params.toString();
         window.location.href = url.toString();
@@ -136,9 +221,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function removeSort(field) {
         const url = new URL(window.location);
         const params = new URLSearchParams(url.search);
+        const prefix = getParamPrefix();
+        const sortParam = prefix + 'sort';
         
         // Получаем текущую сортировку
-        let currentSort = params.get('sort') || '';
+        let currentSort = params.get(sortParam) || '';
         let sortFields = [];
         
         if (currentSort) {
@@ -154,9 +241,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Формируем новую строку сортировки
         if (sortFields.length > 0) {
             const sortString = sortFields.map(s => `${s.field}:${s.order}`).join(',');
-            params.set('sort', sortString);
+            params.set(sortParam, sortString);
         } else {
-            params.delete('sort');
+            params.delete(sortParam);
         }
         
         params.set('page', '1');

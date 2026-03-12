@@ -1,56 +1,233 @@
 """Маршруты для администрирования"""
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+import logging
+import sys
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
+from sqlalchemy import or_, cast, String, func, Date
 from services import fetch_data_from_mysql
+from services import notification_service
+from notification_client import get_notification_client
 from .auth_routes import get_current_user
 from models import *
 from services import withdrawal_service
+from utils import get_user_full_name_from_auth
+from permission_utils import (
+    requires_admin_access, 
+    get_allowed_statuses_for_user, 
+    get_default_status_filter,
+    can_change_status_to,
+    can_change_status_from_to,
+    get_user_role_type,
+    get_allowed_status_changes_for_user,
+    has_permission
+)
+from status_permissions import (
+    get_user_status_summary,
+    get_all_status_permissions,
+    format_permission_name,
+    ROLE_PERMISSION_PRESETS
+)
 import utils
 import os
+import requests
+
+# Настраиваем логирование для gunicorn
+logger = logging.getLogger('gunicorn.error')
+
+
+def get_user_email_from_auth_service(auth_user_id):
+    """Получить актуальный email пользователя из auth-service"""
+    try:
+        auth_service_url = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:80')
+        profile_url = f"{auth_service_url}/api/users/{auth_user_id}/profile"
+        
+        api_headers = {'X-API-Key': os.getenv('INTERNAL_API_KEY', '')}
+        response = requests.get(profile_url, headers=api_headers, timeout=5)
+        
+        if response.status_code == 200:
+            profile_data = response.json()
+            email = profile_data.get('email')
+            if email:
+                print(f"✅ Got email from auth-service for user {auth_user_id}: {email}")
+                return email
+            else:
+                print(f"⚠️ No email in auth-service profile for user {auth_user_id}")
+        else:
+            print(f"⚠️ Failed to get profile from auth-service: {response.status_code}")
+    except Exception as e:
+        print(f"❌ Error getting email from auth-service: {str(e)}")
+    
+    return None
 
 
 admin_bp = Blueprint('admin', __name__)
 
 
+def send_admin_deal_status_notification(referal_deal, admin_user, old_status_id, new_status_id, new_status_name, rejection_reason=None):
+    """Send notification about deal status change by admin to users with appropriate permissions.
+    
+    Использует permission-based систему из notification_utils для определения получателей.
+    Для статуса 500 (Отказ) дополнительно уведомляет самого пользователя-реферала.
+    """
+    try:
+        from notification_utils import get_notification_recipients_for_status, get_status_display_name
+
+        # Получаем общие данные о договоре
+        agreement_number = referal_deal.deal.agreement_number if referal_deal.deal else 'Неизвестно'
+        referal_name = referal_deal.referal.referal_data.full_name if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
+        referal_phone = referal_deal.referal.referal_data.phone_number if referal_deal.referal and referal_deal.referal.referal_data else 'Неизвестно'
+        withdrawal_amount = referal_deal.withdrawal_amount or 0
+        admin_name = get_user_full_name_from_auth(admin_user)
+        status_display = get_status_display_name(new_status_id)
+        old_status_display = get_status_display_name(old_status_id) if old_status_id is not None else 'Неизвестно'
+
+        notification_client = get_notification_client()
+
+        # --- Специальная логика для статуса 500 (Отказ): уведомляем самого пользователя ---
+        if new_status_id == 500:
+            user_email = None
+            if referal_deal.referal and referal_deal.referal.user and referal_deal.referal.user.auth_user_id:
+                user_email = get_user_email_from_auth_service(referal_deal.referal.user.auth_user_id)
+
+            if user_email:
+                subject = f'Отказ по договору №{agreement_number}'
+                body = f"""Уважаемый(ая) {referal_name},
+
+К сожалению, ваш договор №{agreement_number} был отклонён."""
+
+                if rejection_reason:
+                    body += f"\n\nПричина отказа: {rejection_reason}"
+
+                body += "\n\nЕсли у вас есть вопросы, пожалуйста, свяжитесь с нами."
+
+                notification_client.send_email(
+                    recipient=user_email,
+                    subject=subject,
+                    body=body
+                )
+                print(f"✅ Rejection notification sent to user {user_email} for deal {referal_deal.id}")
+            else:
+                print(f"⚠️ Cannot send rejection notification: user email not found for deal {referal_deal.id}")
+
+        # --- Permission-based уведомления для всех ответственных сотрудников ---
+        recipients = get_notification_recipients_for_status(new_status_id)
+
+        if not recipients:
+            print(f"⚠️ No users with notification permissions found for status {new_status_id} ({status_display}), skipping staff notification")
+            return
+
+        # Формируем тело письма для ответственных
+        subject = f'Договор №{agreement_number} — статус: {status_display}'
+        body = f"""Администратор {admin_name} изменил статус договора.
+
+Детали договора:
+- Номер договора: {agreement_number}
+- Реферал: {referal_name} ({referal_phone})
+- Сумма вывода: {withdrawal_amount:,.0f} сум
+- Предыдущий статус: {old_status_display}
+- Новый статус: {status_display}"""
+
+        if new_status_id == 500 and rejection_reason:
+            body += f"\n- Причина отказа: {rejection_reason}"
+
+        body += "\n\nТребуется ваша проверка."
+
+        # Отправляем уведомление каждому получателю с нужным разрешением
+        sent_count = 0
+        for recipient in recipients:
+            recipient_email = recipient.get('email')
+            recipient_name = recipient.get('full_name', recipient.get('username', 'Сотрудник'))
+
+            if not recipient_email:
+                print(f"⚠️ Recipient has no email, skipping: {recipient}")
+                continue
+
+            try:
+                notification_client.send_email(
+                    recipient=recipient_email,
+                    subject=subject,
+                    body=body
+                )
+                sent_count += 1
+                print(f"📧 Status change notification sent to: {recipient_name} ({recipient_email}) for status {status_display}")
+            except Exception as e:
+                print(f"❌ Failed to send email to {recipient_email}: {str(e)}")
+
+        print(f"✅ Admin status change notification process completed. Sent to {sent_count}/{len(recipients)} recipients for status {old_status_id} -> {new_status_id}")
+
+    except Exception as e:
+        print(f"❌ Failed to send admin status change notification: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
 @admin_bp.route('/admin', methods=['GET'])
 def admin_panel():
-    """Административная панель для управления рефералами."""
+    """Административная панель для управления рефералами и договорами."""
+    
     user = get_current_user()
-    if not user or user.role not in ['admin', 'manager', 'call-center']:
-        flash('Доступ запрещен', 'error')
-        return redirect(url_for('referal.profile'))
+    
+    if not user:
+        flash('Доступ запрещен - пользователь не найден', 'error')
+        return redirect(request.referrer or '/')
+        
+    # Проверка доступа через permissions (новая система)
+    if not requires_admin_access():
+        flash('Доступ запрещен - недостаточно прав', 'error')
+        return redirect(request.referrer or '/')
+    
+    
+    # Get user role type based on permissions
+    user_role_type = get_user_role_type()
+    
+    # Получаем режим просмотра: 'referals' (по умолчанию) или 'deals'
+    view_mode = request.args.get('view_mode', 'deals')  # По умолчанию показываем договоры
     
     # Получаем параметры из URL
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     
-    # Получаем фильтры
-    status_filter = request.args.get('status', '')
-    name_filter = request.args.get('name', '')
-    phone_filter = request.args.get('phone', '')
-    contract_filter = request.args.get('contract', '')
-    contact_id_filter = request.args.get('contact_id', '')
-    user_filter = request.args.get('user', '')
+    # РАЗДЕЛЯЕМ ФИЛЬТРЫ ПО РЕЖИМАМ
+    # Префикс 'r_' для рефералов, 'd_' для договоров
+    if view_mode == 'referals':
+        status_filter = ''  # У рефералов НЕТ статусов!
+        name_filter = request.args.get('r_name', '')
+        phone_filter = request.args.get('r_phone', '')
+        contract_filter = request.args.get('r_contract', '')
+        contact_id_filter = request.args.get('r_contact_id', '')
+        user_filter = request.args.get('r_user', '')
+        created_at_filter = request.args.get('r_created_at', '')
+        total_withdrawal_filter = request.args.get('r_total_withdrawal', '')
+        deals_count_filter = ''  # Убираем фильтр по deals_count так как это вычисляемое поле
+        amount_filter = ''
+        sort_param = request.args.get('r_sort', '')
+    else:  # deals
+        status_filter = request.args.get('d_status', '')
+        name_filter = request.args.get('d_name', '')
+        phone_filter = ''  # Для договоров нет фильтра по телефону
+        contract_filter = request.args.get('d_contract', '')
+        contact_id_filter = ''  # Для договоров нет фильтра по contact_id
+        user_filter = request.args.get('d_user', '')
+        created_at_filter = ''  # Для договоров нет фильтра по дате создания
+        total_withdrawal_filter = ''  # Для договоров нет фильтра по выплатам
+        deals_count_filter = ''  # Для договоров нет фильтра по количеству
+        amount_filter = request.args.get('d_amount', '').strip()
+        sort_param = request.args.get('d_sort', '')
     
     # Проверяем наличие заголовка Referer для определения "чистого" захода
     referer = request.headers.get('Referer', '')
     is_direct_access = not referer or '/admin' not in referer
     
-    # УСТАНАВЛИВАЕМ ФИЛЬТРЫ ПО УМОЛЧАНИЮ ТОЛЬКО ПРИ ПРЯМОМ ЗАХОДЕ
-    if not status_filter and not any([name_filter, phone_filter, contract_filter, contact_id_filter, user_filter]) and is_direct_access:
-        # Устанавливаем фильтр по умолчанию только при первом заходе на страницу
-        if user.role == 'manager':
-            default_status = '200'
-        elif user.role == 'call-center':
-            default_status = '10'
-        else:  # admin
-            default_status = '1'
-        
-        # Перенаправляем с фильтром по умолчанию
-        return redirect(url_for('admin.admin_panel', status=default_status))
+    # УСТАНАВЛИВАЕМ ФИЛЬТРЫ ПО УМОЛЧАНИЮ ТОЛЬКО ПРИ ПРЯМОМ ЗАХОДЕ (только для договоров!)
+    if view_mode == 'deals' and not status_filter and not any([name_filter, phone_filter, contract_filter, contact_id_filter, user_filter, amount_filter]) and is_direct_access:
+        # Используем функцию для получения фильтра по умолчанию на основе разрешений
+        default_status = get_default_status_filter()
+        if default_status:
+            # Перенаправляем с фильтром по умолчанию (с правильным префиксом)
+            status_param = f"{'r_status' if view_mode == 'referals' else 'd_status'}"
+            return redirect(url_for('admin.admin_panel', view_mode=view_mode, **{status_param: default_status}))
     
     # Получаем сортировку
-    sort_param = request.args.get('sort', '')
     sort_fields = []
     if sort_param:
         for sort_item in sort_param.split(','):
@@ -61,49 +238,64 @@ def admin_panel():
     # Базовый запрос
     query = Referal.query
 
-
     selected_statuses = []
     status_ids = []
 
-    ALL_STATUSES = []
-
-    if user.role == 'manager':
-        ALL_STATUSES = [200, 300, 500]
-    elif user.role == 'call-center':
-        ALL_STATUSES = [10, 500, 20]
-    elif user.role == 'admin':
-        ALL_STATUSES = [s.id for s in Status.query.all()]
-         
-    if status_filter:
-        try:
-            statuses = status_filter.split(',')
-            for status in statuses:
-                if status.isdigit():
-                    # Если статус - это число, добавляем его в фильтр
-                    status_ids.append(int(status))
-                else:
-                    flash(f'Неверный формат статуса: {status}', 'warning')
-            query = query.filter(Referal.status_id.in_(status_ids))
-            selected_statuses = status_ids
-        except ValueError:
-            # Если в параметре что-то не то, игнорируем его
-            flash('Получен неверный формат статусов в фильтре.', 'warning')
-            pass 
-    else:
-        # СТАНДАРТНОЕ ПОВЕДЕНИЕ: Показываем все, кроме "Оплачено" (300)
-        # Убедитесь, что у вас есть эти ID в модели Status
-
-        if user.role == 'manager':
-            INCLUDED_STATUSES = [200, 300, 500]
-        elif user.role == 'call-center':
-            INCLUDED_STATUSES = [10, 500]
-        elif user.role == 'admin':
-            INCLUDED_STATUSES = [s.id for s in Status.query.all()]
-            # INCLUDED_STATUSES = [1]
-        query = query.filter(Referal.status_id.in_(INCLUDED_STATUSES))
-        selected_statuses = [s.id for s in Status.query.filter(Status.id.in_(INCLUDED_STATUSES)).all()]
+    # Получаем разрешенные статусы на основе разрешений пользователя (только для договоров!)
+    ALL_STATUSES = get_allowed_statuses_for_user()
+    print(f"🔍 DEBUG: get_allowed_statuses_for_user() returned: {ALL_STATUSES}")
+    print(f"🔍 DEBUG: User permissions from headers: {request.headers.get('X-User-Service-Permissions', 'NONE')}")
+    print(f"🔍 DEBUG: User service roles: {request.headers.get('X-User-Service-Roles', 'NONE')}")
     
-    statuses = [s for s in Status.query.filter(Status.id.in_(ALL_STATUSES)).all()]
+    # Получаем доступные статусы для изменения
+    allowed_status_changes = get_allowed_status_changes_for_user()
+    
+    # Для фильтра используем только статусы для просмотра
+    # Для выпадающего списка изменения будем использовать allowed_status_changes отдельно
+    filter_status_ids = ALL_STATUSES
+    
+    # ВАЖНО: Фильтрация по статусам ТОЛЬКО для режима 'deals', у рефералов нет статусов!
+    # Для рефералов просто показываем все записи
+    if view_mode == 'referals':
+        # Рефералы не имеют статусов - показываем все
+        pass
+    else:
+        # Логика фильтрации статусов только для договоров (будет применена позже к ReferalDeal)
+        if status_filter:
+            try:
+                statuses = status_filter.split(',')
+                for status in statuses:
+                    if status.isdigit():
+                        status_id = int(status)
+                        # Проверяем, может ли пользователь видеть этот статус
+                        if status_id in filter_status_ids:
+                            status_ids.append(status_id)
+                        else:
+                            flash(f'У вас нет прав для просмотра статуса: {status}', 'warning')
+                    else:
+                        flash(f'Неверный формат статуса: {status}', 'warning')
+                
+                # ВАЖНО: Если пользователь запросил фильтрацию, но ни один статус не прошел проверку прав,
+                # применяем фильтр по умолчанию (только разрешенные статусы)
+                if status_ids:
+                    selected_statuses = status_ids
+                else:
+                    # Все запрошенные статусы недоступны - показываем только разрешенные
+                    print(f"⚠️ All requested statuses denied! Applying default filter: {filter_status_ids}")
+                    status_ids = filter_status_ids
+                    selected_statuses = status_ids
+            except ValueError:
+                # Если в параметре что-то не то, применяем фильтр по умолчанию
+                flash('Получен неверный формат статусов в фильтре.', 'warning')
+                status_ids = filter_status_ids
+                selected_statuses = status_ids
+    
+    # Для фильтра используем ТОЛЬКО статусы для просмотра (filter_status_ids)
+    # Статусы для изменения (allowed_status_changes) будут использоваться отдельно в выпадающем списке изменения статуса
+    statuses = [s for s in Status.query.filter(Status.id.in_(filter_status_ids)).all()]
+    
+    # Для выпадающего списка изменения статуса получим отдельный список
+    change_statuses = [s for s in Status.query.filter(Status.id.in_(allowed_status_changes)).all()]
     
     if name_filter:
         query = query.filter(ReferalData.full_name.ilike(f'%{name_filter}%'))
@@ -115,20 +307,40 @@ def admin_panel():
         query = query.filter(ReferalData.contract_number.ilike(f'%{contract_filter}%'))
     
     if contact_id_filter:
-        query = query.filter(Referal.contact_id.ilike(f'%{contact_id_filter}%'))
+        # contact_id - это integer, приводим к строке через cast
+        query = query.filter(cast(Referal.contact_id, String).ilike(f'%{contact_id_filter}%'))
         
     if user_filter:
         query = query.filter(User.login.ilike(f'%{user_filter}%'))
     
-    # Для сортировки по user.login делаем join с User
+    if created_at_filter:
+        # created_at это timestamp, конвертируем в дату для поиска
+        query = query.filter(func.date(Referal.created_at) == created_at_filter)
+    
+    if total_withdrawal_filter:
+        query = query.filter(cast(User.total_withdrawal, String).ilike(f'%{total_withdrawal_filter}%'))
+    
+    # deals_count убираем - это вычисляемое поле, не колонка БД
+    
+    # Определяем нужны ли джойны для фильтров и сортировки
     need_user_join = False
     need_referal_data_join = False
+    
+    # Проверяем фильтры
+    if user_filter or total_withdrawal_filter:
+        need_user_join = True
+    if name_filter or phone_filter or contract_filter:
+        need_referal_data_join = True
+    
+    # Проверяем сортировку
     if sort_fields:
         for sort_field in sort_fields:
             if sort_field['field'] == 'user':
                 need_user_join = True
             if sort_field['field'] in ['name', 'phone', 'contract']:
                 need_referal_data_join = True
+                
+    # Делаем джойны если нужно
     if need_user_join:
         query = query.join(User, Referal.user_id == User.id)
     if need_referal_data_join:
@@ -153,6 +365,11 @@ def admin_panel():
                 clause = Referal.status_id.desc() if order == 'desc' else Referal.status_id.asc()
             elif field == 'amount':
                 clause = Referal.withdrawal_amount.desc() if order == 'desc' else Referal.withdrawal_amount.asc()
+            elif field == 'created_at':
+                clause = Referal.created_at.desc() if order == 'desc' else Referal.created_at.asc()
+            elif field == 'total_withdrawal':
+                clause = User.total_withdrawal.desc() if order == 'desc' else User.total_withdrawal.asc()
+            # deals_count убираем - это вычисляемое поле
             else:
                 continue
 
@@ -180,13 +397,208 @@ def admin_panel():
             referal.macro_contacts = []
             referal.macro_contact = None
     
-    print(f"Found {len(referals)} referals for user {user.login}")
+    # Если режим просмотра - договоры, получаем список всех договоров
+    deals_pagination = None
+    deals = []
+    if view_mode == 'deals':
+        from models import ReferalDeal, MacroDeal
+        from sqlalchemy.orm import joinedload
+        
+        print(f"=== DEALS VIEW MODE ACTIVATED ===")
+        print(f"User: {user.login}, Role: {user.role}")
+        print(f"Filter status IDs: {filter_status_ids}")
+        print(f"Status filter param: {status_filter}")
+        print(f"Status IDs list: {status_ids}")
+        
+        # Базовый запрос для договоров с загрузкой связанных данных
+        deals_query = ReferalDeal.query\
+            .options(
+                joinedload(ReferalDeal.status),
+                joinedload(ReferalDeal.deal),
+                joinedload(ReferalDeal.referal).joinedload(Referal.referal_data),
+                joinedload(ReferalDeal.referal).joinedload(Referal.user)
+            )\
+            .join(Referal, ReferalDeal.referal_id == Referal.id)\
+            .join(MacroDeal, ReferalDeal.deal_id == MacroDeal.id)\
+            .join(ReferalData, Referal.id == ReferalData.referal_id)\
+            .join(User, Referal.user_id == User.id)
+        
+        print(f"Base query created")
+        
+        # Фильтруем только реальные договоры (с номером договора)
+        deals_query = deals_query.filter(
+            MacroDeal.agreement_number.isnot(None),
+            MacroDeal.agreement_number != ''
+        )
+        
+        # Фильтруем: либо есть оплата >= 3млн, либо есть рассчитанная выплата
+        deals_query = deals_query.filter(
+            or_(
+                MacroDeal.total_payments >= 3000000,
+                ReferalDeal.withdrawal_amount > 0
+            )
+        )
+        
+        # Только реальные договора: "Сделка проведена" и "Сделка в работе"
+        valid_statuses = ['Сделка проведена', 'Сделка в работе']
+        deals_query = deals_query.filter(
+            MacroDeal.deal_status_name.in_(valid_statuses)
+        )
+        
+        # Фильтры для режима договоров
+        if status_filter:
+            # Применяем фильтр по статусам (уже проверенным на права доступа)
+            # Если все статусы были отклонены, status_ids уже содержит filter_status_ids
+            deals_query = deals_query.filter(ReferalDeal.status_id.in_(status_ids))
+            print(f"Applied status filter with IDs: {status_ids}")
+        else:
+            # ФИЛЬТР ПО УМОЛЧАНИЮ: Показываем ТОЛЬКО договоры с разрешенными статусами
+            # Это предотвращает показ ВСЕХ договоров для call-center и других ролей
+            if filter_status_ids:
+                deals_query = deals_query.filter(ReferalDeal.status_id.in_(filter_status_ids))
+                print(f"Applied default status filter with IDs: {filter_status_ids}")
+                # Устанавливаем selected_statuses чтобы UI показывал какие статусы применены
+                selected_statuses = filter_status_ids
+        
+        if name_filter:
+            deals_query = deals_query.filter(
+                ReferalData.full_name.ilike(f'%{name_filter}%')
+            )
+            print(f"Applied name filter: {name_filter}")
+        
+        if contract_filter:
+            deals_query = deals_query.filter(MacroDeal.agreement_number.ilike(f'%{contract_filter}%'))
+            print(f"Applied contract filter: {contract_filter}")
+        
+        if user_filter:
+            deals_query = deals_query.filter(
+                User.login.ilike(f'%{user_filter}%')
+            )
+            print(f"Applied user filter: {user_filter}")
+        
+        if amount_filter:
+            try:
+                min_amount = float(amount_filter)
+                deals_query = deals_query.filter(ReferalDeal.withdrawal_amount >= min_amount)
+                print(f"Applied amount filter: >= {min_amount}")
+            except ValueError:
+                print(f"Invalid amount filter value: {amount_filter}")
+        
+        # Сортировка по умолчанию - по ID договора (новые сверху)
+        deals_query = deals_query.order_by(ReferalDeal.id.desc())
+        
+        print(f"Query SQL: {str(deals_query)}")
+        
+        # Пагинация для договоров
+        try:
+            deals_pagination = deals_query.paginate(
+                page=page,
+                per_page=per_page,
+                error_out=False
+            )
+            deals = deals_pagination.items
+            print(f"Query executed successfully. Total deals: {deals_pagination.total}, Current page deals: {len(deals)}")
+            for deal in deals[:5]:  # Показываем первые 5 для отладки
+                print(f"Deal ID: {deal.id}, Referal: {deal.referal_id}, Status: {deal.status_id}")
+        except Exception as e:
+            print(f"ERROR executing deals query: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    
+    all_statuses_in_db = Status.query.all()
+    
+    # Синхронизируем данные ВСЕХ пользователей перед рендерингом
+    from utils import sync_user_data_from_auth_service
+    synced_users = set()  # Чтобы не синхронизировать одного пользователя дважды
+    
+    print(f"🔄 Starting user data synchronization for admin panel...")
+    
+    # Синхронизируем пользователей из рефералов
+    if referals:
+        for referal in referals:
+            if referal.user and referal.user.auth_user_id and referal.user.id not in synced_users:
+                try:
+                    print(f"  📥 Syncing referal user: {referal.user.login} (auth_user_id: {referal.user.auth_user_id})")
+                    sync_user_data_from_auth_service(referal.user, force_sync=True, headers=request.headers)
+                    synced_users.add(referal.user.id)
+                except Exception as e:
+                    print(f"  ❌ Failed to sync user {referal.user.login}: {e}")
+    
+    # Синхронизируем пользователей из договоров
+    if deals:
+        for deal in deals:
+            if deal.referal and deal.referal.user and deal.referal.user.auth_user_id and deal.referal.user.id not in synced_users:
+                try:
+                    print(f"  📥 Syncing deal user: {deal.referal.user.login} (auth_user_id: {deal.referal.user.auth_user_id})")
+                    sync_user_data_from_auth_service(deal.referal.user, force_sync=True, headers=request.headers)
+                    synced_users.add(deal.referal.user.id)
+                except Exception as e:
+                    print(f"  ❌ Failed to sync user {deal.referal.user.login}: {e}")
+    
+    print(f"✅ Synchronized {len(synced_users)} users")
+    
+    # Загружаем документы для каждого пользователя из Auth-Service
+    print(f"📄 Loading documents for users from Auth-Service...")
+    user_documents = {}  # {user_id: {documents: [], download_urls: {}}}
+    
+    from app_with_auth_connector import get_user_documents_from_auth_service
 
-
+    # Собираем уникальных пользователей из рефералов и договоров
+    users_to_load = set()
+    if referals:
+        for referal in referals:
+            if referal.user and referal.user.auth_user_id:
+                users_to_load.add((referal.user.id, referal.user.auth_user_id))
+    
+    if deals:
+        for deal in deals:
+            if deal.referal and deal.referal.user and deal.referal.user.auth_user_id:
+                users_to_load.add((deal.referal.user.id, deal.referal.user.auth_user_id))
+    
+    # Загружаем документы для каждого пользователя
+    for user_id, auth_user_id in users_to_load:
+        try:
+            docs = get_user_documents_from_auth_service(auth_user_id)
+            
+            # Формируем URL для скачивания документов
+            auth_service_url = current_app.config.get('AUTH_SERVICE_URL', 'http://gateway-nginx-1')
+            download_urls = {
+                'pinfl': f"{auth_service_url}/api/users/{auth_user_id}/documents/pinfl/download",
+                'passport': f"{auth_service_url}/api/users/{auth_user_id}/documents/passport/download",
+                'bank_details': f"{auth_service_url}/api/users/{auth_user_id}/documents/bank_details/download",
+                'employment_certificate': f"{auth_service_url}/api/users/{auth_user_id}/documents/employment_certificate/download"
+            }
+            
+            user_documents[user_id] = {
+                'documents': docs,
+                'download_urls': download_urls,
+                'auth_user_id': auth_user_id
+            }
+            print(f"  📄 Loaded documents for user {user_id} (auth_user_id: {auth_user_id}): {docs}")
+        except Exception as e:
+            print(f"  ❌ Failed to load documents for user {user_id}: {e}")
+            user_documents[user_id] = {
+                'documents': {},
+                'download_urls': {},
+                'auth_user_id': auth_user_id,
+                'error': str(e)
+            }
+    
+    print(f"✅ Loaded documents for {len(user_documents)} users")
+    
+    print(f"📋 Rendering template with selected_statuses: {selected_statuses}")
+    print(f"📋 filter_statuses count: {len(statuses)}")
+    
     return render_template('admin.html', 
                           current_user=user,
                           referals=referals,
                           pagination=pagination,
+                          view_mode=view_mode,
+                          deals=deals,
+                          deals_pagination=deals_pagination,
+                          user_documents=user_documents,  # Документы пользователей из Auth-Service
+                          all_statuses_in_db=all_statuses_in_db,  # Добавляем все статусы для фильтра
                           current_filters={
                               'status': status_filter,
                               'name': name_filter,
@@ -194,24 +606,315 @@ def admin_panel():
                               'contract': contract_filter,
                               'contact_id': contact_id_filter,
                               'user': user_filter,
+                              'amount': amount_filter,
+                              'created_at': created_at_filter,
+                              'total_withdrawal': total_withdrawal_filter,
                               'per_page': per_page
                           },
                           selected_statuses=selected_statuses,
-                          statuses=statuses,
+                          statuses=statuses,  # Только статусы для просмотра
+                          filter_statuses=statuses,  # Для фильтра - те же статусы для просмотра
+                          change_statuses=change_statuses,  # Отдельно - статусы для изменения (выпадающий список)
                           current_sort=sort_param,
-                          sort_fields=sort_fields)
+                          sort_fields=sort_fields,
+                          user_role_type=user_role_type,
+                          can_change_status_from_to=can_change_status_from_to,
+                          allowed_status_changes=allowed_status_changes)
+
+
+@admin_bp.route('/admin/deal/<int:deal_id>/update_status', methods=['POST'])
+def update_deal_status(deal_id):
+    """Обновляет статус договора (только для админов)"""
+    try:
+        user = get_current_user()
+        if not user or not requires_admin_access():
+            return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+        
+        # Получаем новый статус из запроса
+        data = request.get_json()
+        new_status_id = data.get('status_id')
+        rejection_reason = data.get('rejection_reason', '').strip()
+        
+        print(f"DEBUG update_deal_status: deal_id={deal_id}, new_status_id={new_status_id}, type={type(new_status_id)}")
+        
+        # ВАЖНО: Проверяем is None, т.к. статус 0 это валидное значение!
+        if new_status_id is None:
+            return jsonify({'success': False, 'message': 'Не указан новый статус'}), 400
+        
+        # Проверяем обязательность комментария при отказе (status_id = 500)
+        if new_status_id == 500 and not rejection_reason:
+            return jsonify({
+                'success': False,
+                'message': 'При отказе необходимо указать причину в поле "Комментарий об отказе"'
+            }), 400
+        
+        # Находим договор
+        referal_deal = ReferalDeal.query.get(deal_id)
+        if not referal_deal:
+            return jsonify({'success': False, 'message': 'Договор не найден'}), 404
+        
+        # Проверяем права на изменение статуса
+        old_status = referal_deal.status_id
+        if not can_change_status_from_to(old_status, new_status_id):
+            return jsonify({
+                'success': False,
+                'message': f'Недостаточно прав для изменения статуса с {old_status} на {new_status_id}'
+            }), 403
+        
+        # Обновляем статус
+        referal_deal.status_id = new_status_id
+        
+        # Сохраняем или очищаем причину отказа
+        if new_status_id == 500:
+            referal_deal.rejection_reason = rejection_reason
+        else:
+            referal_deal.rejection_reason = None  # Очищаем при смене на другой статус
+        
+        # Обновляем deal_status для обратной совместимости
+        status_mapping = {
+            0: 'pending',
+            100: 'sent_for_review',
+            200: 'approved',
+            300: 'paid',
+            500: 'rejected'
+        }
+        referal_deal.deal_status = status_mapping.get(new_status_id, 'pending')
+        
+        db.session.commit()
+        
+        # Обновляем объект после коммита чтобы подгрузить связанный статус
+        db.session.refresh(referal_deal)
+        
+        # Отправляем уведомление о смене статуса
+        send_admin_deal_status_notification(referal_deal, user, old_status, new_status_id, referal_deal.status_name, rejection_reason)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Статус договора обновлен: {referal_deal.status_name}',
+            'new_status_id': new_status_id,
+            'new_status_name': referal_deal.status_name
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating deal status: {str(e)}")
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+@admin_bp.route('/admin/referal/<int:referal_id>/add_deal', methods=['POST'])
+def add_deal_to_referal(referal_id):
+    """Вручную добавляет договор к рефералу по номеру договора"""
+    try:
+        print(f"🔍 add_deal_to_referal called for referal_id={referal_id}")
+        
+        user = get_current_user()
+        print(f"🔍 get_current_user returned: {user}")
+        
+        has_access = requires_admin_access()
+        print(f"🔍 requires_admin_access returned: {has_access}")
+        
+        if not user or not has_access:
+            print(f"❌ Access denied: user={user}, has_access={has_access}")
+            return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+        
+        # Получаем номер договора из запроса
+        data = request.get_json()
+        print(f"🔍 Request data: {data}")
+        
+        if not data:
+            return jsonify({'success': False, 'message': 'Не получены данные запроса'}), 400
+            
+        agreement_number = data.get('agreement_number', '').strip()
+        
+        if not agreement_number:
+            return jsonify({'success': False, 'message': 'Не указан номер договора'}), 400
+        
+        print(f"🔍 Looking for referal with id={referal_id}")
+        # Находим реферала
+        referal = Referal.query.get(referal_id)
+        if not referal:
+            return jsonify({'success': False, 'message': 'Реферал не найден'}), 404
+        
+        print(f"🔍 Looking for deal with agreement_number={agreement_number}")
+        # Находим договор по номеру
+        deal = MacroDeal.query.filter_by(agreement_number=agreement_number).first()
+        if not deal:
+            return jsonify({
+                'success': False, 
+                'message': f'Договор с номером "{agreement_number}" не найден в базе данных'
+            }), 404
+        
+        print(f"🔍 Found deal: id={deal.id}, agreement_number={deal.agreement_number}, deal_metr={deal.deal_metr}, total_payments={deal.total_payments}")
+        
+        # Проверяем не добавлен ли уже этот договор
+        existing_link = ReferalDeal.query.filter_by(
+            referal_id=referal_id,
+            deal_id=deal.id
+        ).first()
+        
+        if existing_link:
+            return jsonify({
+                'success': False,
+                'message': f'Договор "{agreement_number}" уже привязан к этому рефералу'
+            }), 400
+        
+        # Рассчитываем сумму выплаты по площади квартиры (та же логика что и при автоматическом добавлении)
+        withdrawal_amount = 0
+        logger.error(f"🔥🔥🔥 НАЧИНАЕМ РАСЧЁТ ВЫПЛАТЫ для deal_id={deal.id}, deal_metr={deal.deal_metr}, total_payments={deal.total_payments}")
+        try:
+            # Проверяем есть ли оплата больше брони (3млн)
+            if deal.total_payments and deal.total_payments >= 3000000:
+                deal_metr = deal.deal_metr or 0
+                logger.error(f"🔥 УСЛОВИЕ 1 ВЫПОЛНЕНО: total_payments={deal.total_payments} >= 3000000")
+                
+                # Логика расчёта по площади из referal_service.py
+                if 20.0 <= deal_metr < 40.0:
+                    withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_40M', 300000))
+                    logger.error(f"🔥 ВЕТКА 20-40м²: withdrawal_amount={withdrawal_amount}")
+                elif 40.0 <= deal_metr < 60.0:
+                    withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_60M', 400000))
+                    logger.error(f"🔥 ВЕТКА 40-60м²: withdrawal_amount={withdrawal_amount}")
+                elif 60.0 <= deal_metr < 80.0:
+                    withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_80M', 500000))
+                    logger.error(f"🔥 ВЕТКА 60-80м²: withdrawal_amount={withdrawal_amount}")
+                elif deal_metr >= 80.0:
+                    withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_81M', 600000))
+                    logger.error(f"🔥 ВЕТКА 80+м²: withdrawal_amount={withdrawal_amount}")
+                elif deal_metr > 0:
+                    # Для квартир меньше 20м² - минимальная выплата
+                    withdrawal_amount = int(os.getenv('REFERAL_WITHDRAWAL_FOR_40M', 300000))
+                    logger.error(f"🔥 ВЕТКА <20м²: withdrawal_amount={withdrawal_amount}")
+                else:
+                    logger.error(f"🔥 НИ ОДНА ВЕТКА НЕ СРАБОТАЛА! deal_metr={deal_metr}")
+                
+                logger.error(f"💰 Calculated withdrawal_amount: {withdrawal_amount} for deal {deal.agreement_number} (deal_metr={deal_metr})")
+            else:
+                logger.error(f"⚠️ Deal {deal.agreement_number} has insufficient payments: {deal.total_payments}")
+        except Exception as calc_error:
+            import traceback
+            logger.error(f"❌ Error calculating withdrawal: {calc_error}")
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        
+        logger.error(f"🔥🔥🔥 ИТОГО withdrawal_amount={withdrawal_amount}")
+        sys.stdout.flush()
+        
+        # Обновляем contact_id (macro_id) у реферала из договора
+        if deal.contacts_buy_id and not referal.contact_id:
+            referal.contact_id = deal.contacts_buy_id
+            print(f"📋 Updated referal.contact_id = {deal.contacts_buy_id} from deal")
+        elif deal.contacts_buy_id and referal.contact_id != deal.contacts_buy_id:
+            # Если contact_id уже есть но отличается - логируем предупреждение
+            print(f"⚠️ Referal already has contact_id={referal.contact_id}, deal has contacts_buy_id={deal.contacts_buy_id}")
+        
+        # Создаем связь
+        referal_deal = ReferalDeal(
+            referal_id=referal_id,
+            deal_id=deal.id,
+            status_id=0,  # Начальный статус "Ждет проверки"
+            is_within_window=True,  # Ручное добавление админом - считаем в окне
+            withdrawal_amount=withdrawal_amount,
+            payment_processed=False,
+            deal_status='pending',
+            days_from_referal_creation=None  # Не рассчитываем для ручного добавления
+        )
+        
+        db.session.add(referal_deal)
+        db.session.commit()
+        
+        print(f"✅ Admin manually added deal {agreement_number} to referal {referal_id} | User: {user.login} | withdrawal_amount: {withdrawal_amount} | contact_id: {referal.contact_id}")
+        
+        # Отправляем уведомление менеджеру КЦ о новом договоре
+        try:
+            from notification_client import get_notification_client
+            
+            notification_client = get_notification_client()
+            call_center_email = os.getenv('CALL_CENTER_MANAGER_EMAIL')
+            main_admin_email = os.getenv('MAIN_ADMIN_EMAIL')
+            
+            # Получаем информацию о рефе��але
+            referal_name = referal.referal_data.full_name if referal.referal_data else 'Неизвестно'
+            referal_phone = referal.referal_data.phone_number if referal.referal_data else 'Неизвестно'
+            admin_name = get_user_full_name_from_auth(user)
+            
+            subject = f'Новый договор №{agreement_number} добавлен к рефералу'
+            body = f"""Администратор {admin_name} добавил новый договор к рефералу.
+
+Детали договора:
+- Номер договора: {agreement_number}
+- Проект: {deal.project_name or 'Не указан'}
+- Сумма платежей: {deal.total_payments:,.0f} сум
+
+Информация о реферале:
+- ФИО: {referal_name}
+- Телефон: {referal_phone}
+
+Необходимо связаться с рефералом для назначения встречи."""
+
+            # Отправляем менеджеру КЦ
+            if call_center_email:
+                notification_client.send_email(
+                    recipient=call_center_email,
+                    subject=subject,
+                    body=body
+                )
+                print(f"✅ Notification sent to call center manager: {call_center_email}")
+            
+            # Копия главному админу
+            if main_admin_email and main_admin_email != call_center_email:
+                notification_client.send_email(
+                    recipient=main_admin_email,
+                    subject=f"[Копия] {subject}",
+                    body=body
+                )
+                print(f"✅ Copy sent to main admin: {main_admin_email}")
+                
+        except Exception as email_error:
+            print(f"⚠️ Failed to send notification for deal add: {str(email_error)}")
+            # Не прерываем операцию если письмо не отправилось
+        
+        return jsonify({
+            'success': True,
+            'message': f'Договор "{agreement_number}" успешно привязан к рефералу',
+            'deal_id': deal.id,
+            'referal_deal_id': referal_deal.id,
+            'withdrawal_amount': withdrawal_amount,
+            'debug_info': {
+                'deal_metr': deal.deal_metr,
+                'total_payments': deal.total_payments,
+                'calculated_withdrawal': withdrawal_amount
+            },
+            'deal_info': {
+                'agreement_number': deal.agreement_number,
+                'contacts_buy_id': deal.contacts_buy_id,
+                'total_payments': deal.total_payments,
+                'project_name': deal.project_name
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error adding deal to referal: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
 
 
 @admin_bp.route('/update_withdrawal_stage/<int:referal_id>', methods=['POST'])
 def update_withdrawal_stage(referal_id):
     """Обновление статуса реферала."""
-    current_user =  get_current_user()
-    if not current_user or current_user.role not in ['admin', 'manager', 'call-center']:
+    current_user = get_current_user()
+    if not current_user or not requires_admin_access():
         flash('Доступ запрещен', 'error')
-        return redirect(url_for('referal.profile'))
+        return redirect(request.referrer or '/')
 
     referal = Referal.query.get_or_404(referal_id)
     withdrawal_stage = int(request.form.get('withdrawal_stage'))
+    
+    # Проверяем, может ли пользователь изменить статус с текущего на указанный
+    if not can_change_status_from_to(referal.status_id, withdrawal_stage):
+        flash('У вас нет прав для изменения статуса с текущего на выбранный', 'error')
+        return redirect(url_for('admin.admin_panel'))
+    
     user = User.query.get(referal.user_id)
     
     from flask import session
@@ -250,34 +953,31 @@ def update_withdrawal_stage(referal_id):
          utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал поступил на проверку отделом аналитики',
-            f'Реферал от {user.user_data.full_name} поступил на проверку отделу аналитики:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+            f'Реферал от {get_user_full_name_from_auth(user)} поступил на проверку отделу аналитики:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
     
     elif withdrawal_stage == 20:
          utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал прошёл проверку колл-центром',
-            f'Реферал от {user.user_data.full_name} прошёл проверку колл-центром:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+            f'Реферал от {get_user_full_name_from_auth(user)} прошёл проверку колл-центром:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
         
     elif withdrawal_stage == 10:
          utils.send_email(
             os.getenv('CALL_CENTER_MANAGER_EMAIL'),
             'Запрос на проверку реферала',
-            f'Пожалуйста созвонитесь с рефералом от {user.user_data.full_name}: ФИО: {referal.referal_data.full_name} Телефон: {referal.referal_data.phone_number} для проверки его данных после чего обязательно измените статус реферала в системе.\n'
+            f'Пожалуйста созвонитесь с рефералом от {get_user_full_name_from_auth(user)}: ФИО: {referal.referal_data.full_name} Телефон: {referal.referal_data.phone_number} для проверки его данных после чего обязательно измените статус реферала в системе.\n'
         )
         
     elif withdrawal_stage == 200:
-        print(f"DEBUG: Withdrawal stage set to 200 for referal {referal.id} by user {user.login}")
         payment_email = os.getenv('PAYMENT_MANAGER_EMAIL')
-        print(f"DEBUG: PAYMENT_MANAGER_EMAIL from env: {payment_email}")
 
         utils.send_email(
             os.getenv('PAYMENT_MANAGER_EMAIL'),
             'Запрос на выплату рефереру',
-            f'{user.user_data.full_name} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
+            f'{get_user_full_name_from_auth(user)} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
         )
-        print(f"DEBUG: Sending email to {payment_email} for referal {referal.id} with amount {referal.withdrawal_amount}")
 
 
 
@@ -285,7 +985,7 @@ def update_withdrawal_stage(referal_id):
         utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал был оплачен рефереру',
-            f'Реферал от {user.user_data.full_name} был помечен как оплаченый:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
+            f'Реферал от {get_user_full_name_from_auth(user)} был помечен как оплаченый:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
         if not referal.balance_withdrawn:
             user.pending_withdrawal -= referal.withdrawal_amount
@@ -298,12 +998,12 @@ def update_withdrawal_stage(referal_id):
             flash('Пожалуйста, укажите причину отказа', 'error')
             return redirect(url_for('admin.admin_panel', **return_params))
         referal.rejection_reason = rejection_reason
-        rejecter_name = current_user.user_data.full_name
+        rejecter_name = get_user_full_name_from_auth(current_user)
         utils.send_email(
             os.getenv('MAIN_ADMIN_EMAIL'),
             'Реферал не прошёл проверку',
             f"""
-            Реферал от {user.user_data.full_name} не прошёл проверку {referal.status_name}\n
+            Реферал от {get_user_full_name_from_auth(user)} не прошёл проверку {referal.status_name}\n
             Причина: {rejection_reason}.\n
             Отклонил: {rejecter_name}\n
             Данные реферала:\n
@@ -326,10 +1026,123 @@ def update_withdrawal_stage(referal_id):
     else:
         return redirect(url_for('admin.admin_panel'))
 
+# Глобальное состояние синхронизации (для отслеживания прогресса)
+import threading
+from datetime import datetime as dt
+
+_sync_status = {
+    'is_running': False,
+    'started_at': None,
+    'started_by': None,
+    'completed_at': None,
+    'last_error': None,
+    'last_result': None
+}
+_sync_lock = threading.Lock()
+
+
+def _run_sync_in_background(app, username):
+    """Выполняет синхронизацию в фоновом потоке"""
+    global _sync_status
+    
+    with app.app_context():
+        try:
+            print(f"🔄 Background sync STARTED by {username}")
+            fetch_data_from_mysql()
+            
+            with _sync_lock:
+                _sync_status['completed_at'] = dt.now()
+                _sync_status['is_running'] = False
+                _sync_status['last_result'] = 'success'
+                _sync_status['last_error'] = None
+            
+            print(f"✅ Background sync COMPLETED by {username}")
+            
+        except Exception as e:
+            with _sync_lock:
+                _sync_status['completed_at'] = dt.now()
+                _sync_status['is_running'] = False
+                _sync_status['last_result'] = 'error'
+                _sync_status['last_error'] = str(e)
+            
+            print(f"❌ Background sync FAILED by {username} | Error: {str(e)}")
+
+
 @admin_bp.route('/force_update', methods=['GET'])
 def force_update():
-    """Принудительное обновление всех рефералов."""
-    user =  get_current_user()
-    if not user or user.role != 'admin':
-        flash('Доступ запрещен', 'error')
-    fetch_data_from_mysql()
+    """Принудительное обновление всех рефералов. ТОЛЬКО для администраторов!
+    Запускает синхронизацию в фоновом режиме и сразу возвращает ответ.
+    """
+    global _sync_status
+    
+    user = get_current_user()
+    
+    # Проверяем что пользователь существует
+    if not user:
+        print("⛔ Force update access DENIED - No user found")
+        flash('Доступ запрещен - пользователь не найден', 'error')
+        return redirect(request.referrer or '/')
+    
+    # Проверяем права: только админ системы или админ сервиса
+    user_role = get_user_role_type()
+    has_admin_permission = has_permission('referal.admin.force_update')
+    is_system_admin = user_role == 'admin'
+    
+    if not (is_system_admin or has_admin_permission):
+        username = request.headers.get('X-User-Name', 'Unknown')
+        print(f"⛔ Force update access DENIED | User: {username} | Role: {user_role} | Has permission: {has_admin_permission}")
+        flash('Доступ запрещен - недостаточно прав для принудительной синхронизации', 'error')
+        return redirect(url_for('admin.admin_panel'))
+    
+    username = request.headers.get('X-User-Name', user.login if hasattr(user, 'login') else 'Unknown')
+    
+    # Проверяем, не запущена ли уже синхронизация
+    with _sync_lock:
+        if _sync_status['is_running']:
+            started_at = _sync_status['started_at']
+            started_by = _sync_status['started_by']
+            flash(f'Синхронизация уже выполняется (запущена {started_by} в {started_at.strftime("%H:%M:%S")}). Дождитесь завершения.', 'warning')
+            return redirect(url_for('admin.admin_panel'))
+        
+        # Устанавливаем статус "выполняется"
+        _sync_status['is_running'] = True
+        _sync_status['started_at'] = dt.now()
+        _sync_status['started_by'] = username
+        _sync_status['completed_at'] = None
+        _sync_status['last_error'] = None
+        _sync_status['last_result'] = None
+    
+    # Запускаем синхронизацию в фоновом потоке
+    print(f"🔄 Force update QUEUED by admin | User: {username} | Role: {user_role}")
+    
+    app = current_app._get_current_object()
+    sync_thread = threading.Thread(
+        target=_run_sync_in_background,
+        args=(app, username),
+        daemon=True
+    )
+    sync_thread.start()
+    
+    flash('Синхронизация запущена в фоновом режиме. Проверьте статус через несколько минут.', 'info')
+    return redirect(url_for('admin.admin_panel'))
+
+
+@admin_bp.route('/sync_status', methods=['GET'])
+def sync_status():
+    """Возвращает текущий статус синхронизации (JSON)"""
+    if not requires_admin_access():
+        return jsonify({'error': 'Доступ запрещен'}), 403
+    
+    global _sync_status
+    
+    with _sync_lock:
+        status = {
+            'is_running': _sync_status['is_running'],
+            'started_at': _sync_status['started_at'].isoformat() if _sync_status['started_at'] else None,
+            'started_by': _sync_status['started_by'],
+            'completed_at': _sync_status['completed_at'].isoformat() if _sync_status['completed_at'] else None,
+            'last_result': _sync_status['last_result'],
+            'last_error': _sync_status['last_error']
+        }
+    
+    return jsonify(status)

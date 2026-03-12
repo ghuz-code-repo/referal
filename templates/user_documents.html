@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}Мои документы{% endblock %}
+
+{% block content %}
+<header>
+    {% include 'components/header.html' %}
+</header>
+
+<main class="main">
+    <div class="container">
+        <div class="page-header">
+            <h1><i class="fas fa-file-alt"></i> Мои документы</h1>
+            <a href="/" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> На главную
+            </a>
+        </div>
+
+        <div class="documents-section">
+            {% if documents %}
+                <div class="documents-grid">
+                    {% for document in documents %}
+                        <div class="document-card">
+                            <div class="document-header">
+                                <h3 class="document-title">
+                                    <i class="fas fa-file-alt"></i>
+                                    {{ document.title or document.document_type }}
+                                </h3>
+                                <span class="document-status status-{{ document.status }}">
+                                    {{ document.status }}
+                                </span>
+                            </div>
+                            
+                            <div class="document-info">
+                                <div class="document-type">
+                                    <strong>Тип:</strong> {{ document.document_type }}
+                                </div>
+                                <div class="document-dates">
+                                    <div>
+                                        <strong>Создан:</strong> 
+                                        {{ document.created_at.strftime('%d.%m.%Y %H:%M') if document.created_at else 'Неизвестно' }}
+                                    </div>
+                                    <div>
+                                        <strong>Обновлен:</strong> 
+                                        {{ document.updated_at.strftime('%d.%m.%Y %H:%M') if document.updated_at else 'Неизвестно' }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% if document.fields %}
+                                <div class="document-fields">
+                                    <h4>Поля документа:</h4>
+                                    <div class="fields-list">
+                                        {% for field_name, field_value in document.fields.items() %}
+                                            <div class="field-item">
+                                                <span class="field-name">{{ field_name }}:</span>
+                                                <span class="field-value">{{ field_value }}</span>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            {% if document.attachments %}
+                                <div class="document-attachments">
+                                    <h4>Прикрепленные файлы:</h4>
+                                    <div class="attachments-list">
+                                        {% for attachment in document.attachments %}
+                                            <div class="attachment-item">
+                                                <div class="attachment-info">
+                                                    <i class="fas fa-paperclip"></i>
+                                                    <span class="attachment-name">{{ attachment.original_name }}</span>
+                                                    <span class="attachment-size">({{ (attachment.size / 1024) | round(1) }} KB)</span>
+                                                </div>
+                                                <div class="attachment-actions">
+                                                    {% set user_auth = get_auth_user_data() %}
+                                                    {% if user_auth and 'profile.documents.download' in user_auth.get('permissions', []) %}
+                                                        <a href="{{ url_for('user_documents.download_attachment', 
+                                                                 document_id=document.id, 
+                                                                 attachment_id=attachment.id) }}" 
+                                                           class="btn btn-primary btn-sm download-btn">
+                                                            <i class="fas fa-download"></i> Скачать
+                                                        </a>
+                                                    {% else %}
+                                                        <span class="btn btn-secondary btn-sm disabled" title="Нет прав для скачивания">
+                                                            <i class="fas fa-lock"></i> Недоступно
+                                                        </span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="no-attachments">
+                                    <i class="fas fa-info-circle"></i>
+                                    К этому документу не прикреплены файлы
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="no-documents">
+                    <div class="no-documents-content">
+                        <i class="fas fa-file-alt"></i>
+                        <h3>Документы не найдены</h3>
+                        <p>У вас пока нет загруженных документов.</p>
+                        <a href="/" class="btn btn-primary">
+                            <i class="fas fa-home"></i> На главную
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</main>
+
+<style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--primary-color, #d4af37);
+}
+
+.documents-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+}
+
+.document-card {
+    background: var(--card-background, #fff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+.document-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.document-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.document-title {
+    color: var(--primary-color, #d4af37);
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.document-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-draft {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-completed {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-archived {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.document-info {
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary, #666);
+}
+
+.document-type {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.document-fields {
+    margin-bottom: 1rem;
+}
+
+.document-fields h4 {
+    color: var(--primary-color, #d4af37);
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+}
+
+.fields-list {
+    background: var(--light-gray, #f8f9fa);
+    padding: 0.75rem;
+    border-radius: 4px;
+}
+
+.field-item {
+    display: flex;
+    margin-bottom: 0.25rem;
+}
+
+.field-item:last-child {
+    margin-bottom: 0;
+}
+
+.field-name {
+    font-weight: bold;
+    min-width: 120px;
+    color: var(--text-primary, #333);
+}
+
+.field-value {
+    color: var(--text-secondary, #666);
+}
+
+.document-attachments {
+    border-top: 1px solid var(--border-color, #ddd);
+    padding-top: 1rem;
+}
+
+.document-attachments h4 {
+    color: var(--primary-color, #d4af37);
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+}
+
+.attachments-list {
+    background: var(--light-gray, #f8f9fa);
+    padding: 0.75rem;
+    border-radius: 4px;
+}
+
+.attachment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color, #ddd);
+}
+
+.attachment-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.attachment-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.attachment-name {
+    font-weight: 500;
+    color: var(--text-primary, #333);
+}
+
+.attachment-size {
+    color: var(--text-secondary, #666);
+    font-size: 0.85rem;
+}
+
+.attachment-actions {
+    flex-shrink: 0;
+}
+
+.download-btn {
+    background-color: var(--primary-color, #d4af37);
+    color: white;
+    border: none;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: background-color 0.3s ease;
+}
+
+.download-btn:hover {
+    background-color: var(--primary-color-hover, #b8860b);
+    color: white;
+}
+
+.no-attachments {
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-secondary, #666);
+    font-style: italic;
+}
+
+.no-documents {
+    text-align: center;
+    padding: 3rem;
+}
+
+.no-documents-content {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.no-documents-content i {
+    font-size: 4rem;
+    color: var(--text-secondary, #666);
+    margin-bottom: 1rem;
+}
+
+.no-documents-content h3 {
+    color: var(--primary-color, #d4af37);
+    margin-bottom: 1rem;
+}
+
+.no-documents-content p {
+    color: var(--text-secondary, #666);
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+    .documents-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .attachment-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+</style>
+
+{% endblock %}

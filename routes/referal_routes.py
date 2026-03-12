@@ -1,4 +1,16 @@
-"""Маршруты для работы с рефералами"""
+"""
+⚠️ DEPRECATED: Этот файл НЕ ИСПОЛЬЗУЕТСЯ в production!
+============================================================
+Вместо него используется: referal_routes_with_auth_connector.py
+
+Этот файл содержит СТАРУЮ систему аутентификации на основе user.role
+и оставлен только для справки и обратной совместимости.
+
+TODO: Удалить после полной миграции на новую систему permissions
+============================================================
+
+Маршруты для работы с рефералами (LEGACY VERSION)
+"""
 
 import random
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
@@ -10,22 +22,37 @@ from services import referal_service, notification_service, data_sync_service, w
 import utils
 import os
 
+# DEPRECATED: Этот Blueprint НЕ регистрируется в app.py
+# Вместо него используется referal_bp из referal_routes_with_auth_connector.py
 referal_bp = Blueprint('referal', __name__)
 
 
 @referal_bp.route('/', methods=['GET'])
-def profile():
-    print("Profile route accessed")
+@referal_bp.route('/list', methods=['GET']) 
+def referal_list():
+    """Главная страница рефералки - список рефералов пользователя"""
     user = get_current_user()
-    print(f"User after get_current_user: {user}")
     
     if not user:
-        print("No user found, redirecting to referal profile")
-        return redirect(url_for('referal.profile'))
+        from flask import render_template_string
+        return render_template_string("""
+        <html>
+        <body>
+        <h1>Authentication Required</h1>
+        <p>Please log in to access the referal system.</p>
+        <a href="/login">Login</a>
+        </body>
+        </html>
+        """), 401
     
+    # DEPRECATED: Проверка по user.role - используйте permissions вместо этого!
     if user.role == 'admin' or user.role == 'manager' or user.role == 'call-center':
         """Перенаправление на административную панель для администраторов."""
         return redirect(url_for('admin.admin_panel'))
+    
+    # Автоматически синхронизируем данные пользователя из auth-service
+    from utils import sync_user_data_from_auth_service
+    sync_user_data_from_auth_service(user, force_sync=True, headers=request.headers)
     
     referal_service.update_deal_info(user)
     
@@ -151,8 +178,7 @@ def profile():
             referal.macro_contacts = []
             referal.macro_contact = None
     
-    print(f"Found {len(referals)} referals for user {user.login}")
-
+    
 
     return render_template('profile.html', 
                           current_user=user,
@@ -178,38 +204,7 @@ def profile():
 
 @referal_bp.route('/add', methods=['POST'])
 def add_referal():
-    """Добавление нового реферала через модальную форму"""
-    
-    managers = ["""Mamatov A'zam""",
-                """Buaxunov Baxtiyor""",
-                """Magovskiy Aleksandr""",
-                """RU Saytxalilov Alisher""",
-                """Komilov Sunnatilla""",
-                """Dayanova Aida""",
-                """Mirvosikov Mirazim""",
-                """Suleymanov Artur""",
-                """Krubayev Enver""",
-                """Raximberdiyev Raxmonberdi""",
-                """Kadirov Timur""",
-                """Kaxarov Sherzod Yuldashevich""",
-                """Mirzaolimov Nurmuhammad""",
-                """Atamatov Davron""",
-                """Nikiforova Kseniya""",
-                """Yulchiyev Umidjon""",
-                """Zairov Odil Kamildjanovich""",
-                """Yulchiyev Ramazon""",
-                """Rustamov Azizbek""",
-                """Miraxmad Mirboboev""",
-                """Djumabayev Akbar""",
-                """Lyovkin Dmitriy""",
-                """Abdukhalikova Jasmina""",
-                """Bekov Abbosbek Alisher ogli""",
-                """Mukhsinov Sukhrob""",
-                """Parpiyeva Nasibaxon"""]
-    
-    
-    manager = managers[random.randint(0, len(managers) - 1)]
-    
+    """Добавление нового реферала с проверкой истории CRM и привязкой договоров"""
     
     user = get_current_user()
     if not user:
@@ -244,64 +239,123 @@ def add_referal():
             flash(f'Реферал с номером {formatted_phone} уже добавлен', 'error')
             return redirect(url_for('referal.profile'))
         
-                # Проверяем, не существует ли уже реферал с таким телефоном 
-        existing_referal = Referal.query.join(ReferalData).filter(
+        # Проверяем, не существует ли уже реферал с таким именем 
+        existing_referal_by_name = Referal.query.join(ReferalData).filter(
             ReferalData.full_name == full_name
         ).first()
-        if existing_referal:
+        if existing_referal_by_name:
             flash(f'Реферал с именем {full_name} уже добавлен', 'error')
             return redirect(url_for('referal.profile'))
         
-        # Пытаемся найти соответствующий MacroContact
-        macro_contact = MacroContact.query.filter_by(phone_number=formatted_phone).first()
-        if macro_contact:
-            new_referal.contact_id = macro_contact.contacts_id
-            print(f"Found matching MacroContact for {formatted_phone}: {macro_contact.contacts_id}")
-            flash('Данный человек не может являться рефералом', 'error')
+        # НОВАЯ ЛОГИКА: Проверяем историю взаимодействий с CRM за последние 45 дней
+        days_threshold = int(os.getenv('REFERAL_DAYS_THRESHOLD', 45))
+        check_result = referal_service.check_contact_history_before_adding(
+            formatted_phone, full_name, days_threshold
+        )
+        
+        if not check_result['can_add']:
+            # ЗАПРЕЩЕНО добавление
+            flash(f'❌ Данный клиент не может быть добавлен как реферал: {check_result["reason"]}', 'error')
             return redirect(url_for('referal.profile'))
-
-        # Создаем новый реферал
-        print(user.id)
-        new_referal = Referal(user_id=user.id)
+        
+        # Создаем реферала с валидацией (использует новую логику с created_at)
+        new_referal, error = referal_service.create_new_referal_with_validation(
+            full_name, formatted_phone, user, days_threshold
+        )
+        
+        if error:
+            flash(f'Ошибка при создании реферала: {error}', 'error')
+            return redirect(url_for('referal.profile'))
+        
+        # Сохраняем реферала
         db.session.add(new_referal)
         db.session.commit()
-        db.session.flush()  # Получаем ID реферала
+        db.session.flush()
         
-        # Создаем данные реферала
-        referal_data = ReferalData(
-            referal_id=new_referal.id,
-            full_name=full_name,
-            phone_number=formatted_phone
-        )
-
+        # Добавляем дополнительные паспортные данные из формы
+        referal_data = new_referal.referal_data
         passport_number = request.form.get('passport_number', '').strip()
         passport_date = request.form.get('passport_date', '').strip()
         passport_giver = request.form.get('passport_giver', '').strip()
-
         
-        if passport_number and passport_number != '':
+        if passport_number:
             referal_data.passport_number = passport_number
-        if passport_date and passport_date != '':
+        if passport_date:
             referal_data.passport_date = datetime.strptime(passport_date, '%Y-%m-%d')
-        if passport_giver and passport_giver != '':
+        if passport_giver:
             referal_data.passport_giver = passport_giver
-
         
-        db.session.add(referal_data)
         db.session.commit()
-        db.session.flush()
-        flash(f'Реферал {full_name} успешно добавлен', 'success')
-        utils.send_email(
-            os.getenv('CALL_CENTER_MANAGER_EMAIL'),
-            subject='Назначение встречи для реферала',
-            body=f'Пользователь {user.user_data.full_name} добавил нового реферала: {full_name} ({formatted_phone}). Создайте встречу реферала с менеджером: {manager} для дальнейшего взаимодействия с клиентом.'
-        )
-        print(f"Successfully added referal: {full_name} ({formatted_phone}) for user {user.login}")
+        
+        # НОВАЯ ЛОГИКА: Ищем и привязываем все договора в пределах 45 дней
+        linked_deals = referal_service.find_and_link_deals_for_referal(new_referal)
+        
+        if linked_deals:
+            # Обновляем баланс на основе найденных договоров
+            total_added = referal_service.update_balance_for_referal(new_referal, user)
+            db.session.commit()
+            
+            flash(
+                f'✅ Реферал {full_name} добавлен! Найдено и привязано {len(linked_deals)} договоров. '
+                f'К балансу добавлено: {total_added} сум.', 
+                'success'
+            )
+        else:
+            flash(f'✅ Реферал {full_name} успешно добавлен!', 'success')
+        
+        # Случайный выбор менеджера для назначения встречи
+        managers = [
+            """Zairov Odil Kamildjanovich""",
+            """Yulchiyev Ramazon""",
+            """Rustamov Azizbek""",
+            """Miraxmad Mirboboev""",
+            """Djumabayev Akbar""",
+            """Lyovkin Dmitriy""",
+            """Abdukhalikova Jasmina""",
+            """Bekov Abbosbek Alisher ogli""",
+            """Mukhsinov Sukhrob""",
+            """Parpiyeva Nasibaxon"""
+        ]
+        manager = managers[random.randint(0, len(managers) - 1)]
+        
+        # Отправляем уведомление менеджеру call-центра
+        try:
+            # Получаем пользователей с ролью call-center из auth-service
+            call_center_users = utils.get_call_center_users_from_auth()
+            
+            if call_center_users:
+                # Берем первого пользователя из списка
+                first_cc_user = call_center_users[0]
+                call_center_email = first_cc_user.get('email')
+                call_center_name = first_cc_user.get('full_name', first_cc_user.get('username', 'Call-center менеджер'))
+                
+                if call_center_email:
+                    utils.send_email(
+                        call_center_email,
+                        subject='Новый реферал для обзвона',
+                        body=f'Пользователь {user.user_data.full_name if user.user_data else user.login} добавил нового реферала:\n\n'
+                             f'Имя: {full_name}\n'
+                             f'Телефон: {formatted_phone}\n\n'
+                             f'Пожалуйста, свяжитесь с рефералом для дальнейшего взаимодействия.'
+                    )
+                    print(f"📧 Email notification sent to call-center manager: {call_center_name} ({call_center_email})")
+                else:
+                    print(f"⚠️ Call-center user found but has no email: {first_cc_user}")
+            else:
+                print(f"⚠️ No call-center users found in auth-service, skipping notification")
+        except Exception as email_error:
+            print(f"❌ Failed to send email notification: {email_error}")
+            import traceback
+            traceback.print_exc()
+        
+        print(f"✅ Successfully added referal: {full_name} ({formatted_phone}) for user {user.login} with {len(linked_deals)} linked deals")
         
     except Exception as e:
         db.session.rollback()
-        print(f"Error adding referal: {e}")
-        flash('Произошла ошибка при добавлении реферала', 'error')
+        print(f"❌ Error adding referal: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f'Произошла ошибка при добавлении реферала: {str(e)}', 'error')
     
     return redirect(url_for('referal.profile'))
 
@@ -362,9 +416,16 @@ def update_referal_documents(referal_id):
         mail_adress = request.form.get('mail_adress', '').strip()
         passport_date_str = request.form.get('passport_date', '').strip()
         
+        # Форматируем номер телефона через utils функцию
+        formatted_phone = None
+        if phone_number:
+            # Если есть запятые, берем только первый номер
+            first_phone = phone_number.split(',')[0].strip()
+            formatted_phone = utils.format_phone_number(first_phone)
+        
         # Обновляем поля реферала
         referal.referal_data.full_name = full_name if full_name else None
-        referal.referal_data.phone_number = phone_number if phone_number else None
+        referal.referal_data.phone_number = formatted_phone if formatted_phone else phone_number if phone_number else None
         referal.referal_data.passport_number = passport_number if passport_number else None
         referal.referal_data.passport_giver = passport_giver if passport_giver else None
         referal.referal_data.passport_adress = passport_adress if passport_adress else None
@@ -395,8 +456,8 @@ def update_referal_documents(referal_id):
             return redirect(url_for('referal.profile'))
         
         # Валидация телефона
-        if phone_number and not re.match(r'^\+998 \d{2} \d{3} \d{2} \d{2}$', phone_number):
-            flash('Неверный формат телефона. Используйте формат +998 XX XXX XX XX', 'error')
+        if phone_number and not formatted_phone:
+            flash('Неверный формат телефона. Введите корректный номер телефона', 'error')
             return redirect(url_for('referal.profile'))
         
         db.session.commit()
@@ -449,14 +510,222 @@ def update_macro_data():
             'success': False,
             'message': f"Ошибка: {str(e)}"
         })
+
+
+@referal_bp.route('/get_referal_deals/<int:referal_id>', methods=['GET'])
+def get_referal_deals(referal_id):
+    """API endpoint для получения списка договоров реферала"""
+    print(f"🔍 get_referal_deals called with referal_id={referal_id}")
+    try:
+        user = get_current_user()
+        print(f"🔍 Current user: {user.login if user else 'None'}")
+        
+        if not user:
+            print(f"❌ User not authorized")
+            return jsonify({'success': False, 'message': 'Пользователь не авторизован'}), 401
+        
+        print(f"🔍 Looking for referal with id={referal_id}")
+        referal = Referal.query.get_or_404(referal_id)
+        print(f"✅ Referal found: {referal.id}, user_id={referal.user_id}")
+        
+        # Проверяем права доступа: либо это владелец реферала, либо админ
+        from permission_utils import requires_admin_access
+        is_admin = requires_admin_access()
+        print(f"🔍 Is admin: {is_admin}, referal.user_id={referal.user_id}, current user.id={user.id}")
+        
+        if not is_admin and referal.user_id != user.id:
+            print(f"❌ Access denied: not admin and not owner")
+            return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+        
+        print(f"🔍 Getting deals summary...")
+        deals_summary = referal.get_deals_summary()
+        print(f"✅ Deals summary retrieved: {len(deals_summary)} deals")
+        
+        result = {
+            'success': True,
+            'referal_name': referal.referal_data.full_name if referal.referal_data else 'Неизвестно',
+            'total_deals': referal.get_deals_count(),
+            'pending_deals': referal.get_pending_deals_count(),
+            'approved_deals': referal.get_approved_deals_count(),
+            'total_withdrawal': referal.get_total_withdrawal_amount(),
+            'deals': deals_summary
+        }
+        print(f"✅ Returning success response")
+        return jsonify(result)
     except Exception as e:
+        print(f"❌ ERROR in get_referal_deals: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+@referal_bp.route('/request_withdrawal_deal/<int:referal_deal_id>', methods=['POST'])
+def request_withdrawal_deal(referal_deal_id):
+    """Отправка конкретного договора на проверку"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({'success': False, 'message': 'Пользователь не авторизован'}), 401
+        
+        referal_deal = ReferalDeal.query.get_or_404(referal_deal_id)
+        referal = referal_deal.referal
+        
+        # Проверяем что реферал принадлежит текущему пользователю
+        if referal.user_id != user.id:
+            return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+        
+        # Проверяем что договор еще не отправлен
+        if referal_deal.deal_status != 'pending':
+            return jsonify({
+                'success': False, 
+                'message': f'Договор уже был отправлен (статус: {referal_deal.deal_status})'
+            }), 400
+        
+        # Проверяем наличие паспортных данных
+        if not referal.referal_data:
+            return jsonify({'success': False, 'message': 'Отсутствуют данные реферала'}), 400
+            
+        if not referal.referal_data.passport_number or not referal.referal_data.passport_giver:
+            return jsonify({
+                'success': False, 
+                'message': 'Необходимо заполнить паспортные данные реферала'
+            }), 400
+        
+        # Обновляем статус договора на "Проверка отделом аналитики" (status_id = 1)
+        referal_deal.status_id = 1
+        referal_deal.deal_status = 'sent_for_review'
+        db.session.commit()
+        
+        # Обновляем объект после коммита чтобы подгрузить связанный статус
+        db.session.refresh(referal_deal)
+        
+        # Отправляем уведомление (можно добавить позже)
+        # notification_service.notify_deal_sent_for_review(referal_deal)
+        
         return jsonify({
-            'success': False,
-            'message': f"Ошибка: {str(e)}"
+            'success': True,
+            'message': f'Договор {referal_deal.deal.agreement_number} отправлен на проверку',
+            'new_status': 'sent_for_review',
+            'new_status_id': 1,
+            'new_status_name': referal_deal.status_name
         })
     except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+@referal_bp.route('/add_referal_deal/<int:referal_id>', methods=['POST'])
+def add_referal_deal(referal_id):
+    """Добавление нового договора к рефералу"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({'success': False, 'message': 'Пользователь не авторизован'}), 401
+        
+        referal = Referal.query.get_or_404(referal_id)
+        
+        # Проверяем доступ
+        if not check_referal_access(referal):
+            return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+        
+        data = request.get_json()
+        contact_id = data.get('contact_id')
+        deal_status = data.get('deal_status', 'active')
+        
+        if not contact_id:
+            return jsonify({'success': False, 'message': 'ID контакта обязателен'}), 400
+        
+        # Ищем договор по contact_id
+        deal = MacroDeal.query.filter_by(contacts_buy_id=contact_id).first()
+        if not deal:
+            return jsonify({'success': False, 'message': f'Договор с contact_id {contact_id} не найден'}), 404
+        
+        # Проверяем, не существует ли уже такая связь
+        existing = ReferalDeal.query.filter_by(referal_id=referal_id, deal_id=deal.id).first()
+        if existing:
+            return jsonify({'success': False, 'message': 'Этот договор уже связан с рефералом'}), 400
+        
+        # Создаем новую связь
+        referal_deal = ReferalDeal(
+            referal_id=referal_id,
+            deal_id=deal.id,
+            deal_status=deal_status
+        )
+        
+        db.session.add(referal_deal)
+        db.session.commit()
+        
         return jsonify({
-            'success': False,
-            'message': f"Ошибка: {str(e)}"
+            'success': True,
+            'message': f'Договор {deal.agreement_number} успешно добавлен'
         })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+@referal_bp.route('/update_deal_status/<int:referal_deal_id>', methods=['POST'])
+def update_deal_status(referal_deal_id):
+    """Обновление статуса связи реферал-договор"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({'success': False, 'message': 'Пользователь не авторизован'}), 401
+        
+        referal_deal = ReferalDeal.query.get_or_404(referal_deal_id)
+        referal = referal_deal.referal
+        
+        # Проверяем доступ
+        if not check_referal_access(referal):
+            return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+        
+        data = request.get_json()
+        new_status = data.get('deal_status')
+        
+        if not new_status:
+            return jsonify({'success': False, 'message': 'Статус обязателен'}), 400
+        
+        valid_statuses = ['active', 'completed', 'cancelled']
+        if new_status not in valid_statuses:
+            return jsonify({'success': False, 'message': f'Неверный статус. Допустимые: {", ".join(valid_statuses)}'}), 400
+        
+        referal_deal.deal_status = new_status
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Статус успешно обновлен'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
+@referal_bp.route('/remove_referal_deal/<int:referal_deal_id>', methods=['DELETE'])
+def remove_referal_deal(referal_deal_id):
+    """Удаление связи между рефералом и договором"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({'success': False, 'message': 'Пользователь не авторизован'}), 401
+        
+        referal_deal = ReferalDeal.query.get_or_404(referal_deal_id)
+        referal = referal_deal.referal
+        
+        # Проверяем доступ
+        if not check_referal_access(referal):
+            return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+        
+        db.session.delete(referal_deal)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Связь успешно удалена'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'}), 500
+
+
 

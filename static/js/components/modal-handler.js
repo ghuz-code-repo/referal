@@ -99,6 +99,20 @@ function openModal(modalId) {
         modal.style.display = 'block';
         document.body.style.overflow = 'hidden';
         modal.classList.add('modal-open');
+        
+        // Инициализация date picker и валидации для модального окна добавления реферала
+        setTimeout(function() {
+            if (typeof initReferalDatePickers === 'function') {
+                console.log('Initializing date pickers in modal:', modalId);
+                initReferalDatePickers();
+            }
+            
+            // Инициализация валидации для формы добавления реферала
+            if (modalId === 'DocumentFormModal_new' && typeof initAddReferalValidation === 'function') {
+                console.log('Initializing add referal validation in modal:', modalId);
+                initAddReferalValidation();
+            }
+        }, 100);
     } else {
         console.error('Modal not found:', modalId);
         // Выводим список всех доступных модальных окон для отладки

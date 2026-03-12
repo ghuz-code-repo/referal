@@ -112,15 +112,33 @@ button:hover:disabled {
     justify-content: center;
 }
 
-.save-all-btn:hover {
+.save-all-btn:hover:not(:disabled):not(.disabled) {
     background: linear-gradient(135deg, #20c997, var(--info-color));
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
 }
 
-.save-all-btn:active {
+.save-all-btn:active:not(:disabled):not(.disabled) {
     transform: translateY(0);
     box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+
+/* Неактивное состояние кнопки сохранения */
+.save-all-btn:disabled,
+.save-all-btn.disabled {
+    background: linear-gradient(135deg, #6c757d, #495057);
+    color: #adb5bd;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 1px 2px rgba(108, 117, 125, 0.2);
+    opacity: 0.6;
+}
+
+.save-all-btn:disabled:hover,
+.save-all-btn.disabled:hover {
+    background: linear-gradient(135deg, #6c757d, #495057);
+    transform: none;
+    box-shadow: 0 1px 2px rgba(108, 117, 125, 0.2);
 }
 
 .save-all-btn i {

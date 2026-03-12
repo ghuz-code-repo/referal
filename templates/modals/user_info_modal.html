@@ -1,9 +1,14 @@
 <!-- Модальное окно для просмотра информации о пользователе -->
-<div id="UserInfoModal_{{ referal.user.id }}" class="modal">
+<div id="UserInfoModal_{{ referal.user.auth_user_id if referal.user and referal.user.auth_user_id else referal.user.id if referal.user else 'unknown' }}" class="modal">
     <div class="modal-content user-info-modal">
         <div class="modal-header">
             <h1><i class="fas fa-user-circle"></i> {{ referal.user.user_data.full_name }}</h1>
-           {% set user_data_complete = referal.user!=None and referal.user.user_data!=None and referal.user.user_data.full_name!=None and referal.user.user_data.full_name!='' and referal.user.user_data.passport_number!=None and referal.user.user_data.passport_number!='' and referal.user.user_data.passport_giver!=None and referal.user.user_data.passport_giver!='' and referal.user.user_data.passport_date!=None and referal.user.user_data.passport_adress!=None and referal.user.user_data.passport_adress!='' and referal.user.user_data.pinfl!=None and referal.user.user_data.pinfl!='' and referal.user.user_data.bank_name!=None and referal.user.user_data.bank_name!='' and referal.user.user_data.trans_schet!=None and referal.user.user_data.trans_schet!='' and referal.user.user_data.card_number!=None and referal.user.user_data.card_number!='' and referal.user.user_data.mfo!=None and referal.user.user_data.mfo!='' and referal.user.user_data.phone!=None and referal.user.user_data.phone!=''%}
+           {% if referal.user and referal.user.id in user_documents %}
+               {% set docs = user_documents[referal.user.id].documents %}
+               {% set user_data_complete = docs and docs.get('passport_number') and docs.get('passport_giver') and docs.get('passport_date') and docs.get('passport_address') and docs.get('pinfl') and docs.get('bank_name') and docs.get('bank_account') and docs.get('bank_card') and docs.get('bank_mfo') %}
+           {% else %}
+               {% set user_data_complete = False %}
+           {% endif %}
            <div class="download-act-container"> 
            {% if user_data_complete %}
             <a href="{{ url_for('document.get_agreement', user_id=referal.user.id) }}" class="download-act-btn download-act-link">
@@ -65,83 +70,119 @@
                     </div>
                 </div>
 
-                {% if referal.user.user_data %}
                 <!-- Личные данные -->
                 <div class="info-section">
                     <h4><i class="fas fa-user"></i> Личные данные</h4>
                     <div class="info-grid">
                         <div class="info-item wide">
                             <label>ФИО:</label>
-                            <span>{{ referal.user.user_data.full_name if referal.user.user_data.full_name else 'Не указано' }}</span>
+                            <span>{{ referal.user.user_data.full_name if referal.user.user_data and referal.user.user_data.full_name else 'Не указано' }}</span>
                         </div>
                         <div class="info-item">
                             <label>Телефон:</label>
-                            <span>{{ referal.user.user_data.phone if referal.user.user_data.phone else 'Не указан' }}</span>
+                            <span>{{ referal.user.user_data.phone if referal.user.user_data and referal.user.user_data.phone else 'Не указан' }}</span>
                         </div>
                         <div class="info-item">
                             <label>Email:</label>
-                            <span>{{ referal.user.user_data.e_mail if referal.user.user_data.e_mail else 'Не указан' }}</span>
+                            <span>{{ referal.user.user_data.e_mail if referal.user.user_data and referal.user.user_data.e_mail else 'Не указан' }}</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Паспортные данные -->
+                <!-- Документы из auth-service -->
                 <div class="info-section">
-                    <h4><i class="fas fa-passport"></i> Документы</h4>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <label>ПИНФЛ:</label>
-                            <span>{{ referal.user.user_data.pinfl if referal.user.user_data.pinfl else 'Не указан' }}</span>
+                    <div class="section-header-with-button">
+                        <h4><i class="fas fa-passport"></i> Документы</h4>
+                        {% if referal.user and referal.user.auth_user_id %}
+                        <div class="document-buttons">
+                            <button class="download-doc-btn pinfl-btn" onclick="downloadDocumentType({{ referal.user.id }}, 'pinfl')" title="Скачать ПИНФЛ">
+                                <i class="fas fa-id-card"></i> ПИНФЛ
+                            </button>
+                            <button class="download-doc-btn passport-btn" onclick="downloadDocumentType({{ referal.user.id }}, 'passport')" title="Скачать паспорт">
+                                <i class="fas fa-passport"></i> Паспорт
+                            </button>
+                            <button class="download-doc-btn bank-btn" onclick="downloadDocumentType({{ referal.user.id }}, 'bank_details')" title="Скачать банковские данные">
+                                <i class="fas fa-credit-card"></i> Банк
+                            </button>
+                            <button class="download-doc-btn employment-btn" onclick="downloadDocumentType({{ referal.user.id }}, 'employment_certificate')" title="Скачать справку с места работы">
+                                <i class="fas fa-briefcase"></i> Справка
+                            </button>
                         </div>
-                        <div class="info-item">
-                            <label>Паспорт:</label>
-                            <span>{{ referal.user.user_data.passport_number if referal.user.user_data.passport_number else 'Не указан' }}</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Дата выдачи:</label>
-                            <span>{{ referal.user.user_data.passport_date.strftime('%d.%m.%Y') if referal.user.user_data.passport_date else 'Не указана' }}</span>
-                        </div>
-                        <div class="info-item wide">
-                            <label>Кем выдан:</label>
-                            <span>{{ referal.user.user_data.passport_giver if referal.user.user_data.passport_giver else 'Не указан' }}</span>
-                        </div>
-                        <div class="info-item wide">
-                            <label>Адрес:</label>
-                            <span>{{ referal.user.user_data.passport_adress if referal.user.user_data.passport_adress else 'Не указан' }}</span>
+                        {% endif %}
+                    </div>
+                    <!-- Отображение документов из контекста -->
+                    <div class="documents-container">
+                        {% if referal.user and referal.user.id in user_documents %}
+                            {% set docs = user_documents[referal.user.id].documents %}
+                        {% else %}
+                            {% set docs = {} %}
+                        {% endif %}
+                        
+                        <div class="info-grid">
+                            <!-- ПИНФЛ -->
+                            <div class="info-item wide">
+                                <label>ПИНФЛ:</label>
+                                <span>{{ docs.pinfl if docs.pinfl else 'Не указан' }}</span>
+                            </div>
+                            
+                            <!-- Паспорт -->
+                            <div class="info-item">
+                                <label>Паспорт:</label>
+                                <span>{{ docs.passport_number if docs.passport_number else 'Не указан' }}</span>
+                            </div>
+                            
+                            <div class="info-item">
+                                <label>Дата выдачи:</label>
+                                <span>{{ docs.passport_date if docs.passport_date else 'Не указана' }}</span>
+                            </div>
+                            
+                            <div class="info-item wide">
+                                <label>Кем выдан:</label>
+                                <span>{{ docs.passport_giver if docs.passport_giver else 'Не указан' }}</span>
+                            </div>
+                            
+                            <div class="info-item wide">
+                                <label>Адрес:</label>
+                                <span>{{ docs.passport_address if docs.passport_address else 'Не указан' }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Банковские данные -->
+                <!-- Банковские данные из auth-service -->
                 <div class="info-section">
                     <h4><i class="fas fa-credit-card"></i> Банковские данные</h4>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <label>Карта:</label>
-                            <span>{{ referal.user.user_data.card_number if referal.user.user_data.card_number else 'Не указан' }}</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Банк:</label>
-                            <span>{{ referal.user.user_data.bank_name if referal.user.user_data.bank_name else 'Не указан' }}</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Транзитный счет:</label>
-                            <span>{{ referal.user.user_data.trans_schet if referal.user.user_data.trans_schet else 'Не указан' }}</span>
-                        </div>
-                        <div class="info-item">
-                            <label>МФО:</label>
-                            <span>{{ referal.user.user_data.mfo if referal.user.user_data.mfo else 'Не указан' }}</span>
+                    <!-- Отображение банковских данных из контекста -->
+                    <div class="bank-data-container">
+                        {% if referal.user and referal.user.id in user_documents %}
+                            {% set docs = user_documents[referal.user.id].documents %}
+                        {% else %}
+                            {% set docs = {} %}
+                        {% endif %}
+                        
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Карта:</label>
+                                <span>{{ docs.bank_card if docs.bank_card else 'Не указана' }}</span>
+                            </div>
+                            
+                            <div class="info-item">
+                                <label>Банк:</label>
+                                <span>{{ docs.bank_name if docs.bank_name else 'Не указан' }}</span>
+                            </div>
+                            
+                            <div class="info-item">
+                                <label>Транзитный счет:</label>
+                                <span>{{ docs.bank_account if docs.bank_account else 'Не указан' }}</span>
+                            </div>
+                            
+                            <div class="info-item">
+                                <label>МФО:</label>
+                                <span>{{ docs.bank_mfo if docs.bank_mfo else 'Не указан' }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                {% else %}
-                <div class="info-section no-data">
-                    <div class="no-data-message">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p>Реферер не заполнил дополнительную информацию</p>
-                    </div>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>

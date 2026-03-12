@@ -7,10 +7,13 @@ pandas
 flask
 flask_login
 flask_sqlalchemy
+gunicorn
 requests
 pymysql
+psycopg2-binary
 schedule
 python-docx
 openpyxl
 dotenv
 flask_apscheduler
+PyJWT

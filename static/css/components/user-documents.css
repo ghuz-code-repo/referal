@@ -1,0 +1,323 @@
+/* Стили для секции документов в профиле пользователя */
+
+/* Основные стили для документов */
+.documents-info {
+    margin-bottom: 15px;
+}
+
+.auth-data-note {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    background-color: var(--bg-secondary);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 3px solid var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.auth-data-note i {
+    color: var(--primary);
+}
+
+.auth-data-note a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.auth-data-note a:hover {
+    text-decoration: underline;
+}
+
+/* Загрузка документов */
+.loading-message {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+}
+
+.loading-message i {
+    margin-right: 8px;
+    color: var(--primary);
+}
+
+/* Список документов */
+.documents-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.document-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    transition: border-color 0.2s ease;
+}
+
+.document-item:hover {
+    border-color: var(--primary);
+}
+
+.document-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--primary-light);
+    border-radius: 6px;
+    color: var(--primary);
+}
+
+.document-icon i {
+    font-size: 1.2rem;
+}
+
+.document-info {
+    flex-grow: 1;
+}
+
+.document-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.document-type {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.document-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.document-date i {
+    font-size: 0.75rem;
+}
+
+.document-status {
+    flex-shrink: 0;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-badge.status-approved {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-badge.status-pending {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.status-badge.status-rejected {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.status-badge.status-draft {
+    background-color: #e2e3e5;
+    color: #495057;
+    border: 1px solid #d6d8db;
+}
+
+.status-badge.status-unknown {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-light);
+}
+
+/* Сообщения */
+.no-documents-message,
+.error-message {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--text-secondary);
+}
+
+.no-documents-message i,
+.error-message i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: var(--text-muted);
+    display: block;
+}
+
+.error-message i {
+    color: var(--danger);
+}
+
+.no-documents-message p,
+.error-message p {
+    margin: 10px 0 5px 0;
+    font-weight: 500;
+}
+
+.no-documents-message small,
+.error-message small {
+    color: var(--text-muted);
+}
+
+.no-documents-message a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.no-documents-message a:hover {
+    text-decoration: underline;
+}
+
+/* Информация о дополнительных документах */
+.more-documents-info {
+    padding: 8px 12px;
+    background-color: var(--bg-light);
+    border-radius: 6px;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.more-documents-info small {
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+/* Действия с документами */
+.documents-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .document-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .document-icon {
+        align-self: center;
+    }
+    
+    .document-status {
+        align-self: center;
+    }
+}
+
+/* Темная тема */
+[data-theme="dark"] .auth-data-note {
+    background-color: var(--bg-dark-secondary);
+    border-left-color: var(--primary-light);
+}
+
+[data-theme="dark"] .document-item {
+    background-color: var(--bg-dark-card);
+    border-color: var(--border-dark);
+}
+
+[data-theme="dark"] .document-item:hover {
+    border-color: var(--primary-light);
+}
+
+[data-theme="dark"] .document-icon {
+    background-color: var(--primary-dark);
+    color: var(--primary-light);
+}
+
+[data-theme="dark"] .more-documents-info {
+    background-color: var(--bg-dark-light);
+}
+
+/* Стили для отображения данных в формате info-grid */
+.info-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 1rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-item.wide {
+    grid-column: 1 / -1;
+}
+
+.info-item label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-item span {
+    font-size: 1rem;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+/* Стили для плейсхолдеров */
+.placeholder-text {
+    color: var(--text-muted) !important;
+    font-style: italic;
+    opacity: 0.7;
+}
+
+/* Темная тема для плейсхолдеров */
+[data-theme="dark"] .placeholder-text {
+    color: var(--text-muted-dark) !important;
+    opacity: 0.6;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 600px) {
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .info-item.wide {
+        grid-column: 1;
+    }
+}
+
+/* Темная тема для info-grid */
+[data-theme="dark"] .info-item label {
+    color: var(--text-secondary-dark);
+}
+
+[data-theme="dark"] .info-item span {
+    color: var(--text-primary-dark);
+}

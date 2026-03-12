@@ -13,6 +13,21 @@
     box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
 }
 
+/* Инлайн ошибки в лейблах для формы добавления реферала */
+.field-label .field-error {
+    position: static;
+    display: none;
+    margin-left: 8px;
+    padding: 2px 6px;
+    background: none;
+    color: #dc3545; /* Ярко-красный цвет */
+    font-size: 11px;
+    font-weight: 600; /* Более жирный шрифт для лучшей видимости */
+    border-radius: 3px;
+    box-shadow: none;
+    border: none;
+}
+
 .field-hint {
     position: absolute;
     top: 100%;

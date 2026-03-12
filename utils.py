@@ -6,11 +6,21 @@ import threading
 import time
 import os
 import re
-import smtplib
 from typing import List, Optional, Tuple
 
 from flask import current_app, logging
 import requests
+
+
+def _get_api_headers():
+    """Get headers with X-API-Key for auth-service /api/* calls"""
+    from flask import current_app
+    auth_client = getattr(current_app, 'auth_client', None)
+    if auth_client and hasattr(auth_client, 'api_headers'):
+        return auth_client.api_headers
+    api_key = os.getenv('INTERNAL_API_KEY', '')
+    return {'X-API-Key': api_key} if api_key else {}
+
 
 # Вспомогательная функция для запуска задач в отдельном потоке с контекстом Flask
 def run_async_task(func, *args, **kwargs):
@@ -47,6 +57,83 @@ def clean_phone_number(phone: str) -> str:
         return ""
     # Убираем все кроме цифр и знака +
     return re.sub(r'[^\d+]', '', phone.strip())
+
+
+def extract_and_normalize_phones(phone_field: str) -> list:
+    """
+    Извлекает и нормализует все номера телефонов из строки.
+    Обрабатывает различные форматы:
+    - 9989773824501 (без разделителей)
+    - +998.974031753 (с точками)
+    - (+998.981154200,+998.914093336) (несколько телефонов в скобках через запятую)
+    - +998 90 315 84 14 (с пробелами)
+    
+    Возвращает список всех уникальных вариантов нормализованных номеров для поиска.
+    """
+    if not phone_field:
+        return []
+    
+    phones = []
+    
+    # Удаляем внешние скобки если есть
+    phone_field = phone_field.strip()
+    if phone_field.startswith('(') and phone_field.endswith(')'):
+        phone_field = phone_field[1:-1]
+    
+    # Разделяем по запятым для случая с несколькими номерами
+    phone_parts = [p.strip() for p in phone_field.split(',')]
+    
+    for part in phone_parts:
+        if not part:
+            continue
+        
+        # Убираем точки, пробелы, скобки, дефисы - оставляем только + и цифры
+        clean = re.sub(r'[^\d+]', '', part)
+        
+        if not clean or len(clean) < 9:
+            continue
+        
+        # Генерируем варианты для поиска
+        variants = set()
+        
+        # Вариант 1: как есть после очистки
+        variants.add(clean)
+        
+        # Вариант 2: добавляем + в начало если нет
+        if not clean.startswith('+'):
+            variants.add('+' + clean)
+        
+        # Вариант 3: убираем + если есть
+        if clean.startswith('+'):
+            variants.add(clean[1:])
+        
+        # Вариант 4: для узбекских номеров - стандартизация
+        # Если начинается с 998 или +998
+        if clean.startswith('+998') or clean.startswith('998'):
+            # Извлекаем основную часть (9 цифр после 998)
+            digits = clean.replace('+', '').replace('998', '', 1)
+            if len(digits) == 9:
+                # Добавляем все варианты
+                variants.add('998' + digits)  # 9989XXXXXXXX
+                variants.add('+998' + digits)  # +9989XXXXXXXX
+                variants.add(digits)  # 9XXXXXXXX (без кода страны)
+                # НОВОЕ: добавляем формат С ПРОБЕЛАМИ для поиска в MacroContact
+                variants.add(f"+998 {digits[:2]} {digits[2:5]} {digits[5:7]} {digits[7:9]}")  # +998 XX XXX XX XX
+        
+        # Вариант 5: если номер начинается с 9 и длина 12-13 цифр (998 + 9 цифр)
+        elif clean.startswith('9') and len(clean) >= 12:
+            # Возможно это 9989XXXXXXXX без +
+            if clean[:3] == '998':
+                digits = clean[3:]
+                if len(digits) == 9:
+                    variants.add(clean)  # 9989XXXXXXXX
+                    variants.add('+' + clean)  # +9989XXXXXXXX
+                    variants.add('998' + digits)  # на случай если код дублируется
+        
+        phones.extend(variants)
+    
+    # Убираем дубликаты и возвращаем
+    return list(set(phones))
 
 
 def format_phone_number(phone: str) -> Optional[str]:
@@ -260,53 +347,59 @@ def send_sms(phone_number, user_full_name):
 
 def _send_email_sync(recipient_email, subject, body):
     """
-    Внутренняя функция для синхронной отправки email сообщения.
+    Внутренняя функция для синхронной отправки email сообщения через Notification Service.
     Предназначена для вызова из send_email_async.
     """
-    from email.mime.text import MIMEText
-
-
+    from notification_client import get_notification_client
+    
     try:
-        with smtplib.SMTP(os.getenv('EMAIL_SERVER'), os.getenv('EMAIL_SERVER_PORT')) as server:
-            msg = MIMEText(body)
-            msg['Subject'] = subject
-            msg['From'] = os.getenv('SEND_FROM_EMAIL') 
-            msg['To'] = recipient_email
-            server.starttls()
-            server.login(os.getenv('SEND_FROM_EMAIL') , os.getenv('SEND_FROM_EMAIL_PASSWORD'))
-            server.sendmail(os.getenv('SEND_FROM_EMAIL'), recipient_email, msg.as_string().encode('utf-8').strip())
-            print("Email sent to recipient")
-        with smtplib.SMTP(os.getenv('EMAIL_SERVER'), os.getenv('EMAIL_SERVER_PORT')) as server:
-            msg = MIMEText(f'Письмо отправлено {recipient_email} с темой {subject}\nтело:\n{body}')
-            msg['Subject'] = f'Ответсвенное лицой реферальной программы {recipient_email} получило письмо'
-            msg['From'] = os.getenv('SEND_FROM_EMAIL') 
-            msg['To'] = os.getenv('MAIN_ADMIN_EMAIL')
-            server.starttls()
-            server.login(os.getenv('SEND_FROM_EMAIL') , os.getenv('SEND_FROM_EMAIL_PASSWORD'))
-            server.sendmail(os.getenv('SEND_FROM_EMAIL'), os.getenv('MAIN_ADMIN_EMAIL'), msg.as_string().encode('utf-8').strip())
-            print("Email sent to admin")
-        print(f"Email sent successfully {recipient_email} {subject}")
+        # Получаем клиент notification service
+        notification_client = get_notification_client()
+        
+        # Отправляем основное письмо получателю
+        success = notification_client.send_email(
+            recipient=recipient_email,
+            subject=subject,
+            body=body
+        )
+        
+        if success:
+            print(f"Email queued for sending to {recipient_email}")
+            
+            # Отправляем уведомление администратору об успешной отправке
+            admin_email = os.getenv('MAIN_ADMIN_EMAIL')
+            if admin_email:
+                admin_subject = f'Ответственное лицо реферальной программы {recipient_email} получило письмо'
+                admin_body = f'Письмо отправлено {recipient_email} с темой {subject}\nтело:\n{body}'
+                notification_client.send_email(
+                    recipient=admin_email,
+                    subject=admin_subject,
+                    body=admin_body
+                )
+                print("Admin notification queued")
+            
+            print(f"Email sent successfully via Notification Service: {recipient_email} {subject}")
+        else:
+            raise Exception("Notification service returned failure status")
+            
     except Exception as e:
+        print(f"Failed to send email via Notification Service: {e}")
+        
+        # Отправляем уведомление администратору об ошибке
         try:
-            with smtplib.SMTP(os.getenv('EMAIL_SERVER'), os.getenv('EMAIL_SERVER_PORT')) as server:
-                msg = MIMEText(f'Письмо не было отправлено {recipient_email} с темой {subject}\nтело:\n{body}\nОшибка {e}')
-                msg['Subject'] = f'Ответсвенное лицой реферальной программы {recipient_email} НЕ получило письмо'
-                msg['From'] = os.getenv('SEND_FROM_EMAIL') 
-                msg['To'] = os.getenv('MAIN_ADMIN_EMAIL')
-                server.starttls()
-                server.login(os.getenv('SEND_FROM_EMAIL') , os.getenv('SEND_FROM_EMAIL_PASSWORD'))
-                server.sendmail(os.getenv('SEND_FROM_EMAIL'), os.getenv('MAIN_ADMIN_EMAIL'), msg.as_string().encode('utf-8').strip())
-                print("Email sent successfully to admin")
-        except Exception as e:
-            print(f"Failed to send even admin email: {e}")
-        # Убрана рекурсивная попытка, т.к. это плохая практика в асинхронных задачах
-        # и может привести к бесконечному циклу.
-        # Вместо этого можно добавить более умную логику повторных попыток
-        # с задержками, если это необходимо.
-        # print(f"Retrying email send in 10 seconds...")
-        # time.sleep(10)
-        # _send_email_sync(recipient_email, subject, body) # Это может быть бесконечная рекурсия
-        # Также можно использовать current_app.logger.error, если контекст доступен
+            admin_email = os.getenv('MAIN_ADMIN_EMAIL')
+            if admin_email:
+                notification_client = get_notification_client()
+                admin_subject = f'Ответственное лицо реферальной программы {recipient_email} НЕ получило письмо'
+                admin_body = f'Письмо не было отправлено {recipient_email} с темой {subject}\nтело:\n{body}\nОшибка {e}'
+                notification_client.send_email(
+                    recipient=admin_email,
+                    subject=admin_subject,
+                    body=admin_body
+                )
+                print("Error notification sent to admin")
+        except Exception as admin_error:
+            print(f"Failed to send error notification to admin: {admin_error}")
         
 def send_email(recipient_email, subject, body):
     """
@@ -315,3 +408,344 @@ def send_email(recipient_email, subject, body):
     thread = threading.Thread(target=run_async_task, args=(_send_email_sync, recipient_email, subject, body))
     thread.daemon = True # Позволяет программе завершиться, даже если поток еще работает
     thread.start()
+
+
+def sync_user_data_from_auth_service(user, force_sync=False, headers=None):
+    """
+    Синхронизирует данные пользователя из auth-service.
+    
+    Args:
+        user: Объект пользователя из referal сервиса
+        force_sync: Принудительная синхронизация даже если данные уже есть
+        headers: Request headers для fallback данных (phone, email)
+    
+    Returns:
+        bool: True если синхронизация прошла успешно
+    """
+    from models import UserData, db
+    
+    try:
+        # Импортируем auth_client из app контекста
+        from flask import current_app
+        auth_client = getattr(current_app, 'auth_client', None)
+        
+        if not auth_client:
+            print("AuthClient not available")
+            return False
+        
+        # Проверяем наличие auth_user_id
+        if not hasattr(user, 'auth_user_id') or not user.auth_user_id:
+            print(f"❌ User {user.login} does not have auth_user_id set, skipping sync")
+            print(f"   User object: id={user.id}, login={user.login}, has auth_user_id attr: {hasattr(user, 'auth_user_id')}")
+            if hasattr(user, 'auth_user_id'):
+                print(f"   auth_user_id value: '{user.auth_user_id}'")
+            return False
+            
+        # Проверяем, есть ли уже данные пользователя
+        user_data = UserData.query.filter_by(user_id=user.id).first()
+        
+        print(f"🔄 Syncing user data for {user.login} (auth_user_id: {user.auth_user_id})")
+        print(f"   UserData exists: {user_data is not None}, force_sync: {force_sync}")
+        
+        # Если данные есть и принудительная синхронизация не требуется, пропускаем
+        # Получаем данные профиля из auth-service
+        profile_url = f"/api/users/{user.auth_user_id}/profile"
+        print(f"📡 Fetching profile from: {auth_client.auth_service_url.rstrip('/')}{profile_url}")
+        try:
+            profile_response = requests.get(
+                f"{auth_client.auth_service_url.rstrip('/')}{profile_url}",
+                headers=_get_api_headers(),
+                timeout=5
+            )
+            
+            print(f"   Response status: {profile_response.status_code}")
+            
+            if profile_response.status_code != 200:
+                print(f"   ❌ Failed to fetch profile: {profile_response.text[:200]}")
+                return False
+        except Exception as e:
+            print(f"   ❌ Exception fetching profile: {e}")
+            return False
+            
+        profile_data = profile_response.json()
+        
+        print(f"📥 Profile data from auth-service: {profile_data}")
+        
+        # Создаем или обновляем UserData
+        if not user_data:
+            user_data = UserData(user_id=user.id)
+            db.session.add(user_data)
+        
+        # Получаем компоненты ФИО из auth-service
+        last_name = profile_data.get('last_name', '').strip()
+        first_name = profile_data.get('first_name', '').strip()
+        middle_name = profile_data.get('middle_name', '').strip()
+        suffix = profile_data.get('suffix', '').strip()
+        
+        # Сохраняем компоненты
+        user_data.last_name = last_name
+        user_data.first_name = first_name
+        user_data.middle_name = middle_name
+        
+        # ФОРМИРУЕМ ПОЛНОЕ ИМЯ: Фамилия Имя Отчество Частица
+        name_parts = []
+        if last_name:
+            name_parts.append(last_name)
+        if first_name:
+            name_parts.append(first_name)
+        if middle_name:
+            name_parts.append(middle_name)
+        if suffix:
+            name_parts.append(suffix)
+        
+        user_data.full_name = ' '.join(name_parts) if name_parts else profile_data.get('full_name', '')
+        
+        # Синхронизируем только основные данные профиля (НЕ документы)
+        user_data.phone = profile_data.get('phone') or profile_data.get('phone_number', '')
+        user_data.e_mail = profile_data.get('email') or profile_data.get('e_mail', '')
+        
+        # ❌ DEPRECATED: Documents are NOT synced to local DB anymore
+        # Documents should be fetched from Auth-Service API in real-time:
+        # - Via headers (X-User-Passport-*, X-User-Bank-*, X-User-PINFL)
+        # - Via API: /api/users/{user_id}/documents/for-service/referal
+        # See app_with_auth_connector.py:get_user_documents_from_auth_service()
+        
+        # Parse birth_date if present
+        if profile_data.get('birth_date'):
+            try:
+                user_data.birth_date = datetime.fromisoformat(
+                    profile_data['birth_date'].replace('Z', '+00:00')
+                ).date()
+            except (ValueError, AttributeError):
+                pass
+        
+        # Fallback на заголовки если данные не пришли из API
+        if headers and not user_data.phone:
+            header_phone = headers.get('X-User-Phone')
+            if header_phone:
+                user_data.phone = header_phone
+                print(f"   📞 Using phone from headers: {header_phone}")
+        
+        if headers and not user_data.e_mail:
+            header_email = headers.get('X-User-Email')
+            if header_email:
+                user_data.e_mail = header_email
+                print(f"   📧 Using email from headers: {header_email}")
+        
+        db.session.commit()
+        print(f"✅ Successfully synced user data for {user.login}")
+        print(f"   Last name: {last_name}")
+        print(f"   First name: {first_name}")
+        print(f"   Middle name: {middle_name}")
+        print(f"   Suffix: {suffix}")
+        print(f"   ➡️ FULL NAME (constructed): {user_data.full_name}")
+        print(f"   Phone: {user_data.phone}")
+        print(f"   Email: {user_data.e_mail}")
+        print(f"   PINFL: {user_data.pinfl}")
+        print(f"   Passport: {user_data.passport_number}")
+        return True
+        
+    except Exception as e:
+        print(f"Error syncing user data from auth-service: {e}")
+        db.session.rollback()
+        return False
+
+
+def get_user_full_name_from_auth(user):
+    """
+    Получает актуальное полное имя пользователя из auth-service.
+    
+    Args:
+        user: Объект пользователя из referal сервиса
+        
+    Returns:
+        str: Полное имя пользователя из auth-service или fallback значение
+    """
+    from flask import current_app
+    
+    # Сначала пытаемся получить из auth-service
+    try:
+        auth_client = getattr(current_app, 'auth_client', None)
+        
+        if not auth_client or not hasattr(user, 'auth_user_id') or not user.auth_user_id:
+            # Fallback к локальным данным
+            if hasattr(user, 'user_data') and user.user_data and user.user_data.full_name:
+                return user.user_data.full_name
+            return user.login if hasattr(user, 'login') else "Неизвестно"
+        
+        # Получаем данные из auth-service
+        profile_url = f"/api/users/{user.auth_user_id}/profile"
+        profile_response = requests.get(
+            f"{auth_client.auth_service_url.rstrip('/')}{profile_url}",
+            headers=_get_api_headers(),
+            timeout=3  # Короткий timeout для быстрого ответа
+        )
+        
+        if profile_response.status_code == 200:
+            profile_data = profile_response.json()
+            
+            # ФОРМИРУЕМ ПОЛНОЕ ИМЯ ИЗ ОТДЕЛЬНЫХ ПОЛЕЙ: Фамилия Имя Отчество Частица
+            last_name = profile_data.get('last_name', '').strip()
+            first_name = profile_data.get('first_name', '').strip()
+            middle_name = profile_data.get('middle_name', '').strip()
+            suffix = profile_data.get('suffix', '').strip()
+            
+            name_parts = []
+            if last_name:
+                name_parts.append(last_name)
+            if first_name:
+                name_parts.append(first_name)
+            if middle_name:
+                name_parts.append(middle_name)
+            if suffix:
+                name_parts.append(suffix)
+            
+            if name_parts:
+                return ' '.join(name_parts)
+            
+            # Fallback к полю full_name если отдельные поля пусты
+            full_name = profile_data.get('full_name', '').strip()
+            if full_name:
+                return full_name
+        
+    except Exception as e:
+        print(f"Warning: Failed to get user full name from auth-service: {e}")
+    
+    # Fallback к локальным данным
+    if hasattr(user, 'user_data') and user.user_data and user.user_data.full_name:
+        return user.user_data.full_name
+    return user.login if hasattr(user, 'login') else "Неизвестно"
+
+
+def sync_user_profile_always(user):
+    """
+    ВСЕГДА синхронизирует данные пользователя из auth-service при каждом запросе.
+    Если auth-service недоступен - оставляет локальные данные.
+    
+    Args:
+        user: Объект пользователя из referal сервиса
+        
+    Returns:
+        bool: True если синхронизация прошла успешно
+    """
+    from models import UserData, db
+    from flask import current_app
+    
+    try:
+        auth_client = getattr(current_app, 'auth_client', None)
+        
+        if not auth_client or not hasattr(user, 'auth_user_id') or not user.auth_user_id:
+            print(f"❌ Cannot sync user {user.login}: no auth_client or auth_user_id")
+            return False
+        
+        # Получаем данные профиля из auth-service
+        profile_url = f"/api/users/{user.auth_user_id}/profile"
+        print(f"🔄 Syncing profile for {user.login} from auth-service...")
+        
+        profile_response = requests.get(
+            f"{auth_client.auth_service_url.rstrip('/')}{profile_url}",
+            headers=_get_api_headers(),
+            timeout=5
+        )
+        
+        if profile_response.status_code != 200:
+            print(f"❌ Failed to fetch profile: HTTP {profile_response.status_code}")
+            return False
+            
+        profile_data = profile_response.json()
+        print(f"📥 Profile data from auth-service: {profile_data}")
+        print(f"🔍 Checking all keys in profile_data: {list(profile_data.keys())}")
+        
+        # Получаем или создаем UserData
+        user_data = UserData.query.filter_by(user_id=user.id).first()
+        if not user_data:
+            user_data = UserData(user_id=user.id)
+            db.session.add(user_data)
+            print(f"📝 Created new UserData for user {user.login}")
+        
+        # Обновляем данные из auth-service
+        user_data.e_mail = profile_data.get('email', '')
+        user_data.phone = profile_data.get('phone', '')
+        
+        # Получаем компоненты ФИО
+        last_name = profile_data.get('last_name', '').strip()
+        first_name = profile_data.get('first_name', '').strip()
+        middle_name = profile_data.get('middle_name', '').strip()
+        suffix = profile_data.get('suffix', '').strip()  # Частица (O`G`LI, QIZI и т.д.)
+        
+        # Сохраняем компоненты
+        user_data.last_name = last_name
+        user_data.first_name = first_name
+        user_data.middle_name = middle_name
+        
+        # ФОРМИРУЕМ ПОЛНОЕ ИМЯ: Фамилия Имя Отчество Частица
+        name_parts = []
+        if last_name:
+            name_parts.append(last_name)
+        if first_name:
+            name_parts.append(first_name)
+        if middle_name:
+            name_parts.append(middle_name)
+        if suffix:
+            name_parts.append(suffix)
+        
+        user_data.full_name = ' '.join(name_parts) if name_parts else profile_data.get('full_name', '')
+        
+        # ❌ DEPRECATED: Documents NOT synced to local DB
+        # Documents are fetched from Auth-Service in real-time only
+        
+        db.session.commit()
+        print(f"✅ Successfully synced user data for {user.login}")
+        print(f"   Last name: {last_name}")
+        print(f"   First name: {first_name}")
+        print(f"   Middle name: {middle_name}")
+        print(f"   Suffix: {suffix}")
+        print(f"   ➡️ FULL NAME (constructed): {user_data.full_name}")
+        print(f"   Phone: {user_data.phone}")
+        print(f"   Email: {user_data.e_mail}")
+        print(f"   📄 Documents: NOT synced (fetch from Auth-Service API)")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error syncing user data from auth-service: {e}")
+        db.session.rollback()
+        return False
+
+
+def get_call_center_users_from_auth():
+    """
+    Получает список пользователей с разрешением на получение уведомлений о новых рефералах из auth-service.
+    
+    Returns:
+        list: Список пользователей с email и другими данными, или пустой список при ошибке
+    """
+    from flask import current_app
+    import requests
+    
+    try:
+        auth_client = getattr(current_app, 'auth_client', None)
+        
+        if not auth_client:
+            print("❌ AuthClient not available")
+            return []
+        
+        # Запрашиваем пользователей с разрешением referal.notifications.new_referral
+        users_url = f"/api/services/referal/users-by-permission/referal.notifications.new_referral"
+        full_url = f"{auth_client.auth_service_url.rstrip('/')}{users_url}"
+        
+        print(f"📡 Fetching notification recipients from: {full_url}")
+        
+        response = requests.get(full_url, headers=_get_api_headers(), timeout=5)
+        
+        if response.status_code == 200:
+            users = response.json()
+            print(f"✅ Found {len(users)} users with notification permission")
+            return users
+        else:
+            print(f"⚠️ Failed to get notification recipients: {response.status_code} - {response.text}")
+            return []
+            
+    except Exception as e:
+        print(f"❌ Error getting notification recipients from auth-service: {e}")
+        return []

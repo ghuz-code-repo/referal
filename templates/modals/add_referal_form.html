@@ -10,20 +10,20 @@
       <div class="data-card referal-card">
         <h3 style="padding-bottom: 10px;"><i class="fas fa-user-edit"></i> Данные реферала</h3>
         <h3 style="padding-bottom: 10px;">Обязательные данные</h3>
-        <form action="{{ url_for('referal.add_referal') }}" method="POST">
+        <form action="{{ url_for('referal.add_referal') }}" method="POST" class="add-referal-form" id="add-referal-form">
           <div class="card-content">
             <!-- Основная строка с именем -->
             <div class="name-row">
-              <span class="field-label">ФИО:</span>
+              <span class="field-label">ФИО: <span class="field-error" id="name-error"></span></span>
 
-              <input type="text" name="full_name" class="editable-input" placeholder="Введите ФИО реферала" required />
+              <input type="text" name="full_name" id="full_name" class="editable-input" placeholder="Введите ФИО реферала (минимум 2 слова)" required />
             </div>
 
             <!-- Вторая строка: телефон и ID -->
             <div class="info-row" style="grid-template-columns: 1fr;">
               <div class="info-item full-phone">
-                <span class="field-label">Телефон:</span>
-                <input type="tel" name="phone_number" class="editable-input" placeholder="+998 XX XXX XX XX" required />
+                <span class="field-label">Телефон: <span class="field-error" id="phone-error"></span></span>
+                <input type="tel" name="phone" id="phone_number" class="editable-input" placeholder="+998 XX XXX XX XX" required />
               </div>
             </div>
             <!-- Блок паспортной информации -->
@@ -76,7 +76,7 @@
 
             <!-- Кнопка сохранения внизу карточки реферала (аналогично кнопке переноса в MacroCRM) -->
             <div class="save-all-container">
-              <button type="submit" class="save-all-btn"><i class="fas fa-save"></i> Сохранить данные реферала</button>
+              <button type="submit" id="save-referal-btn" class="save-all-btn" disabled><i class="fas fa-save"></i> Сохранить данные реферала</button>
             </div>
           </div>
         </form>

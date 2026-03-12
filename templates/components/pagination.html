@@ -12,7 +12,7 @@
     </div>
     <nav aria-label="Page navigation" class="pagination-nav">
     <ul class="pagination">
-        {% set base_url = base_pagination_url if base_pagination_url else url_for('referal.profile') %}
+        {% set base_url = base_pagination_url if base_pagination_url else request.path %}
         {% set current_params = request.args.to_dict() %}
         
         <!-- Первая страница -->

@@ -1,0 +1,18 @@
+/* Стили для бейджей номеров договоров */
+.deal-number-badge {
+    display: inline-block;
+    background-color: var(--accent-color, #c4a668);
+    color: var(--bg-primary, #1a1a1a);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    margin: 2px 0;
+    white-space: nowrap;
+}
+
+.no-deals {
+    color: var(--text-secondary, #999);
+    font-style: italic;
+    font-size: 13px;
+}
