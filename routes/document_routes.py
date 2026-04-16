@@ -481,60 +481,60 @@ def get_referal_act(referal_id=None, referal_deal_id=None):
         return redirect(request.referrer or '/')
 
 
+def _replace_in_paragraph(paragraph, replacements):
+    """Заменяет плейсхолдеры в параграфе, сохраняя форматирование runs"""
+    for placeholder, replacement in replacements.items():
+        search = f'{{{placeholder}}}'
+        if search not in paragraph.text:
+            continue
+        # Собираем полный текст из runs и находим позиции placeholder
+        runs = paragraph.runs
+        full_text = ''.join(run.text for run in runs)
+        start = full_text.find(search)
+        while start != -1:
+            end = start + len(search)
+            # Определяем, какие runs затрагивает placeholder
+            char_pos = 0
+            for i, run in enumerate(runs):
+                run_start = char_pos
+                run_end = char_pos + len(run.text)
+                if run_start <= start < run_end:
+                    first_run_idx = i
+                    offset_in_first = start - run_start
+                if run_start < end <= run_end:
+                    last_run_idx = i
+                    offset_in_last = end - run_start
+                    break
+                char_pos = run_end
+            # Заменяем текст в первом run, сохраняя его форматирование
+            first_run = runs[first_run_idx]
+            first_run.text = first_run.text[:offset_in_first] + str(replacement) + runs[last_run_idx].text[offset_in_last:]
+            # Очищаем промежуточные и последний run (если они отличаются от первого)
+            for j in range(first_run_idx + 1, last_run_idx + 1):
+                runs[j].text = ''
+            # Пересобираем для поиска следующего вхождения
+            full_text = ''.join(run.text for run in runs)
+            start = full_text.find(search)
+
+
 def _replace_text_in_document(doc, replacements):
-    """Заменяет плейсхолдеры в документе"""
+    """Заменяет плейсхолдеры в документе, сохраняя форматирование шрифтов"""
     # Замена в параграфах
     for paragraph in doc.paragraphs:
-        for placeholder, replacement in replacements.items():
-            if placeholder in paragraph.text:
-                paragraph.text = paragraph.text.replace(f'{{{placeholder}}}', str(replacement))
+        _replace_in_paragraph(paragraph, replacements)
     
     # Замена в таблицах
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                for placeholder, replacement in replacements.items():
-                    if placeholder in cell.text:
-                        cell.text = cell.text.replace(f'{{{placeholder}}}', str(replacement))
+                for paragraph in cell.paragraphs:
+                    _replace_in_paragraph(paragraph, replacements)
     
     # Замена в колонтитулах
     for section in doc.sections:
-        # Верхний колонтитул
         if section.header:
             for paragraph in section.header.paragraphs:
-                for placeholder, replacement in replacements.items():
-                    if placeholder in paragraph.text:
-                        paragraph.text = paragraph.text.replace(f'{{{placeholder}}}', str(replacement))
-        
-        # Нижний колонтитул
+                _replace_in_paragraph(paragraph, replacements)
         if section.footer:
             for paragraph in section.footer.paragraphs:
-                for placeholder, replacement in replacements.items():
-                    if placeholder in paragraph.text:
-                        paragraph.text = paragraph.text.replace(f'{{{placeholder}}}', str(replacement))
-            if placeholder in paragraph.text:
-                paragraph.text = paragraph.text.replace(f'{{{placeholder}}}', str(replacement))
-    
-    # Замена в таблицах
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for placeholder, replacement in replacements.items():
-                    if placeholder in cell.text:
-                        cell.text = cell.text.replace(f'{{{placeholder}}}', str(replacement))
-    
-    # Замена в колонтитулах
-    for section in doc.sections:
-        # Верхний колонтитул
-        if section.header:
-            for paragraph in section.header.paragraphs:
-                for placeholder, replacement in replacements.items():
-                    if placeholder in paragraph.text:
-                        paragraph.text = paragraph.text.replace(f'{{{placeholder}}}', str(replacement))
-        
-        # Нижний колонтитул
-        if section.footer:
-            for paragraph in section.footer.paragraphs:
-                for placeholder, replacement in replacements.items():
-                    if placeholder in paragraph.text:
-                        paragraph.text = paragraph.text.replace(f'{{{placeholder}}}', str(replacement))
+                _replace_in_paragraph(paragraph, replacements)
