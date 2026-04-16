@@ -614,7 +614,7 @@
                                                 
                                                 <!-- Причина отказа (если статус = Отказано) -->
                                                 {% if deal.status_id == 500 and deal.rejection_reason %}
-                                                <div class="rejection-reason" style="margin-top: 5px; padding: 5px; background: #fff3cd; border-left: 3px solid #ffc107; font-size: 0.85em;">
+                                                <div class="rejection-reason">
                                                     <strong>Причина отказа:</strong><br>
                                                     {{ deal.rejection_reason }}
                                                 </div>

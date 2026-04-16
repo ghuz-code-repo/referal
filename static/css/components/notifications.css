@@ -216,3 +216,19 @@
     border-color: #dc3545;
     color: #f0a0a8;
 }
+
+/* Rejection reason block (inline in deal rows) */
+.rejection-reason {
+    margin-top: 5px;
+    padding: 5px;
+    background: #fff3cd;
+    border-left: 3px solid #ffc107;
+    font-size: 0.85em;
+    color: #664d03;
+}
+
+:root.dark-theme .rejection-reason {
+    background: #3a2e1a;
+    border-left-color: #cc9a06;
+    color: #f0d68a;
+}
