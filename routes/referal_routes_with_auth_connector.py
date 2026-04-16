@@ -887,9 +887,9 @@ def get_referal_deals(referal_id):
             
         print(f"✅ Referal found: {referal.id}, user_id={referal.user_id}")
         
-        # Проверяем права доступа: либо это владелец реферала, либо админ
+        # Проверяем права доступа: владелец, админ или пользователь с правом admin.panel (менеджер и т.д.)
         is_owner = referal.user_id == local_user.id
-        is_admin = user_context.is_admin
+        is_admin = user_context.is_admin or user_context.has_permission('referal.admin.panel')
         
         print(f"🔍 Is admin: {is_admin}, Is owner: {is_owner}")
         
