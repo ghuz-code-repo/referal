@@ -142,8 +142,9 @@ class Referal(db.Model):
                 valid_statuses = ['Сделка проведена', 'Сделка в работе']
                 is_valid_status = deal.deal_status_name in valid_statuses
                 
-                # Показываем если есть номер И (есть оплата ИЛИ есть рассчитанная выплата) И статус валидный
-                if has_agreement_number and (has_payment or has_withdrawal) and is_valid_status:
+                # Показываем если: (а) добавлен вручную админом, или (б) есть номер И (есть оплата ИЛИ есть рассчитанная выплата) И статус валидный
+                is_manually_added = getattr(referal_deal, 'manually_added', False)
+                if is_manually_added or (has_agreement_number and (has_payment or has_withdrawal) and is_valid_status):
                     deals_info.append({
                         'referal_deal_id': referal_deal.id,
                         'deal_id': deal.id,
@@ -178,7 +179,8 @@ class Referal(db.Model):
                 valid_statuses = ['Сделка проведена', 'Сделка в работе']
                 is_valid_status = deal.deal_status_name in valid_statuses
                 
-                if has_agreement_number and (has_payment or has_withdrawal) and is_valid_status:
+                is_manually_added = getattr(referal_deal, 'manually_added', False)
+                if is_manually_added or (has_agreement_number and (has_payment or has_withdrawal) and is_valid_status):
                     total += referal_deal.withdrawal_amount
         return total
     
@@ -196,7 +198,8 @@ class Referal(db.Model):
                 valid_statuses = ['Сделка проведена', 'Сделка в работе']
                 is_valid_status = deal.deal_status_name in valid_statuses
                 
-                if has_agreement_number and (has_payment or has_withdrawal) and is_valid_status:
+                is_manually_added = getattr(referal_deal, 'manually_added', False)
+                if is_manually_added or (has_agreement_number and (has_payment or has_withdrawal) and is_valid_status):
                     count += 1
         return count
     
@@ -214,7 +217,8 @@ class Referal(db.Model):
                 valid_statuses = ['Сделка проведена', 'Сделка в работе']
                 is_valid_status = deal.deal_status_name in valid_statuses
                 
-                if has_agreement_number and (has_payment or has_withdrawal) and is_valid_status:
+                is_manually_added = getattr(referal_deal, 'manually_added', False)
+                if is_manually_added or (has_agreement_number and (has_payment or has_withdrawal) and is_valid_status):
                     count += 1
         return count
     
@@ -232,7 +236,8 @@ class Referal(db.Model):
                 valid_statuses = ['Сделка проведена', 'Сделка в работе']
                 is_valid_status = deal.deal_status_name in valid_statuses
                 
-                if has_agreement_number and (has_payment or has_withdrawal) and is_valid_status:
+                is_manually_added = getattr(referal_deal, 'manually_added', False)
+                if is_manually_added or (has_agreement_number and (has_payment or has_withdrawal) and is_valid_status):
                     count += 1
         return count
 
@@ -360,6 +365,9 @@ class ReferalDeal(db.Model):
     
     payment_processed = db.Column(db.Boolean, default=False)
     # Была ли обработана выплата
+    
+    manually_added = db.Column(db.Boolean, default=False)
+    # Был ли договор добавлен вручную админом
     
     # Связи
     status = db.relationship('Status', foreign_keys=[status_id])

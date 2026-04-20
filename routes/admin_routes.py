@@ -815,7 +815,8 @@ def add_deal_to_referal(referal_id):
             withdrawal_amount=withdrawal_amount,
             payment_processed=False,
             deal_status='pending',
-            days_from_referal_creation=None  # Не рассчитываем для ручного добавления
+            days_from_referal_creation=None,  # Не рассчитываем для ручного добавления
+            manually_added=True  # Флаг ручного добавления - всегда показывать в списке
         )
         
         db.session.add(referal_deal)
