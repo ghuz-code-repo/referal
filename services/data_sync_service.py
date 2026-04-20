@@ -922,46 +922,46 @@ def _update_last_deal_dates_for_contacts():
     """
     Обновляет поле last_deal_date для всех контактов на основе их последних сделок.
     Используется для проверки 45-дневного окна при добавлении рефералов.
+    Оптимизировано: один SQL-запрос вместо N+1.
     """
     from models import MacroContact, MacroDeal
-    from datetime import datetime
+    from sqlalchemy import func, text
     
     print("Starting update of last_deal_date for all contacts...")
     
-    # Получаем все контакты
-    all_contacts = MacroContact.query.all()
-    updated_count = 0
+    # Один запрос: получаем максимальную дату сделки для каждого contacts_buy_id
+    last_dates = db.session.query(
+        MacroDeal.contacts_buy_id,
+        func.max(MacroDeal.agreement_date).label('last_date')
+    ).filter(
+        MacroDeal.agreement_date.isnot(None)
+    ).group_by(
+        MacroDeal.contacts_buy_id
+    ).all()
     
-    for contact in all_contacts:
-        # Находим все сделки этого контакта
-        deals = MacroDeal.query.filter_by(contacts_buy_id=contact.contacts_id).all()
+    # Строим словарь contacts_buy_id -> last_deal_date
+    last_date_map = {row[0]: row[1] for row in last_dates}
+    print(f"  Found last_deal_dates for {len(last_date_map)} contacts with deals")
+    
+    # Обновляем контакты батчами через один проход
+    batch_size = 1000
+    updated_count = 0
+    offset = 0
+    
+    while True:
+        contacts_batch = MacroContact.query.offset(offset).limit(batch_size).all()
+        if not contacts_batch:
+            break
         
-        if not deals:
-            # Нет сделок - оставляем last_deal_date = None
-            if contact.last_deal_date is not None:
-                contact.last_deal_date = None
+        for contact in contacts_batch:
+            new_date = last_date_map.get(contact.contacts_id)
+            if contact.last_deal_date != new_date:
+                contact.last_deal_date = new_date
                 updated_count += 1
-            continue
         
-        # Находим последнюю дату сделки (максимальную agreement_date)
-        deals_with_dates = [d for d in deals if d.agreement_date]
-        
-        if not deals_with_dates:
-            # Есть сделки, но у них нет дат
-            if contact.last_deal_date is not None:
-                contact.last_deal_date = None
-                updated_count += 1
-            continue
-        
-        # Находим максимальную дату
-        last_deal_date = max(d.agreement_date for d in deals_with_dates)
-        
-        # Обновляем только если изменилось
-        if contact.last_deal_date != last_deal_date:
-            old_date = contact.last_deal_date
-            contact.last_deal_date = last_deal_date
-            updated_count += 1
-            print(f"  Updated contact {contact.contacts_id} ({contact.full_name}): {old_date} -> {last_deal_date}")
+        offset += batch_size
+        if offset % 10000 == 0:
+            print(f"  Processed {offset} contacts...")
     
     # Сохраняем изменения
     try:
