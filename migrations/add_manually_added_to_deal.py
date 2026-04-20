@@ -11,7 +11,7 @@ import os
 # Добавляем родительскую директорию в path для импортов
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import app, db
+from app_with_auth_connector import app, db
 from sqlalchemy import text, inspect
 
 def migrate():
