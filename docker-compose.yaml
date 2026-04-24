@@ -52,6 +52,37 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:16
+    container_name: referal_postgres_backup
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-referal_db}
+      POSTGRES_USER: ${POSTGRES_USER:-referal_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-referal_password}
+      POSTGRES_EXTRA_OPTS: "-Z6 --blobs"
+      # Cron schedule (default: every day at 03:00 server time)
+      SCHEDULE: ${BACKUP_SCHEDULE:-0 0 3 * * *}
+      # Retention policy:
+      #   daily/   - last 7 daily dumps (this week, Mon..Sun)
+      #   weekly/  - one Sunday dump per week, last 53 weeks (~1 year)
+      #   monthly/ - one dump from the 1st of each month, last 12 months
+      # On Mondays the previous Sunday's file leaves daily/ but stays in weekly/.
+      # Max files at any moment: 7 + 53 + 12 = 72.
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+      BACKUP_KEEP_WEEKS: ${BACKUP_KEEP_WEEKS:-53}
+      BACKUP_KEEP_MONTHS: ${BACKUP_KEEP_MONTHS:-12}
+      HEALTHCHECK_PORT: 8080
+      TZ: ${TZ:-Asia/Tashkent}
+    volumes:
+      - ./backups:/backups
+    networks:
+      - service_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
     name: referal_postgres_data
