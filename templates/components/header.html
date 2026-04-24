@@ -20,11 +20,63 @@
     
     <nav class="nav" id="mobileNav">
         <div class="nav__list">
-            {# Скачать своё соглашение - показываем если есть право на скачивание документов #}
-            {% if check_permission('referal.profile.documents.download') %}
+            {# Скачать своё соглашение - НЕ показываем админам (у них нет личного соглашения) #}
+            {% if check_permission('referal.profile.documents.download') and not check_permission('referal.admin.panel') %}
             <div class="nav__item">
                 <a href="{{ url_for('document.my_agreement') }}" class="nav__link"><i class="fas fa-file-download"></i> Скачать соглашение</a>
             </div>
+            {% endif %}
+            {# Полный экспорт БД в Excel - только для пользователей со специфичным разрешением #}
+            {% if check_permission('referal.admin.export_database_excel') %}
+            <div class="nav__item">
+                <a href="{{ url_for('admin.export_database_excel') }}" class="nav__link" title="Полный экспорт всех таблиц БД в .xlsx">
+                    <i class="fas fa-file-excel"></i> Экспорт БД (Excel)
+                </a>
+            </div>
+            {% endif %}
+            {# Ручной бэкап БД (pg_dump) - в backups/manual/, никогда не очищается #}
+            {% if check_permission('referal.admin.manual_db_backup') %}
+            <div class="nav__item">
+                <button type="button"
+                        class="nav__link"
+                        id="manual-backup-btn"
+                        title="Создать ручной бэкап БД (pg_dump). Файл сохраняется в backups/manual/ и НИКОГДА не очищается автоматически."
+                        data-url="{{ url_for('admin.manual_db_backup') }}"
+                        style="background: none; border: none; cursor: pointer; font: inherit; color: inherit;">
+                    <i class="fas fa-database"></i> Ручной бэкап БД
+                </button>
+            </div>
+            <script>
+            (function() {
+                var btn = document.getElementById('manual-backup-btn');
+                if (!btn) return;
+                btn.addEventListener('click', function() {
+                    if (!confirm('Создать ручной бэкап БД?\n\nФайл будет сохранён в backups/manual/ на сервере и НЕ будет автоматически удалён.')) return;
+                    var original = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Бэкап...';
+                    fetch(btn.dataset.url, {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json' },
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, body: j }; }); })
+                    .then(function(res) {
+                        if (res.ok && res.body.success) {
+                            var sizeMb = (res.body.size_bytes / (1024 * 1024)).toFixed(2);
+                            alert('✅ Бэкап создан:\n' + res.body.filename + '\nРазмер: ' + sizeMb + ' MB');
+                        } else {
+                            alert('❌ Ошибка: ' + (res.body.message || 'неизвестная ошибка'));
+                        }
+                    })
+                    .catch(function(e) { alert('❌ Сетевая ошибка: ' + e); })
+                    .finally(function() {
+                        btn.disabled = false;
+                        btn.innerHTML = original;
+                    });
+                });
+            })();
+            </script>
             {% endif %}
             {# Управление рефералами - показываем админам #}
             {% if check_permission('referal.admin.panel') and request.path != '/admin' %}

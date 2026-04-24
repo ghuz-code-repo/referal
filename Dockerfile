@@ -4,11 +4,22 @@ FROM python:3.13-slim
 ENV TZ=Asia/Tashkent
 # Install locales package and generate ru_RU.UTF-8 locale
 # Install locales package and generate ru_RU.UTF-8 locale more thoroughly
-RUN apt-get update && apt-get install -y --no-install-recommends locales \
+# Also install postgresql-client-16 (for manual DB backups via pg_dump,
+# version must match the postgres:16 server)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        locales ca-certificates curl gnupg \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-16 \
     && sed -i -e 's/# ru_RU.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen ru_RU.UTF-8 \
     && update-locale LANG=ru_RU.UTF-8 LC_ALL=ru_RU.UTF-8 \
     && dpkg-reconfigure --frontend=noninteractive locales \
+    && apt-get purge -y --auto-remove curl gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables for locale

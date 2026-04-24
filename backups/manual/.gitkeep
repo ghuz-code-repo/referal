@@ -1,0 +1,3 @@
+# Manual database backups created via the "Ручной бэкап БД" admin button.
+# Files in this directory are NEVER automatically cleaned up — neither by
+# the postgres-backup cron service nor by the application. Manage manually.

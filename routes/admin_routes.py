@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, send_file, abort
 from sqlalchemy import or_, cast, String, func, Date
 from services import fetch_data_from_mysql
 from services import notification_service
@@ -1147,3 +1147,209 @@ def sync_status():
         }
     
     return jsonify(status)
+
+
+@admin_bp.route('/admin/export_database.xlsx', methods=['GET'])
+def export_database_excel():
+    """Полный экспорт всех таблиц БД referal в один .xlsx файл (по листу на таблицу).
+
+    Защищён отдельным разрешением `referal.admin.export_database_excel`,
+    которое НЕ выдаётся автоматически вместе с обычным admin-доступом.
+    """
+    user = get_current_user()
+    if not user:
+        abort(403)
+
+    if not has_permission('referal.admin.export_database_excel'):
+        username = getattr(user, 'username', None) or request.headers.get('X-User-Name', 'unknown')
+        print(f"⛔ DB export DENIED for user '{username}' - missing 'referal.admin.export_database_excel'")
+        abort(403)
+
+    import io
+    import datetime as _dt
+    from decimal import Decimal
+    from openpyxl import Workbook
+
+    EXCEL_CELL_LIMIT = 32767  # хард-лимит Excel на размер строки в ячейке
+
+    def _normalize(value):
+        """Приводит значение к типу, пригодному для openpyxl-ячейки."""
+        if value is None:
+            return None
+        if isinstance(value, (str, int, float, bool, Decimal)):
+            if isinstance(value, str) and len(value) > EXCEL_CELL_LIMIT:
+                return value[:EXCEL_CELL_LIMIT - 3] + '...'
+            return value
+        if isinstance(value, (_dt.datetime, _dt.date, _dt.time)):
+            # openpyxl поддерживает date/datetime/time напрямую,
+            # но aware-datetime нужно сделать naive (Excel timezones не хранит).
+            if isinstance(value, _dt.datetime) and value.tzinfo is not None:
+                return value.replace(tzinfo=None)
+            return value
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            return f'<binary {len(bytes(value))} bytes>'
+        # dict / list / прочее — сериализуем строкой
+        text = str(value)
+        if len(text) > EXCEL_CELL_LIMIT:
+            text = text[:EXCEL_CELL_LIMIT - 3] + '...'
+        return text
+
+    try:
+        wb = Workbook(write_only=True)
+        sorted_tables = list(db.metadata.sorted_tables)
+        used_sheet_names = set()
+
+        for table in sorted_tables:
+            # Имя листа: max 31 символ, без запрещённых символов, уникальное.
+            raw_name = table.name
+            sheet_name = ''.join(ch for ch in raw_name if ch not in '[]:*?/\\')[:31] or 'sheet'
+            base = sheet_name
+            counter = 1
+            while sheet_name.lower() in used_sheet_names:
+                suffix = f"_{counter}"
+                sheet_name = (base[:31 - len(suffix)] + suffix)
+                counter += 1
+            used_sheet_names.add(sheet_name.lower())
+
+            ws = wb.create_sheet(title=sheet_name)
+            columns = [c.name for c in table.columns]
+            ws.append(columns)
+
+            result = db.session.execute(table.select())
+            for row in result:
+                ws.append([_normalize(v) for v in row])
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        timestamp = _dt.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'referal_db_export_{timestamp}.xlsx'
+
+        username = getattr(user, 'username', None) or request.headers.get('X-User-Name', 'unknown')
+        print(f"📤 DB export OK | user='{username}' | tables={len(sorted_tables)} | file={filename}")
+
+        return send_file(
+            buf,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename,
+            max_age=0,
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"❌ DB export FAILED: {e}")
+        return jsonify({'success': False, 'message': f'Ошибка экспорта: {e}'}), 500
+
+
+@admin_bp.route('/admin/manual_backup', methods=['POST'])
+def manual_db_backup():
+    """Создаёт ручной бэкап БД через pg_dump в /app/backups/manual/.
+
+    Файлы в этой папке НИКОГДА не очищаются автоматически (cron-сервис
+    postgres-backup трогает только daily/weekly/monthly).
+
+    Защищён отдельным разрешением `referal.admin.manual_db_backup`.
+    """
+    user = get_current_user()
+    if not user:
+        abort(403)
+
+    if not has_permission('referal.admin.manual_db_backup'):
+        username = getattr(user, 'username', None) or request.headers.get('X-User-Name', 'unknown')
+        print(f"⛔ Manual backup DENIED for user '{username}' - missing 'referal.admin.manual_db_backup'")
+        abort(403)
+
+    import subprocess
+    import datetime as _dt
+    import re as _re
+
+    pg_host = os.getenv('POSTGRES_HOST', 'postgres')
+    pg_port = os.getenv('POSTGRES_PORT', '5432')
+    pg_db = os.getenv('POSTGRES_DB', 'referal_db')
+    pg_user = os.getenv('POSTGRES_USER', 'referal_user')
+    pg_pass = os.getenv('POSTGRES_PASSWORD', '')
+
+    backups_dir = '/app/backups/manual'
+    os.makedirs(backups_dir, exist_ok=True)
+
+    timestamp = _dt.datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    username = getattr(user, 'username', None) or request.headers.get('X-User-Name', 'unknown')
+    safe_username = _re.sub(r'[^A-Za-z0-9_.-]+', '_', str(username))[:40] or 'unknown'
+
+    filename = f'referal_db_manual_{timestamp}_by_{safe_username}.sql.gz'
+    out_path = os.path.join(backups_dir, filename)
+
+    env = os.environ.copy()
+    env['PGPASSWORD'] = pg_pass
+
+    cmd = [
+        'pg_dump',
+        '-h', pg_host,
+        '-p', str(pg_port),
+        '-U', pg_user,
+        '-d', pg_db,
+        '--format=plain',
+        '--no-owner',
+        '--no-privileges',
+        '--blobs',
+    ]
+
+    try:
+        print(f"📦 Manual backup STARTED by '{username}' -> {out_path}")
+        with open(out_path, 'wb') as raw_out:
+            # pg_dump | gzip
+            gzip_proc = subprocess.Popen(
+                ['gzip', '-6'],
+                stdin=subprocess.PIPE,
+                stdout=raw_out,
+                stderr=subprocess.PIPE,
+            )
+            dump_proc = subprocess.Popen(
+                cmd,
+                stdout=gzip_proc.stdin,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            # close our handle so gzip sees EOF when pg_dump exits
+            gzip_proc.stdin.close()
+            dump_stderr = dump_proc.stderr.read().decode('utf-8', errors='replace')
+            dump_rc = dump_proc.wait()
+            gzip_stderr = gzip_proc.stderr.read().decode('utf-8', errors='replace')
+            gzip_rc = gzip_proc.wait()
+
+        if dump_rc != 0 or gzip_rc != 0:
+            # удаляем неполный файл
+            try:
+                os.remove(out_path)
+            except OSError:
+                pass
+            err_msg = f"pg_dump rc={dump_rc} ({dump_stderr.strip()}); gzip rc={gzip_rc} ({gzip_stderr.strip()})"
+            print(f"❌ Manual backup FAILED: {err_msg}")
+            return jsonify({'success': False, 'message': err_msg}), 500
+
+        size_bytes = os.path.getsize(out_path)
+        print(f"✅ Manual backup OK | user='{username}' | file={filename} | size={size_bytes} bytes")
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'path': out_path,
+            'size_bytes': size_bytes,
+        })
+
+    except FileNotFoundError as e:
+        # pg_dump не установлен в контейнере
+        print(f"❌ Manual backup FAILED - pg_dump not found: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'pg_dump не найден в контейнере. Пересоберите образ referal с обновлённым Dockerfile.'
+        }), 500
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Manual backup FAILED: {e}")
+        return jsonify({'success': False, 'message': f'Ошибка бэкапа: {e}'}), 500
+
+

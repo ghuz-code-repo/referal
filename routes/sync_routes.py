@@ -54,6 +54,8 @@ def register_referal_permissions():
     registry.register("referal.admin.change_status", "Изменение статусов", "Изменение статусов вывода средств рефералов", "admin")
     registry.register("referal.admin.view_reports", "Просмотр отчетов", "Просмотр административных отчетов", "admin")
     registry.register("referal.admin.export_data", "Экспорт данных", "Экспорт данных в Excel", "admin")
+    registry.register("referal.admin.export_database_excel", "Полный экспорт БД в Excel", "Скачивание полного дампа базы данных referal в формате Excel (.xlsx, по листу на таблицу)", "admin")
+    registry.register("referal.admin.manual_db_backup", "Ручной бэкап БД (pg_dump)", "Создание ручного несжимаемого бэкапа PostgreSQL в backups/manual/ (никогда не очищается автоматически)", "admin")
     registry.register("referal.admin.force_update", "Принудительная синхронизация", "Запуск принудительной синхронизации с MacroData", "admin")
     registry.register("referal.admin.manage_users", "Управление пользователями", "Управление пользователями сервиса", "admin")
     
