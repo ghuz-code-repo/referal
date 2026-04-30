@@ -1,4 +1,4 @@
-<!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\profile.html -->
+﻿<!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\profile.html -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -33,11 +33,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/footer.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/referals.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/profile.css') }}">
-    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script src="/_shared/js/particles.min.js"></script>
 
 
-    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script src="{{ url_for('static', filename='js/vendor/jquery-3.6.0.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/vendor/jquery-ui-1.12.1.min.js') }}"></script>
 
 </head>
 <body>
