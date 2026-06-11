@@ -40,7 +40,8 @@ services:
     environment:
       - CONTAINER_NAME=referal  # For service discovery registration
     networks:
-      - service_network     # Только внутренняя сеть сервисов
+      - service_network     # Внутренняя сеть сервисов (internal, без выхода наружу)
+      - egress_network      # Доступ к внешним ресурсам: MySQL MacroCRM (172.16.0.199)
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,3 +92,6 @@ networks:
   service_network:
     external: true
     name: service_network
+  egress_network:
+    external: true
+    name: egress_network

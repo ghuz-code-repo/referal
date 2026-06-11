@@ -1062,15 +1062,27 @@ def _run_sync_in_background(app, username):
     with app.app_context():
         try:
             print(f"🔄 Background sync STARTED by {username}")
-            fetch_data_from_mysql()
+            sync_result = fetch_data_from_mysql()
             
-            with _sync_lock:
-                _sync_status['completed_at'] = dt.now()
-                _sync_status['is_running'] = False
-                _sync_status['last_result'] = 'success'
-                _sync_status['last_error'] = None
-            
-            print(f"✅ Background sync COMPLETED by {username}")
+            # fetch_data_from_mysql НЕ бросает исключение при сбое задач,
+            # а возвращает статус в словаре — проверяем его явно,
+            # иначе падение обеих задач отчитывалось как 'success'.
+            result_status = (sync_result or {}).get('status', 'unknown')
+            if result_status == 'success':
+                with _sync_lock:
+                    _sync_status['completed_at'] = dt.now()
+                    _sync_status['is_running'] = False
+                    _sync_status['last_result'] = 'success'
+                    _sync_status['last_error'] = None
+                print(f"✅ Background sync COMPLETED by {username}")
+            else:
+                error_summary = f"contacts={((sync_result or {}).get('contacts') or {}).get('status')}, deals={((sync_result or {}).get('deals') or {}).get('status')}"
+                with _sync_lock:
+                    _sync_status['completed_at'] = dt.now()
+                    _sync_status['is_running'] = False
+                    _sync_status['last_result'] = result_status
+                    _sync_status['last_error'] = error_summary
+                print(f"⚠️ Background sync FINISHED WITH ERRORS by {username} | {error_summary}")
             
         except Exception as e:
             with _sync_lock:

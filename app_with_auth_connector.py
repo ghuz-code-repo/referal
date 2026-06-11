@@ -528,17 +528,23 @@ def update_deals_task():
         
         try:
             from services import fetch_data_from_mysql
-            fetch_data_from_mysql()
+            sync_result = fetch_data_from_mysql()
             
-            print("Scheduled deal update task completed successfully (full sync)")
+            # Проверяем реальный статус: fetch_data_from_mysql не бросает
+            # исключение при сбое задач, а возвращает статус в словаре.
+            result_status = (sync_result or {}).get('status', 'unknown')
+            if result_status == 'success':
+                print("Scheduled deal update task completed successfully (full sync)")
+            else:
+                print(f"⚠️ Scheduled deal update task finished with errors: status={result_status}")
             
             # Обновляем статус
             try:
                 with _sync_lock:
                     _sync_status['completed_at'] = dt.now()
                     _sync_status['is_running'] = False
-                    _sync_status['last_result'] = 'success'
-                    _sync_status['last_error'] = None
+                    _sync_status['last_result'] = result_status
+                    _sync_status['last_error'] = None if result_status == 'success' else f"contacts={((sync_result or {}).get('contacts') or {}).get('status')}, deals={((sync_result or {}).get('deals') or {}).get('status')}"
             except:
                 pass
                 
