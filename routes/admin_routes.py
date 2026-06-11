@@ -736,8 +736,21 @@ def add_deal_to_referal(referal_id):
             return jsonify({'success': False, 'message': 'Реферал не найден'}), 404
         
         print(f"🔍 Looking for deal with agreement_number={agreement_number}")
-        # Находим договор по номеру
+        # Находим договор по номеру.
+        # Сначала точное совпадение, затем устойчивый поиск (trim + регистронезависимо),
+        # т.к. в CRM номер может отличаться пробелами/регистром.
         deal = MacroDeal.query.filter_by(agreement_number=agreement_number).first()
+        if not deal:
+            deal = MacroDeal.query.filter(
+                func.lower(func.trim(MacroDeal.agreement_number)) == agreement_number.lower()
+            ).first()
+        if not deal:
+            # Fallback: договор мог не попасть в локальное зеркало при суточной синхронизации.
+            # Пробуем загрузить его напрямую из MacroCRM по номеру и импортировать в MacroDeal.
+            print(f"🔍 Deal not in local mirror, trying direct MacroCRM fetch for {agreement_number}")
+            from services import fetch_single_deal_from_macro
+            deal = fetch_single_deal_from_macro(agreement_number)
+
         if not deal:
             return jsonify({
                 'success': False, 
@@ -1067,6 +1080,17 @@ def _run_sync_in_background(app, username):
                 _sync_status['last_error'] = str(e)
             
             print(f"❌ Background sync FAILED by {username} | Error: {str(e)}")
+            
+            # Алерт на почту о падении ручной синхронизации
+            try:
+                import traceback
+                from services.data_sync_service import send_sync_failure_alert
+                send_sync_failure_alert(
+                    f'manual sync (started by {username})',
+                    f"{str(e)}\n\n{traceback.format_exc()}"
+                )
+            except Exception as alert_error:
+                print(f"⚠️ Failed to send sync failure alert: {alert_error}")
 
 
 @admin_bp.route('/force_update', methods=['GET'])

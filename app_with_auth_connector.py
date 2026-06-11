@@ -545,6 +545,17 @@ def update_deals_task():
         except Exception as e:
             print(f"Error in scheduled deal update task: {str(e)}")
             
+            # Алерт на почту о полном падении задачи синхронизации
+            try:
+                import traceback
+                from services.data_sync_service import send_sync_failure_alert
+                send_sync_failure_alert(
+                    'update_deals_task (cron)',
+                    f"{str(e)}\n\n{traceback.format_exc()}"
+                )
+            except Exception as alert_error:
+                print(f"⚠️ Failed to send sync failure alert: {alert_error}")
+            
             # Обновляем статус ошибки
             try:
                 with _sync_lock:

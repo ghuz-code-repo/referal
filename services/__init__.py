@@ -7,5 +7,5 @@ from .withdrawal_service import *
 __all__ = [
     'create_new_referal', 'update_deal_and_balance', 'update_deal_info',
     'fetch_data_from_mysql', 'sync_referals_with_macro_contacts',
-    'create_macro_task', 'request_withdrawal'
+    'create_macro_task', 'request_withdrawal', 'fetch_single_deal_from_macro'
 ]

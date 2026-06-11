@@ -10,6 +10,40 @@ from models import *
 import utils as utils
 
 
+def send_sync_failure_alert(stage, details):
+    """Отправляет email-алерт о сбое синхронизации с MacroCRM.
+
+    Синхронизация ранее падала молча и новые договора не попадали в зеркало
+    незамеченными месяцами. Алерт не должен ломать саму синхронизацию,
+    поэтому любые ошибки отправки только логируются.
+    """
+    recipient = os.getenv('SYNC_ALERT_EMAIL', 'd.tolkunov@gh.uz')
+    try:
+        from notification_client import get_notification_client
+        notification_client = get_notification_client()
+
+        subject = f'⚠️ Referal: сбой синхронизации с MacroCRM ({stage})'
+        body = f"""Сбой синхронизации данных с MacroCRM в сервисе реферальной программы.
+
+Этап: {stage}
+Время: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}
+
+Детали:
+{details}
+
+Возможные последствия: новые договора не попадают в зеркало MacroDeal,
+пользователи не видят свои договора, авто- и ручная привязка не работают.
+
+Проверьте логи контейнера referal и статус синхронизации в админке.
+"""
+        if notification_client.send_email(recipient, subject, body):
+            print(f"📧 Sync failure alert sent to {recipient} (stage: {stage})")
+        else:
+            print(f"⚠️ Failed to send sync failure alert to {recipient}")
+    except Exception as e:
+        print(f"⚠️ Error sending sync failure alert: {e}")
+
+
 def fetch_data_from_mysql():
     """Получает данные для контактов и сделок из MySQL синхронно."""
     app = current_app._get_current_object() 
@@ -219,6 +253,17 @@ def fetch_data_from_mysql():
         print(f"MacroContact table: {final_contacts_count} records")
         print(f"MacroDeal table: {final_deals_count} records")
     
+    # Алерт при сбое любой из задач или наличии ошибок в батчах
+    failures = []
+    if contacts_result.get('status') != 'success':
+        failures.append(f"Contacts task: status={contacts_result.get('status')}, errors={contacts_result.get('errors_list', [])[:5]}")
+    if deals_result.get('status') != 'success':
+        failures.append(f"Deals task: status={deals_result.get('status')}, errors={deals_result.get('errors', [])[:5]}")
+    elif deals_result.get('errors'):
+        failures.append(f"Deals task: completed with {len(deals_result['errors'])} row errors, first: {deals_result['errors'][:5]}")
+    if failures:
+        send_sync_failure_alert('fetch_data_from_mysql', '\n'.join(failures))
+
     return {
         "status": "success" if contacts_result.get('status') == 'success' and deals_result.get('status') == 'success' else "partial_success",
         "contacts": contacts_result,
@@ -688,6 +733,155 @@ def _fetch_and_process_contacts_task(mysql_config, app_context):
         }
 
 
+def fetch_single_deal_from_macro(agreement_number):
+    """Загружает один договор из MacroCRM по номеру и upsert-ит его в локальную MacroDeal.
+
+    Используется как fallback при ручной привязке договора, когда суточная
+    синхронизация по какой-то причине не донесла сделку в локальное зеркало.
+    В отличие от массовой синхронизации НЕ фильтрует по contacts_buy_id и ищет
+    точно по agreement_number.
+
+    Returns:
+        MacroDeal | None: импортированный/обновлённый договор или None, если в MacroCRM не найден.
+    """
+    if not agreement_number:
+        return None
+
+    agreement_number = agreement_number.strip()
+
+    mysql_config = {
+        'host': os.getenv('MYSQL_HOST'),
+        'port': int(os.getenv('MYSQL_PORT', 3306)),
+        'database': os.getenv('MYSQL_DATABASE'),
+        'user': os.getenv('MYSQL_USER'),
+        'password': os.getenv('MYSQL_PASSWORD'),
+        'cursorclass': pymysql.cursors.Cursor,
+        'connect_timeout': 30,
+        'read_timeout': 60,
+    }
+
+    # Тот же набор полей, что и в массовой синхронизации, но с точным поиском по номеру.
+    query = """
+        SELECT
+            ed.deal_status_name,
+            ed.agreement_number,
+            ed.contacts_buy_id,
+            ed.deal_area,
+            COALESCE(SUM(
+                CASE
+                    WHEN f.status_name = 'Проведено' AND f.types_name != 'Бронь'
+                    THEN f.summa
+                    ELSE 0
+                END
+            ), 0) as total_payments,
+            h.complex_name as project_name,
+            h.geo_street_name as house_address,
+            h.geo_house as house_number,
+            es.geo_flatnum as apartment_number,
+            es.estate_rooms as rooms,
+            es.estate_riser as entrance,
+            es.estate_floor as floor,
+            mf.max_floor as max_floor,
+            ed.finances_income as agreement_price,
+            ed.agreement_date
+        FROM estate_deals ed
+        LEFT JOIN finances f ON ed.id = f.deal_id
+        LEFT JOIN estate_sells es ON ed.estate_sell_id = es.estate_sell_id
+        LEFT JOIN estate_houses h ON es.house_id = h.id
+        LEFT JOIN (
+            SELECT es2.house_id, MAX(es2.estate_floor) as max_floor
+            FROM estate_sells es2
+            GROUP BY es2.house_id
+        ) mf ON mf.house_id = h.id
+        WHERE {where_clause}
+        GROUP BY ed.id, ed.deal_status_name, ed.agreement_number, ed.contacts_buy_id, ed.deal_area,
+                 h.complex_name, h.geo_street_name, h.geo_house, es.geo_flatnum, es.estate_rooms,
+                 es.estate_riser, es.estate_floor, h.id, mf.max_floor,
+                 ed.finances_income, ed.agreement_date
+        LIMIT 1
+    """
+
+    connection = None
+    try:
+        connection = pymysql.connect(**mysql_config)
+        with connection.cursor() as cursor:
+            # 1) Точное совпадение по номеру
+            cursor.execute(query.format(where_clause="ed.agreement_number = %s"), (agreement_number,))
+            row = cursor.fetchone()
+            # 2) Fallback: устойчивый матч (trim + регистронезависимо)
+            if not row:
+                cursor.execute(
+                    query.format(where_clause="LOWER(TRIM(ed.agreement_number)) = LOWER(%s)"),
+                    (agreement_number,)
+                )
+                row = cursor.fetchone()
+    except MySQLError as e:
+        print(f"fetch_single_deal_from_macro: MySQL error for '{agreement_number}': {e}")
+        return None
+    finally:
+        if connection:
+            connection.close()
+
+    if not row:
+        print(f"fetch_single_deal_from_macro: deal '{agreement_number}' not found in MacroCRM")
+        return None
+
+    (deal_status_name, src_agreement_number, contacts_buy_id, deal_area, total_payments,
+     project_name, house_address, house_number, apartment_number, rooms, entrance,
+     floor, max_floor, agreement_price, agreement_date) = row
+
+    if contacts_buy_id is None:
+        print(f"fetch_single_deal_from_macro: deal '{agreement_number}' has no contacts_buy_id, cannot import")
+        return None
+
+    if not deal_status_name:
+        deal_status_name = 'Не указан'
+
+    try:
+        deal = MacroDeal.query.filter_by(agreement_number=src_agreement_number).first()
+        if deal:
+            deal.deal_status_name = deal_status_name
+            deal.contacts_buy_id = contacts_buy_id
+            deal.deal_metr = deal_area
+            deal.total_payments = total_payments or 0
+            deal.project_name = project_name
+            deal.house_address = house_address
+            deal.house_number = house_number
+            deal.apartment_number = apartment_number
+            deal.rooms = rooms
+            deal.entrance = entrance
+            deal.floor = floor
+            deal.max_floor = max_floor
+            deal.agreement_price = agreement_price
+            deal.agreement_date = agreement_date
+        else:
+            deal = MacroDeal(
+                deal_status_name=deal_status_name,
+                agreement_number=src_agreement_number,
+                contacts_buy_id=contacts_buy_id,
+                deal_metr=deal_area,
+                total_payments=total_payments or 0,
+                project_name=project_name,
+                house_address=house_address,
+                house_number=house_number,
+                apartment_number=apartment_number,
+                rooms=rooms,
+                entrance=entrance,
+                floor=floor,
+                max_floor=max_floor,
+                agreement_price=agreement_price,
+                agreement_date=agreement_date
+            )
+            db.session.add(deal)
+        db.session.commit()
+        print(f"fetch_single_deal_from_macro: imported/updated deal '{src_agreement_number}' (contacts_buy_id={contacts_buy_id})")
+        return deal
+    except Exception as e:
+        db.session.rollback()
+        print(f"fetch_single_deal_from_macro: failed to upsert deal '{agreement_number}': {e}")
+        return None
+
+
 def _fetch_and_process_deals_task(mysql_config, app_context):
     """Получает сделки из MySQL и вставляет их в локальную таблицу MacroDeal."""
     task_name = "Deals Task"
@@ -721,6 +915,17 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                 # Fetch deals data with total payments from finances table + property details
                 # Суммируем все ПРОВЕДЕННЫЕ платежи по договору из таблицы finances (кроме брони)
                 # Также получаем данные о недвижимости для генерации актов
+                #
+                # ОПТИМИЗАЦИЯ: ранее max_floor вычислялся коррелированным подзапросом
+                # (SELECT MAX(...) FROM estate_sells WHERE house_id = h.id) на КАЖДУЮ строку
+                # результата — на больших объёмах это приводило к многочасовому выполнению
+                # и таймаутам (read_timeout), из-за чего синхронизация молча останавливалась
+                # и новые сделки переставали попадать в зеркало. Теперь этажность дома
+                # считается один раз через агрегированный JOIN.
+                #
+                # ORDER BY ed.id DESC — новейшие сделки обрабатываются ПЕРВЫМИ: даже если
+                # задача упадёт на середине, свежие договора (которые ждут пользователи)
+                # уже будут закоммичены.
                 query_deals = """
                     SELECT 
                         ed.deal_status_name, 
@@ -741,21 +946,25 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                         es.estate_rooms as rooms,
                         es.estate_riser as entrance,
                         es.estate_floor as floor,
-                        (SELECT MAX(es2.estate_floor) 
-                         FROM estate_sells es2 
-                         WHERE es2.house_id = h.id) as max_floor,
+                        mf.max_floor as max_floor,
                         ed.finances_income as agreement_price,
                         ed.agreement_date
                     FROM estate_deals ed
                     LEFT JOIN finances f ON ed.id = f.deal_id
                     LEFT JOIN estate_sells es ON ed.estate_sell_id = es.estate_sell_id
                     LEFT JOIN estate_houses h ON es.house_id = h.id
+                    LEFT JOIN (
+                        SELECT es2.house_id, MAX(es2.estate_floor) as max_floor
+                        FROM estate_sells es2
+                        GROUP BY es2.house_id
+                    ) mf ON mf.house_id = h.id
                     WHERE ed.contacts_buy_id IS NOT NULL
                     AND ed.agreement_number IS NOT NULL
                     GROUP BY ed.id, ed.deal_status_name, ed.agreement_number, ed.contacts_buy_id, ed.deal_area,
                              h.complex_name, h.geo_street_name, h.geo_house, es.geo_flatnum, es.estate_rooms,
-                             es.estate_riser, es.estate_floor, h.id,
+                             es.estate_riser, es.estate_floor, h.id, mf.max_floor,
                              ed.finances_income, ed.agreement_date
+                    ORDER BY ed.id DESC
                 """
                 
                 # Start timer
