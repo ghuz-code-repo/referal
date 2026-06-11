@@ -790,80 +790,86 @@ def _fetch_and_process_deals_task(mysql_config, app_context):
                     progress_pct = (total_deals_processed / total_deals_to_process) * 100 if total_deals_to_process > 0 else 0
                     print(f"📊 DEALS Batch {batch_number} | Fetched: {current_batch_size} rows in {fetch_duration:.2f}s | Total: {total_deals_processed}/{total_deals_to_process} ({progress_pct:.1f}%)")
                     
-                    deals_in_batch_to_add = []
+                    new_in_batch = 0
                     deals_updated_count = 0
+                    skipped_in_batch = 0
                     processing_start = time.time()
                     
                     for row_data in rows: 
                         (deal_status_name, agreement_number, contacts_buy_id, deal_area, total_payments,
                          project_name, house_address, house_number, apartment_number, rooms, entrance, 
                          floor, max_floor, agreement_price, agreement_date) = row_data
+
+                        # Защита NOT NULL колонок (deal_status_name, contacts_buy_id, agreement_number).
+                        # Если сделка не удовлетворяет схеме, раньше commit всего батча падал и
+                        # db.session.rollback() терял ВСЕ сделки батча (до 1000 штук) на каждой
+                        # синхронизации — из-за чего отдельные договора никогда не попадали в зеркало.
+                        if contacts_buy_id is None or not agreement_number:
+                            skipped_in_batch += 1
+                            continue
+                        if not deal_status_name:
+                            deal_status_name = 'Не указан'
+
                         try:
-                            # Check if deal already exists by agreement_number
-                            existing_deal = MacroDeal.query.filter_by(agreement_number=agreement_number).first()
-                            
-                            if existing_deal:
-                                # Update existing deal with all fields including property details
-                                existing_deal.deal_status_name = deal_status_name
-                                existing_deal.contacts_buy_id = contacts_buy_id
-                                existing_deal.deal_metr = deal_area
-                                existing_deal.total_payments = total_payments or 0
-                                existing_deal.project_name = project_name
-                                existing_deal.house_address = house_address
-                                existing_deal.house_number = house_number
-                                existing_deal.apartment_number = apartment_number
-                                existing_deal.rooms = rooms
-                                existing_deal.entrance = entrance
-                                existing_deal.floor = floor
-                                existing_deal.max_floor = max_floor
-                                existing_deal.agreement_price = agreement_price
-                                existing_deal.agreement_date = agreement_date
-                                deals_updated_count += 1
-                            else:
-                                # Create new deal with all fields including property details
-                                new_deal = MacroDeal(
-                                    deal_status_name=deal_status_name,
-                                    agreement_number=agreement_number,
-                                    contacts_buy_id=contacts_buy_id,
-                                    deal_metr=deal_area,
-                                    total_payments=total_payments or 0,
-                                    project_name=project_name,
-                                    house_address=house_address,
-                                    house_number=house_number,
-                                    apartment_number=apartment_number,
-                                    rooms=rooms,
-                                    entrance=entrance,
-                                    floor=floor,
-                                    max_floor=max_floor,
-                                    agreement_price=agreement_price,
-                                    agreement_date=agreement_date
-                                )
-                                deals_in_batch_to_add.append(new_deal)
+                            # Каждую строку обрабатываем в отдельном SAVEPOINT (begin_nested),
+                            # чтобы сбой одной "битой" сделки откатывал только её, а не весь батч.
+                            with db.session.begin_nested():
+                                # Check if deal already exists by agreement_number
+                                existing_deal = MacroDeal.query.filter_by(agreement_number=agreement_number).first()
+                                
+                                if existing_deal:
+                                    # Update existing deal with all fields including property details
+                                    existing_deal.deal_status_name = deal_status_name
+                                    existing_deal.contacts_buy_id = contacts_buy_id
+                                    existing_deal.deal_metr = deal_area
+                                    existing_deal.total_payments = total_payments or 0
+                                    existing_deal.project_name = project_name
+                                    existing_deal.house_address = house_address
+                                    existing_deal.house_number = house_number
+                                    existing_deal.apartment_number = apartment_number
+                                    existing_deal.rooms = rooms
+                                    existing_deal.entrance = entrance
+                                    existing_deal.floor = floor
+                                    existing_deal.max_floor = max_floor
+                                    existing_deal.agreement_price = agreement_price
+                                    existing_deal.agreement_date = agreement_date
+                                    deals_updated_count += 1
+                                else:
+                                    # Create new deal with all fields including property details
+                                    new_deal = MacroDeal(
+                                        deal_status_name=deal_status_name,
+                                        agreement_number=agreement_number,
+                                        contacts_buy_id=contacts_buy_id,
+                                        deal_metr=deal_area,
+                                        total_payments=total_payments or 0,
+                                        project_name=project_name,
+                                        house_address=house_address,
+                                        house_number=house_number,
+                                        apartment_number=apartment_number,
+                                        rooms=rooms,
+                                        entrance=entrance,
+                                        floor=floor,
+                                        max_floor=max_floor,
+                                        agreement_price=agreement_price,
+                                        agreement_date=agreement_date
+                                    )
+                                    db.session.add(new_deal)
+                                    new_in_batch += 1
                         except Exception as e:
+                            # Savepoint этой строки уже откатан, остальные строки батча не пострадали.
                             error_msg = f"{task_name}: Error processing deal for agreement {agreement_number}: {str(e)}"
                             print(error_msg)
                             errors.append(error_msg)
                     
-                    # Insert new deals
-                    if deals_in_batch_to_add:
-                        try:
-                            db.session.add_all(deals_in_batch_to_add)
-                            loaded_deals += len(deals_in_batch_to_add)
-                        except Exception as e:
-                            db.session.rollback()
-                            error_msg = f"{task_name}: Error adding new deals: {str(e)}"
-                            print(error_msg)
-                            errors.append(error_msg)
-                    
-                    # Commit all changes (updates + inserts)
+                    # Commit good rows in this batch (failed rows already rolled back via savepoint)
                     try:
                         commit_start = time.time()
                         db.session.commit()
                         commit_duration = time.time() - commit_start
                         processing_duration = time.time() - processing_start
                         
-                        total_in_batch = len(deals_in_batch_to_add) + deals_updated_count
-                        print(f"💾 DEALS Batch {batch_number} | Committed: {len(deals_in_batch_to_add)} new + {deals_updated_count} updated | Total loaded: {loaded_deals} | Processing: {processing_duration:.2f}s | Commit: {commit_duration:.2f}s")
+                        loaded_deals += new_in_batch
+                        print(f"💾 DEALS Batch {batch_number} | Committed: {new_in_batch} new + {deals_updated_count} updated | Skipped: {skipped_in_batch} | Total loaded: {loaded_deals} | Processing: {processing_duration:.2f}s | Commit: {commit_duration:.2f}s")
                     except Exception as e:
                         db.session.rollback()
                         error_msg = f"{task_name}: Error committing batch: {str(e)}"
