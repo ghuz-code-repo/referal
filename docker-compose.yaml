@@ -7,6 +7,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-referal_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-referal_password}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
@@ -39,6 +41,17 @@ services:
       - .env
     environment:
       - CONTAINER_NAME=referal  # For service discovery registration
+    # --- Харднинг: захваченный контейнер не сможет поднять привилегии ---
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE   # bind :80
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE       # запись в bind-mount директории
     networks:
       - service_network     # Внутренняя сеть сервисов (internal, без выхода наружу)
       - egress_network      # Доступ к внешним ресурсам: MySQL MacroCRM (172.16.0.199)
@@ -75,6 +88,8 @@ services:
       BACKUP_KEEP_MONTHS: ${BACKUP_KEEP_MONTHS:-12}
       HEALTHCHECK_PORT: 8080
       TZ: ${TZ:-Asia/Tashkent}
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ./backups:/backups
     networks:

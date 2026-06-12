@@ -24,7 +24,15 @@ class NotificationClient:
         self.base_url = base_url or os.getenv('NOTIFICATION_SERVICE_URL', 'http://notification-service:80')
         self.base_url = self.base_url.rstrip('/')
         self.timeout = int(os.getenv('NOTIFICATION_SERVICE_TIMEOUT', '30'))
+        # Персональный ключ сервиса для аутентификации в notification-service
+        self.api_key = os.getenv('NOTIFICATION_API_KEY') or os.getenv('INTERNAL_API_KEY', '')
         logger.info(f"Notification client initialized with URL: {self.base_url}")
+
+    def _headers(self) -> dict:
+        headers = {'Content-Type': 'application/json'}
+        if self.api_key:
+            headers['X-API-Key'] = self.api_key
+        return headers
     
     def send_email(self, recipient: str, subject: str, body: str) -> bool:
         """
@@ -53,7 +61,7 @@ class NotificationClient:
                 url,
                 json=notification,
                 timeout=self.timeout,
-                headers={'Content-Type': 'application/json'}
+                headers=self._headers()
             )
             
             if response.status_code == 202:  # HTTP 202 Accepted
@@ -108,7 +116,7 @@ class NotificationClient:
                 url,
                 json=payload,
                 timeout=self.timeout,
-                headers={'Content-Type': 'application/json'}
+                headers=self._headers()
             )
             
             if response.status_code == 202:  # HTTP 202 Accepted
