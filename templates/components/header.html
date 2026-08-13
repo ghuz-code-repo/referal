@@ -16,7 +16,10 @@
                  data-light-logo="{{ url_for('static', filename='img/logo-mark.svg') }}"
                  data-dark-logo="{{ url_for('static', filename='img/logo-mark.svg') }}">
         </a>
-        <a href="/" class="gh-brand-name" title="На главную сервиса">Реферальная программа</a>
+        {# url_for, а не голый "/": сервис живёт за префиксом /referal
+           (PrefixMiddleware выставляет SCRIPT_NAME), и слэш уводил на корень
+           analytics.gh.uz вместо стартовой страницы сервиса. #}
+        <a href="{{ url_for('home') }}" class="gh-brand-name" title="На главную сервиса">Реферальная программа</a>
     </div>
     
     <!-- Кнопка гамбургер для мобильной версии -->
