@@ -429,21 +429,16 @@ button, .btn {
     }
 }
 
-/* Принудительные стили для логотипа */
+/* Размер герба задаёт единый .gh-brand-logo-img (28px) из components/header.css.
+   Здесь стояли height: 50px и min-width: 100px с !important — они были
+   рассчитаны на широкий логотип со словесной частью и растягивали герб,
+   из-за чего шапка referal отличалась от остальных сервисов. Селектор с
+   #dynamic-logo перебивал любые правила по специфичности, поэтому убрано
+   именно тут. Фильтр яркости для тёмной темы тоже снят: герб золотой и
+   одинаков в обеих темах, подкрашивать его нечем. */
 .header_name img,
 .logo,
 #dynamic-logo {
-    height: 50px !important;
-    width: auto !important;
-    max-width: 200px !important;
-    min-width: 100px !important;
-    object-fit: contain !important;
-    display: block !important;
-}
-
-/* Дополнительная контрастность для тёмной темы */
-.dark-theme .header_name img,
-.dark-theme .logo,
-.dark-theme #dynamic-logo {
-    filter: brightness(1.2) contrast(1.3) drop-shadow(0 0 2px rgba(255, 255, 255, 0.3)) !important;
+    object-fit: contain;
+    display: block;
 }
