@@ -4,13 +4,17 @@
        gateway, название — на главную этого сервиса. Две отдельные ссылки,
        каждая со своей подсказкой и своим откликом на наведение. #}
     <div class="header_name">
+        {# Только герб, без словесной части: она дублировала бы название сервиса
+           рядом. Герб золотой в обеих темах, поэтому data-*-logo указывают на
+           один и тот же файл — theme-manager отрабатывает вхолостую, но и не
+           ругается в консоль на пропавший элемент. #}
         <a href="/menu" class="brand-logo" title="К меню сервисов" aria-label="К меню сервисов">
-            <img src="{{ url_for('static', filename='img/logo-dark.svg')}}"
-                 alt="Golden House Logo"
+            <img src="{{ url_for('static', filename='img/logo-mark.svg')}}"
+                 alt="Golden House"
                  class="logo"
                  id="dynamic-logo"
-                 data-light-logo="{{ url_for('static', filename='img/logo-dark.svg') }}"
-                 data-dark-logo="{{ url_for('static', filename='img/logo-light.svg') }}">
+                 data-light-logo="{{ url_for('static', filename='img/logo-mark.svg') }}"
+                 data-dark-logo="{{ url_for('static', filename='img/logo-mark.svg') }}">
         </a>
         <a href="/" class="brand-name" title="На главную сервиса">Реферальная программа</a>
     </div>
