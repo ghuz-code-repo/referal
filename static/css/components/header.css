@@ -199,14 +199,10 @@
     display: block;
 }
 
-/* Улучшение контрастности в тёмной теме */
-.dark-theme .logo {
-    filter: brightness(1.1) contrast(1.2) !important;
-}
-
-/* Плавный переход при смене логотипа */
+/* Фильтр яркости в тёмной теме убран: он подкрашивал герб и тот отличался
+   по цвету от остальных сервисов. Герб золотой и одинаков в обеих темах. */
 .logo {
-    transition: opacity var(--transition-normal), height var(--transition-normal), filter var(--transition-normal);
+    transition: opacity var(--transition-normal);
 }
 
 /* Кнопка гамбургер - скрыта по умолчанию */
