@@ -1,14 +1,18 @@
 <!-- filepath: c:\Users\d.tolkunov\CodeRepository\AnalyticsRepo\referal\templates\components\header.html -->
 <header class="header">
+    {# Логотип и название ведут в РАЗНЫЕ места: логотип — в общее меню сервисов
+       gateway, название — на главную этого сервиса. Две отдельные ссылки,
+       каждая со своей подсказкой и своим откликом на наведение. #}
     <div class="header_name">
-        <a href="/menu" title="Меню сервисов">
-            <img src="{{ url_for('static', filename='img/logo-dark.svg')}}" 
-                 alt="Golden House Logo" 
-                 class="logo" 
+        <a href="/menu" class="brand-logo" title="К меню сервисов" aria-label="К меню сервисов">
+            <img src="{{ url_for('static', filename='img/logo-dark.svg')}}"
+                 alt="Golden House Logo"
+                 class="logo"
                  id="dynamic-logo"
                  data-light-logo="{{ url_for('static', filename='img/logo-dark.svg') }}"
                  data-dark-logo="{{ url_for('static', filename='img/logo-light.svg') }}">
         </a>
+        <a href="/" class="brand-name" title="На главную сервиса">Реферальная программа</a>
     </div>
     
     <!-- Кнопка гамбургер для мобильной версии -->
@@ -86,9 +90,7 @@
                 </a>
             </div>
             {% endif %}
-            <div class="nav__item">
-                <a href="/menu" class="nav__link"><i class="fas fa-th-list"></i> Меню сервисов</a>
-            </div>
+            {# Пункт «Меню сервисов» убран: этот переход теперь на логотипе. #}
             <div class="nav__item">
                 <button id="theme-switcher" class="nav__link theme-switcher" title="Переключить тему" onclick="window.themeManager && window.themeManager.toggleTheme()">
                     Тёмная тема
@@ -97,7 +99,10 @@
             {% if current_user %}
             <!-- Добавляем ссылку на главный профиль -->
             <div class="nav__item profile-link">
-                <a href="https://analytics.gh.uz/profile" target="_blank" class="nav__link profile-nav-link" title="Перейти в основной профиль">
+                {# Тот же адрес, но относительный и в текущей вкладке: как кнопка
+                   профиля в gateway. Абсолютный URL с target=_blank плодил вкладки
+                   и ломался бы при смене домена. #}
+                <a href="/profile" class="nav__link profile-nav-link" title="Личный кабинет">
                     <div class="profile-mini">
                         <!-- Получаем данные пользователя напрямую из auth-service заголовков -->
                         {% set auth_user = get_auth_user_data() %}

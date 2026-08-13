@@ -2,13 +2,35 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 2rem;
+    /* Шапка в одну строку: вертикальные поля уменьшены, пункты не переносятся. */
+    padding: 0.45rem 1.5rem;
     background-color: var(--header-background) !important;
     box-shadow: var(--header-shadow) !important;
     position: relative;
     border-bottom: 1px solid var(--border-color);
     transition: all var(--transition-normal);
 }
+
+/* Логотип ведёт в меню сервисов, название — на главную сервиса.
+   Разные адресаты, поэтому у каждой половины свой отклик на наведение. */
+.header_name .brand-logo {
+    display: inline-flex;
+    transition: opacity var(--transition-normal), transform var(--transition-normal);
+}
+.header_name .brand-logo:hover { opacity: 0.75; transform: translateY(-1px); }
+.header_name .brand-name {
+    margin-left: 0.6rem;
+    font-size: 1rem;
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--text-primary);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color var(--transition-normal), color var(--transition-normal);
+}
+.header_name .brand-name:hover { border-bottom-color: currentColor; }
+.header .logo { height: 26px; width: auto; display: block; }
+.header .nav__link { white-space: nowrap; }
 
 
 .header_name .nav__link {
