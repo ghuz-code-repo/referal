@@ -2,8 +2,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    /* Шапка в одну строку: вертикальные поля уменьшены, пункты не переносятся. */
-    padding: 0.45rem 1.5rem;
+    /* Единая высота шапки во всех сервисах; поля минимальные, чтобы
+       содержимое не переносилось на вторую строку. */
+    min-height: var(--gh-header-min-height);
+    padding: 0.25rem 1.25rem;
     background-color: var(--header-background) !important;
     box-shadow: var(--header-shadow) !important;
     position: relative;
@@ -11,25 +13,80 @@
     transition: all var(--transition-normal);
 }
 
-/* Логотип ведёт в меню сервисов, название — на главную сервиса.
-   Разные адресаты, поэтому у каждой половины свой отклик на наведение. */
-.header_name .brand-logo {
-    display: inline-flex;
-    transition: opacity var(--transition-normal), transform var(--transition-normal);
+/* ═══ ЕДИНАЯ ШАПКА СЕРВИСОВ GOLDEN HOUSE ═══════════════════════════════════
+   Идентичный блок во всех сервисах (gateway, apartment_finder, referal,
+   client_service, scriptovod). Общего статик-хоста нет и сеть изолирована,
+   поэтому блок живёт копией в каждом сервисе — правки вносить во все сразу.
+
+   Раскладка: слева герб компании и название сервиса, справа действия.
+   Герб ведёт в общее меню сервисов, название — на главную своего сервиса.
+   ────────────────────────────────────────────────────────────────────── */
+:root {
+    --gh-header-min-height: 50px;
+    /* Цвет герба: название сервиса красится в него же, чтобы бренд читался
+       как одно целое независимо от палитры конкретного сервиса. */
+    --gh-brand-gold: #D29F66;
 }
-.header_name .brand-logo:hover { opacity: 0.75; transform: translateY(-1px); }
-.header_name .brand-name {
-    margin-left: 0.6rem;
+
+.gh-header { min-height: var(--gh-header-min-height); }
+
+.gh-brand { display: flex; align-items: center; gap: 10px; }
+
+.gh-brand-logo {
+    display: inline-flex;
+    border-radius: 4px;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.gh-brand-logo:hover { opacity: 0.75; transform: translateY(-1px); }
+.gh-brand-logo-img { height: 28px; width: auto; display: block; }
+
+.gh-brand-name {
     font-size: 1rem;
     font-weight: 700;
+    line-height: 1;
     white-space: nowrap;
-    color: var(--text-primary);
+    color: var(--gh-brand-gold);
     text-decoration: none;
     border-bottom: 1px solid transparent;
-    transition: border-color var(--transition-normal), color var(--transition-normal);
+    transition: border-color 0.2s ease;
 }
-.header_name .brand-name:hover { border-bottom-color: currentColor; }
-.header .logo { height: 26px; width: auto; display: block; }
+.gh-brand-name:hover { color: var(--gh-brand-gold); border-bottom-color: currentColor; }
+
+/* Когда герб и название ведут в одно место (gateway) — это одна ссылка,
+   и подсвечивается она целиком. */
+.gh-brand-link { text-decoration: none; }
+.gh-brand-link:hover .gh-brand-logo-img { opacity: 0.75; }
+.gh-brand-link:hover .gh-brand-name { border-bottom-color: currentColor; }
+
+.gh-header-actions { display: flex; align-items: center; gap: 8px; }
+
+/* Кнопки действий одинаковы во всех сервисах. Цвета берутся от темы через
+   currentColor, поэтому блок не зависит от палитры конкретного сервиса. */
+.gh-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 4px 10px;
+    font-size: 0.875rem;
+    line-height: 1;
+    color: inherit;
+    background: transparent;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+    opacity: 0.7;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.2s ease, color 0.2s ease;
+}
+.gh-btn:hover { opacity: 1; color: var(--gh-brand-gold); }
+
+.gh-user-name { max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* На узких экранах имя прячем — остаётся иконка, шапка не растёт. */
+@media (max-width: 991.98px) { .gh-user-name { display: none; } }
+/* ═══ КОНЕЦ ЕДИНОГО БЛОКА ШАПКИ ══════════════════════════════════════════ */
+
 .header .nav__link { white-space: nowrap; }
 
 

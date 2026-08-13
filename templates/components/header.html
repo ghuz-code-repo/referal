@@ -3,20 +3,20 @@
     {# Логотип и название ведут в РАЗНЫЕ места: логотип — в общее меню сервисов
        gateway, название — на главную этого сервиса. Две отдельные ссылки,
        каждая со своей подсказкой и своим откликом на наведение. #}
-    <div class="header_name">
+    <div class="header_name gh-brand">
         {# Только герб, без словесной части: она дублировала бы название сервиса
            рядом. Герб золотой в обеих темах, поэтому data-*-logo указывают на
            один и тот же файл — theme-manager отрабатывает вхолостую, но и не
            ругается в консоль на пропавший элемент. #}
-        <a href="/menu" class="brand-logo" title="К меню сервисов" aria-label="К меню сервисов">
+        <a href="/menu" class="gh-brand-logo" title="К меню сервисов" aria-label="К меню сервисов">
             <img src="{{ url_for('static', filename='img/logo-mark.svg')}}"
                  alt="Golden House"
-                 class="logo"
+                 class="logo gh-brand-logo-img"
                  id="dynamic-logo"
                  data-light-logo="{{ url_for('static', filename='img/logo-mark.svg') }}"
                  data-dark-logo="{{ url_for('static', filename='img/logo-mark.svg') }}">
         </a>
-        <a href="/" class="brand-name" title="На главную сервиса">Реферальная программа</a>
+        <a href="/" class="gh-brand-name" title="На главную сервиса">Реферальная программа</a>
     </div>
     
     <!-- Кнопка гамбургер для мобильной версии -->
@@ -95,9 +95,10 @@
             </div>
             {% endif %}
             {# Пункт «Меню сервисов» убран: этот переход теперь на логотипе. #}
+            {# Тема и профиль — тот же набор кнопок, что и в остальных сервисах. #}
             <div class="nav__item">
-                <button id="theme-switcher" class="nav__link theme-switcher" title="Переключить тему" onclick="window.themeManager && window.themeManager.toggleTheme()">
-                    Тёмная тема
+                <button id="theme-switcher" class="gh-btn theme-switcher" title="Сменить тему" onclick="window.themeManager && window.themeManager.toggleTheme()">
+                    <i class="fas fa-moon"></i>
                 </button>
             </div>
             {% if current_user %}
@@ -106,7 +107,7 @@
                 {# Тот же адрес, но относительный и в текущей вкладке: как кнопка
                    профиля в gateway. Абсолютный URL с target=_blank плодил вкладки
                    и ломался бы при смене домена. #}
-                <a href="/profile" class="nav__link profile-nav-link" title="Личный кабинет">
+                <a href="/profile" class="gh-btn profile-nav-link" title="Личный кабинет">
                     <div class="profile-mini">
                         <!-- Получаем данные пользователя напрямую из auth-service заголовков -->
                         {% set auth_user = get_auth_user_data() %}
@@ -119,9 +120,8 @@
                                     <i class="fas fa-user-circle"></i>
                                 {% endif %}
                             </div>
-                            <div class="user-info">
+                            <div class="user-info gh-user-name">
                                 <span class="user-name">{{ auth_user.short_name }}</span>
-                                <span class="user-login">({{ auth_user.username }})</span>
                             </div>
                         {% else %}
                             <!-- Fallback -->

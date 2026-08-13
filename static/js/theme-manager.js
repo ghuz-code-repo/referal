@@ -426,27 +426,30 @@ class ThemeManager {
      */
     updateSwitcherUI(theme) {
         const themeSwitcher = document.getElementById('theme-switcher');
-        const textElement = document.getElementById('theme-text');
-        
         if (!themeSwitcher) return;
-        
-        if (theme === this.themes.dark) {
-            if (textElement) {
-                textElement.textContent = 'Светлая тема';
-            } else {
-                themeSwitcher.innerHTML = 'Светлая тема';
-            }
-            themeSwitcher.title = 'Переключить на светлую тему';
-        } else {
-            if (textElement) {
-                textElement.textContent = 'Тёмная тема';
-            } else {
-                themeSwitcher.innerHTML = 'Тёмная тема';
-            }
-            themeSwitcher.title = 'Переключить на тёмную тему';
+
+        const isDark = theme === this.themes.dark;
+        const label = isDark ? 'Светлая тема' : 'Тёмная тема';
+
+        // В шапке кнопка иконочная, без подписи — так же, как в остальных
+        // сервисах. Раньше здесь безусловно перезаписывался innerHTML, и
+        // иконку затирало текстом, поэтому пишем ровно туда, где место есть.
+        const icon = themeSwitcher.querySelector('i');
+        if (icon) {
+            icon.classList.toggle('fa-moon', !isDark);
+            icon.classList.toggle('fa-sun', isDark);
         }
-        
-        console.log('Theme switcher UI updated:', theme, textElement?.textContent);
+
+        const textElement = document.getElementById('theme-text') || themeSwitcher.querySelector('span');
+        if (textElement) {
+            textElement.textContent = label;
+        } else if (!icon) {
+            themeSwitcher.innerHTML = label;
+        }
+
+        themeSwitcher.title = isDark ? 'Переключить на светлую тему' : 'Переключить на тёмную тему';
+
+        console.log('Theme switcher UI updated:', theme, label);
     }
 
     /**
