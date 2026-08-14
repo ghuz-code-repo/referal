@@ -98,43 +98,37 @@
             </div>
             {% endif %}
             {# Пункт «Меню сервисов» убран: этот переход теперь на логотипе. #}
-            {# Тема и профиль — тот же набор кнопок, что и в остальных сервисах. #}
+            {# Блок пользователя и кнопка темы — точно как в шапке gateway:
+               аватар, «Фамилия И. О.», логин в скобках. Выхода здесь нет. #}
+            {% if current_user %}
+            <div class="nav__item profile-link">
+                {% set auth_user = get_auth_user_data() %}
+                {# Адрес относительный и в текущей вкладке: абсолютный URL
+                   с target=_blank плодил вкладки и ломался бы при смене домена. #}
+                <a href="/profile" class="gh-user profile-nav-link" title="Личный кабинет">
+                    <span class="gh-avatar">
+                        {% if auth_user and auth_user.avatar_path %}
+                            <img src="{{ auth_user.avatar_path }}" alt="">
+                        {% else %}
+                            <i class="fas fa-user-circle"></i>
+                        {% endif %}
+                    </span>
+                    <span class="gh-user-info">
+                        {% if auth_user %}
+                            <span class="gh-user-fullname">{{ auth_user.short_name }}</span>
+                            <span class="gh-user-login">({{ auth_user.username }})</span>
+                        {% else %}
+                            <span class="gh-user-fullname">Основной профиль</span>
+                        {% endif %}
+                    </span>
+                </a>
+            </div>
+            {% endif %}
             <div class="nav__item">
                 <button id="theme-switcher" class="gh-btn theme-switcher" title="Сменить тему" onclick="window.themeManager && window.themeManager.toggleTheme()">
                     <i class="fas fa-moon"></i>
                 </button>
             </div>
-            {% if current_user %}
-            <!-- Добавляем ссылку на главный профиль -->
-            <div class="nav__item profile-link">
-                {# Тот же адрес, но относительный и в текущей вкладке: как кнопка
-                   профиля в gateway. Абсолютный URL с target=_blank плодил вкладки
-                   и ломался бы при смене домена. #}
-                <a href="/profile" class="gh-btn profile-nav-link" title="Личный кабинет">
-                    <div class="profile-mini">
-                        <!-- Получаем данные пользователя напрямую из auth-service заголовков -->
-                        {% set auth_user = get_auth_user_data() %}
-                        {% if auth_user %}
-                            <!-- Используем данные из auth-service -->
-                            <div class="user-avatar">
-                                {% if auth_user.avatar_path %}
-                                    <img src="{{ auth_user.avatar_path }}" alt="Avatar" class="avatar-img">
-                                {% else %}
-                                    <i class="fas fa-user-circle"></i>
-                                {% endif %}
-                            </div>
-                            <div class="user-info gh-user-name">
-                                <span class="user-name">{{ auth_user.short_name }}</span>
-                            </div>
-                        {% else %}
-                            <!-- Fallback -->
-                            <i class="fas fa-user-cog"></i>
-                            <span>Основной профиль</span>
-                        {% endif %}
-                    </div>
-                </a>
-            </div>
-            {% endif %}
         </div>
     </nav>
 </header>
