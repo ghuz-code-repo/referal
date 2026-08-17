@@ -25,7 +25,7 @@ def list_user_documents():
         return redirect(url_for('auth.login'))
     
     # Проверяем разрешение на просмотр документов
-    if not current_user.is_admin and not current_user.has_permission('referal.profile.documents'):
+    if not current_user.has_permission('referal.profile.documents'):
         flash('У вас нет прав для просмотра документов', 'error')
         return redirect(url_for('referal.index'))
     
@@ -59,7 +59,7 @@ def download_attachment(document_id, attachment_id):
         return redirect(url_for('auth.login'))
     
     # Проверяем разрешение на скачивание документов
-    if not current_user.is_admin and not current_user.has_permission('referal.profile.documents.download'):
+    if not current_user.has_permission('referal.profile.documents.download'):
         flash('У вас нет прав для скачивания документов', 'error')
         return redirect(url_for('user_documents.list_user_documents'))
     
@@ -236,7 +236,7 @@ def download_all_user_documents(user_id):
         return "Пользователь не найден", 401
     
     # Проверяем разрешение на скачивание документов
-    if not current_user.is_admin and not current_user.has_permission('referal.profile.documents.download'):
+    if not current_user.has_permission('referal.profile.documents.download'):
         return "У вас нет прав для скачивания документов", 403
     
     temp_file_path = None

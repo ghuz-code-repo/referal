@@ -434,7 +434,7 @@ def update_referal_documents(referal_id):
         }), 404
     
     # Check if referal belongs to user (admins can edit any)
-    if user_context.is_admin:
+    if user_context.has_permission('referal.admin.panel'):
         referal = Referal.query.get(referal_id)
     else:
         referal = Referal.query.filter_by(id=referal_id, user_id=local_user.id).first()
@@ -872,7 +872,6 @@ def get_referal_deals(referal_id):
         
         print(f"🔍 Auth user_id: {user_context.user_id}")
         print(f"🔍 Local user: {local_user.id if local_user else 'NOT FOUND'}")
-        print(f"🔍 Is admin: {user_context.is_admin}")
         
         if not local_user:
             print(f"❌ Local user not found for auth_user_id={user_context.user_id}")
@@ -889,7 +888,7 @@ def get_referal_deals(referal_id):
         
         # Проверяем права доступа: владелец, админ или пользователь с правом admin.panel (менеджер и т.д.)
         is_owner = referal.user_id == local_user.id
-        is_admin = user_context.is_admin or user_context.has_permission('referal.admin.panel')
+        is_admin = user_context.has_permission('referal.admin.panel')
         
         print(f"🔍 Is admin: {is_admin}, Is owner: {is_owner}")
         

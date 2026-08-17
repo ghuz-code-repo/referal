@@ -1,6 +1,12 @@
 """Утилиты для работы с разрешениями"""
 
 from flask import request
+
+# Общая для флота проверка права: точное совпадение, голая '*' и префиксные
+# шаблоны вида 'referal.*'. Шлюз отдаёт wildcard-право строкой как есть, и
+# точное сравнение его не видело — админ терял доступ при формально выданной роли.
+from auth_connector.permission_utils import any_permission_granted, permission_granted
+
 from status_permissions import (
     can_view_status,
     can_edit_status, 
@@ -39,48 +45,15 @@ def get_user_permissions():
     if not permissions:
         service_roles_str = request.headers.get('X-User-Service-Roles', '')
         service_roles = [role.strip() for role in service_roles_str.split(',') if role.strip()]
-        
-        # Системный админ или админ сервиса получает все разрешения
-        is_admin = request.headers.get('X-User-Admin', '').lower() == 'true'
-        is_service_admin = 'admin' in service_roles
-        
+
+        # Ветки «админ получает все разрешения» здесь больше нет. Она читала
+        # X-User-Admin и роль 'admin', раздавая захардкоженный список прав,
+        # который расходился с auth-service. Администратору теперь выдаётся
+        # роль admin с правом 'referal.*', и оно приходит обычным списком —
+        # до этого fallback дело просто не доходит.
         from status_permissions import ALL_STATUS_PERMISSIONS
-        
-        if is_admin or is_service_admin:
-            # Admin gets ALL permissions
-            all_perms = set()
-            for status_id in ALL_STATUS_PERMISSIONS:
-                status_perms = ALL_STATUS_PERMISSIONS[status_id]
-                all_perms.update([
-                    status_perms['view'],
-                    status_perms['edit'],
-                    status_perms['move_to'],
-                    status_perms['move_from']
-                ])
-            all_perms.update([
-                'referal.admin.panel',
-                'referal.admin.manage_users',
-                'referal.admin.change_status',
-                'referal.admin.view_reports',
-                'referal.admin.export_data',
-                'referal.admin.force_update',
-                'referal.reports.view',
-                'referal.stats.view',
-                'referal.referrals.list',
-                'referal.referrals.view',
-                'referal.referrals.create',
-                'referal.referrals.edit',
-                'referal.referrals.add',
-                'referal.payments.view',
-                'referal.payments.request',
-                'referal.profile.view',
-                'referal.profile.documents',
-                'referal.profile.documents.download'
-            ])
-            permissions = list(all_perms)
-            print(f"🔓 LEGACY FALLBACK: Granted {len(permissions)} admin permissions")
-            
-        elif 'manager' in service_roles:
+
+        if 'manager' in service_roles:
             # Manager gets permissions for specific statuses: 200, 300, 500
             manager_perms = set()
             for status_id in [200, 300, 500]:
@@ -163,20 +136,18 @@ def get_user_permissions():
 
 def has_permission(permission):
     """Проверяет, есть ли у пользователя конкретное разрешение"""
-    user_permissions = get_user_permissions()
-    return permission in user_permissions
+    return permission_granted(permission, get_user_permissions())
 
 
 def has_any_permission(permissions):
     """Проверяет, есть ли у пользователя любое из указанных разрешений"""
-    user_permissions = get_user_permissions()
-    return any(perm in user_permissions for perm in permissions)
+    return any_permission_granted(permissions, get_user_permissions())
 
 
 def has_all_permissions(permissions):
     """Проверяет, есть ли у пользователя все указанные разрешения"""
     user_permissions = get_user_permissions()
-    return all(perm in user_permissions for perm in permissions)
+    return all(permission_granted(perm, user_permissions) for perm in permissions)
 
 
 def get_user_role_type():
@@ -439,31 +410,10 @@ def requires_admin_access():
     if has_permissions:
         print("DEBUG: Access granted via permissions")
         return True
-    
-    # Fallback: если разрешений нет, используем старую логику ролей из заголовков
-    print("DEBUG: No permissions found, checking legacy roles")
-    
-    # Получаем роли напрямую из заголовков для fallback
-    service_roles_str = request.headers.get('X-User-Service-Roles', '')
-    global_roles_str = request.headers.get('X-User-Roles', '')
-    
-    print(f"DEBUG: Fallback to legacy roles - X-User-Service-Roles: {service_roles_str}, X-User-Roles: {global_roles_str}")
-    
-    # Проверяем service-specific роли
-    if service_roles_str:
-        service_roles = [role.strip() for role in service_roles_str.split(',')]
-        legacy_admin_roles = ['referal-manager', 'referal-admin', 'admin', 'manager', 'call-center', 'analytics']
-        if any(role in legacy_admin_roles for role in service_roles):
-            print(f"DEBUG: Access granted via service role: {service_roles}")
-            return True
-    
-    # Проверяем глобальные роли
-    if global_roles_str:
-        global_roles = [role.strip() for role in global_roles_str.split(',')]
-        legacy_admin_roles = ['system.admin', 'admin', 'manager']
-        if any(role in legacy_admin_roles for role in global_roles):
-            print(f"DEBUG: Access granted via global role: {global_roles}")
-            return True
-    
-    print("DEBUG: Access denied - no permissions and no valid role")
+
+    # Ветки по именам ролей здесь больше нет. Она пускала в админ-панель любого
+    # с ролью 'admin' или 'manager' в заголовке, даже когда соответствующих
+    # прав роли не выдано — то есть решала доступ мимо auth-service. Права из
+    # шлюза теперь единственный источник, wildcard 'referal.*' в их числе.
+    print("DEBUG: Access denied - no admin permissions")
     return False
