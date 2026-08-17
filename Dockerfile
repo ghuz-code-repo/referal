@@ -29,6 +29,12 @@ ENV LC_ALL=ru_RU.UTF-8
 
 ENV FLASK_APP=app.py
 
+# Без этого print() оседает в буфере stdout: в контейнере stdout — пайп, а не
+# терминал, поэтому Python буферизует его блоками по ~8 КБ. Стартовых строк на
+# такой объём не набирается, и логи не доходят ни до docker logs, ни до Dozzle,
+# хотя строки gunicorn видны — он пишет через logging, а тот флашит.
+ENV PYTHONUNBUFFERED=1
+
 # Set the working directory in the container
 WORKDIR /app
 
