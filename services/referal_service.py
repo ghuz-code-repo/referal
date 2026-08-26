@@ -15,30 +15,12 @@ def send_deal_available_notification(user, referal, deal, withdrawal_amount):
     """
     def _send_async():
         try:
-            # Получаем email пользователя
-            user_email = None
-            
-            # Пытаемся получить email из auth-service через API
-            if user.auth_user_id:
-                try:
-                    import requests
-                    auth_service_url = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:80')
-                    api_headers = {'X-API-Key': os.getenv('INTERNAL_API_KEY', '')}
-                    response = requests.get(
-                        f"{auth_service_url}/api/users/{user.auth_user_id}",
-                        headers=api_headers,
-                        timeout=5
-                    )
-                    if response.status_code == 200:
-                        user_data = response.json()
-                        user_email = user_data.get('email')
-                except Exception as e:
-                    print(f"⚠️ Could not fetch email from auth-service: {e}")
-            
-            if not user_email:
-                print(f"⚠️ No email found for user {user.login}, skipping notification")
+            # Пользователь портала адресуется логином из своей же таблицы —
+            # адрес доставки подставит notification-service через auth-service
+            if not user.login:
+                print("⚠️ No portal login for user, skipping notification")
                 return
-            
+
             notification_client = get_notification_client()
             
             subject = "Новый договор готов к отправке на проверку"
@@ -62,15 +44,15 @@ def send_deal_available_notification(user, referal, deal, withdrawal_amount):
 """
             
             success = notification_client.send_email(
-                recipient=user_email,
+                login=user.login,
                 subject=subject,
                 body=body
             )
             
             if success:
-                print(f"📧 Deal available notification sent to {user_email} about deal {deal.agreement_number}")
+                print(f"📧 Deal available notification sent to {user.login} about deal {deal.agreement_number}")
             else:
-                print(f"⚠️ Failed to send notification to {user_email}")
+                print(f"⚠️ Failed to send notification to {user.login}")
                 
         except Exception as e:
             print(f"❌ Error sending deal available notification: {e}")

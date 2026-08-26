@@ -17,7 +17,12 @@ def send_sync_failure_alert(stage, details):
     незамеченными месяцами. Алерт не должен ломать саму синхронизацию,
     поэтому любые ошибки отправки только логируются.
     """
-    recipient = os.getenv('SYNC_ALERT_EMAIL', 'd.tolkunov@gh.uz')
+    # Получатель алерта — сотрудник портала: предпочитаем логин, адрес доставки
+    # определит auth-service. SYNC_ALERT_EMAIL остаётся фоллбеком.
+    login = os.getenv('SYNC_ALERT_LOGIN')
+    addressing = ({'login': login} if login
+                  else {'external_recipient': os.getenv('SYNC_ALERT_EMAIL', 'd.tolkunov@gh.uz')})
+    recipient = login or addressing.get('external_recipient')
     try:
         from notification_client import get_notification_client
         notification_client = get_notification_client()
@@ -36,7 +41,7 @@ def send_sync_failure_alert(stage, details):
 
 Проверьте логи контейнера referal и статус синхронизации в админке.
 """
-        if notification_client.send_email(recipient, subject, body):
+        if notification_client.send_email(subject, body, **addressing):
             print(f"📧 Sync failure alert sent to {recipient} (stage: {stage})")
         else:
             print(f"⚠️ Failed to send sync failure alert to {recipient}")

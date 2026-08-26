@@ -661,25 +661,25 @@ def send_referral_notification(user, full_name, phone):
         
         # Отправляем уведомление каждому получателю
         for recipient in recipients:
-            recipient_email = recipient.get('email')
+            recipient_login = recipient.get('username')
             recipient_name = recipient.get('full_name', recipient.get('username', 'Сотрудник'))
             
-            if not recipient_email:
-                print(f"⚠️ Recipient has no email: {recipient}")
+            if not recipient_login:
+                print(f"⚠️ Recipient has no portal login: {recipient}")
                 continue
             
             try:
                 notification_client.send_email(
-                    recipient=recipient_email,
+                    login=recipient_login,
                     subject='Новый реферал для обзвона',
                     body=f'Пользователь {user_full_name} добавил нового реферала:\n\n'
                          f'Имя: {full_name}\n'
                          f'Телефон: {phone}\n\n'
                          f'Пожалуйста, свяжитесь с рефералом для дальнейшего взаимодействия.'
                 )
-                print(f"📧 Email notification sent to: {recipient_name} ({recipient_email})")
+                print(f"📧 Email notification sent to: {recipient_name} ({recipient_login})")
             except Exception as e:
-                print(f"❌ Failed to send email to {recipient_email}: {str(e)}")
+                print(f"❌ Failed to send email to {recipient_login}: {str(e)}")
         
         print(f"✅ Notification process completed. Sent to {len(recipients)} recipients")
         
@@ -754,22 +754,22 @@ def send_deal_status_notification(referal_deal, user, new_status_id, new_status_
         
         # Отправляем уведомление каждому получателю
         for recipient in recipients:
-            recipient_email = recipient.get('email')
+            recipient_login = recipient.get('username')
             recipient_name = recipient.get('full_name', recipient.get('username', 'Сотрудник'))
             
-            if not recipient_email:
-                print(f"⚠️ Recipient has no email: {recipient}")
+            if not recipient_login:
+                print(f"⚠️ Recipient has no portal login: {recipient}")
                 continue
             
             try:
                 notification_client.send_email(
-                    recipient=recipient_email,
+                    login=recipient_login,
                     subject=subject,
                     body=body
                 )
-                print(f"📧 Status change notification sent to: {recipient_name} ({recipient_email}) for status {status_display}")
+                print(f"📧 Status change notification sent to: {recipient_name} ({recipient_login}) for status {status_display}")
             except Exception as e:
-                print(f"❌ Failed to send email to {recipient_email}: {str(e)}")
+                print(f"❌ Failed to send email to {recipient_login}: {str(e)}")
         
         print(f"✅ Status change notification process completed. Sent to {len(recipients)} recipients for status {new_status_id}")
         

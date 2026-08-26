@@ -326,12 +326,19 @@ def add_referal():
             if call_center_users:
                 # Берем первого пользователя из списка
                 first_cc_user = call_center_users[0]
+                call_center_login = first_cc_user.get('username')
                 call_center_email = first_cc_user.get('email')
                 call_center_name = first_cc_user.get('full_name', first_cc_user.get('username', 'Call-center менеджер'))
                 
-                if call_center_email:
+                # Логин портала — основной способ адресации; адрес из auth-service
+                # оставлен запасным на случай учётки без username
+                addressing = ({'login': call_center_login} if call_center_login
+                              else {'external_recipient': call_center_email} if call_center_email
+                              else None)
+
+                if addressing:
                     utils.send_email(
-                        call_center_email,
+                        **addressing,
                         subject='Новый реферал для обзвона',
                         body=f'Пользователь {user.user_data.full_name if user.user_data else user.login} добавил нового реферала:\n\n'
                              f'Имя: {full_name}\n'

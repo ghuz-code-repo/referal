@@ -17,8 +17,7 @@ def request_withdrawal(referal_id, user):
         referal.balance_pending_withdrawal = True
         db.session.commit()
         
-        recipient_email = os.getenv('MAIN_ADMIN_EMAIL')
         subject = "Запрос на вывод средств по реферальной программе"
         body = f"Сотрудник {user_full_name} сделал запрос на вывод средств в размере {referal.withdrawal_amount} за счет реферала {referal.referal_data.full_name}"
-        return utils.send_email(recipient_email, subject, body)
+        return utils.send_email_to_staff('MAIN_ADMIN', subject, body)
 

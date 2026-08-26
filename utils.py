@@ -345,68 +345,128 @@ def send_sms(phone_number, user_full_name):
     thread.start()
 
 
-def _send_email_sync(recipient_email, subject, body):
+def staff_recipient(role_key):
     """
-    Внутренняя функция для синхронной отправки email сообщения через Notification Service.
-    Предназначена для вызова из send_email_async.
+    Определить получателя-сотрудника по ключу роли.
+
+    Сотрудник — пользователь портала, поэтому адресуем его логином: адрес доставки
+    держит auth-service, и смена почты сотрудника не требует правки .env сервиса.
+    Пока логин не прописан, работает прежний вариант с адресом из .env.
+
+    Args:
+        role_key (str): префикс переменных окружения, например 'MAIN_ADMIN'
+                        (читаются MAIN_ADMIN_LOGIN и MAIN_ADMIN_EMAIL)
+
+    Returns:
+        dict: kwargs адресации для notification_client.send_email, либо пустой dict,
+              если ни логин, ни адрес не заданы
+    """
+    login = os.getenv(f'{role_key}_LOGIN')
+    if login:
+        return {'login': login}
+
+    email = os.getenv(f'{role_key}_EMAIL')
+    if email:
+        return {'external_recipient': email}
+
+    return {}
+
+
+def send_email_to_staff(role_key, subject, body):
+    """
+    Отправить письмо сотруднику, заданному переменными окружения `<role_key>_LOGIN`
+    или `<role_key>_EMAIL`. Отправка идёт в отдельном потоке.
+
+    Returns:
+        bool: False, если получатель не настроен и письмо даже не поставлено в очередь
+    """
+    addressing = staff_recipient(role_key)
+    if not addressing:
+        print(f"⚠️ Получатель {role_key} не настроен: задайте {role_key}_LOGIN или {role_key}_EMAIL")
+        return False
+
+    send_email(subject=subject, body=body, **addressing)
+    return True
+
+
+def _send_email_sync(subject, body, login=None, external_recipient=None):
+    """
+    Внутренняя функция для синхронной отправки email через Notification Service.
+    Предназначена для вызова из send_email.
+
+    Получателя задаёт либо login (пользователь портала), либо external_recipient.
     """
     from notification_client import get_notification_client
-    
+
+    target = login or external_recipient
+
     try:
         # Получаем клиент notification service
         notification_client = get_notification_client()
-        
+
         # Отправляем основное письмо получателю
         success = notification_client.send_email(
-            recipient=recipient_email,
             subject=subject,
-            body=body
+            body=body,
+            login=login,
+            external_recipient=external_recipient,
         )
-        
+
         if success:
-            print(f"Email queued for sending to {recipient_email}")
-            
+            print(f"Email queued for sending to {target}")
+
             # Отправляем уведомление администратору об успешной отправке
-            admin_email = os.getenv('MAIN_ADMIN_EMAIL')
-            if admin_email:
-                admin_subject = f'Ответственное лицо реферальной программы {recipient_email} получило письмо'
-                admin_body = f'Письмо отправлено {recipient_email} с темой {subject}\nтело:\n{body}'
+            admin = staff_recipient('MAIN_ADMIN')
+            if admin:
+                admin_subject = f'Ответственное лицо реферальной программы {target} получило письмо'
+                admin_body = f'Письмо отправлено {target} с темой {subject}\nтело:\n{body}'
                 notification_client.send_email(
-                    recipient=admin_email,
                     subject=admin_subject,
-                    body=admin_body
+                    body=admin_body,
+                    **admin
                 )
                 print("Admin notification queued")
-            
-            print(f"Email sent successfully via Notification Service: {recipient_email} {subject}")
+
+            print(f"Email sent successfully via Notification Service: {target} {subject}")
         else:
             raise Exception("Notification service returned failure status")
-            
+
     except Exception as e:
         print(f"Failed to send email via Notification Service: {e}")
-        
+
         # Отправляем уведомление администратору об ошибке
         try:
-            admin_email = os.getenv('MAIN_ADMIN_EMAIL')
-            if admin_email:
+            admin = staff_recipient('MAIN_ADMIN')
+            if admin:
                 notification_client = get_notification_client()
-                admin_subject = f'Ответственное лицо реферальной программы {recipient_email} НЕ получило письмо'
-                admin_body = f'Письмо не было отправлено {recipient_email} с темой {subject}\nтело:\n{body}\nОшибка {e}'
+                admin_subject = f'Ответственное лицо реферальной программы {target} НЕ получило письмо'
+                admin_body = f'Письмо не было отправлено {target} с темой {subject}\nтело:\n{body}\nОшибка {e}'
                 notification_client.send_email(
-                    recipient=admin_email,
                     subject=admin_subject,
-                    body=admin_body
+                    body=admin_body,
+                    **admin
                 )
                 print("Error notification sent to admin")
         except Exception as admin_error:
             print(f"Failed to send error notification to admin: {admin_error}")
-        
-def send_email(recipient_email, subject, body):
+
+
+def send_email(subject, body, login=None, external_recipient=None):
     """
     Запускает отправку email в отдельном потоке.
+
+    Args:
+        subject: тема письма
+        body: тело письма
+        login: логин получателя на портале (предпочтительно)
+        external_recipient: адрес получателя вне портала
     """
-    thread = threading.Thread(target=run_async_task, args=(_send_email_sync, recipient_email, subject, body))
-    thread.daemon = True # Позволяет программе завершиться, даже если поток еще работает
+    thread = threading.Thread(
+        target=run_async_task,
+        args=(_send_email_sync, subject, body),
+        kwargs={'login': login, 'external_recipient': external_recipient},
+    )
+    thread.daemon = True  # Позволяет программе завершиться, даже если поток еще работает
     thread.start()
 
 

@@ -85,11 +85,14 @@ def send_admin_deal_status_notification(referal_deal, admin_user, old_status_id,
 
         # --- Специальная логика для статуса 500 (Отказ): уведомляем самого пользователя ---
         if new_status_id == 500:
-            user_email = None
-            if referal_deal.referal and referal_deal.referal.user and referal_deal.referal.user.auth_user_id:
-                user_email = get_user_email_from_auth_service(referal_deal.referal.user.auth_user_id)
+            # Логин портала хранится в своей же таблице пользователей — ходить
+            # в auth-service за адресом больше не нужно, его подставит
+            # notification-service
+            user_login = None
+            if referal_deal.referal and referal_deal.referal.user:
+                user_login = referal_deal.referal.user.login
 
-            if user_email:
+            if user_login:
                 subject = f'Отказ по договору №{agreement_number}'
                 body = f"""Уважаемый(ая) {referal_name},
 
@@ -101,13 +104,13 @@ def send_admin_deal_status_notification(referal_deal, admin_user, old_status_id,
                 body += "\n\nЕсли у вас есть вопросы, пожалуйста, свяжитесь с нами."
 
                 notification_client.send_email(
-                    recipient=user_email,
+                    login=user_login,
                     subject=subject,
                     body=body
                 )
-                print(f"✅ Rejection notification sent to user {user_email} for deal {referal_deal.id}")
+                print(f"✅ Rejection notification sent to user {user_login} for deal {referal_deal.id}")
             else:
-                print(f"⚠️ Cannot send rejection notification: user email not found for deal {referal_deal.id}")
+                print(f"⚠️ Cannot send rejection notification: user login not found for deal {referal_deal.id}")
 
         # --- Permission-based уведомления для всех ответственных сотрудников ---
         recipients = get_notification_recipients_for_status(new_status_id)
@@ -135,23 +138,23 @@ def send_admin_deal_status_notification(referal_deal, admin_user, old_status_id,
         # Отправляем уведомление каждому получателю с нужным разрешением
         sent_count = 0
         for recipient in recipients:
-            recipient_email = recipient.get('email')
+            recipient_login = recipient.get('username')
             recipient_name = recipient.get('full_name', recipient.get('username', 'Сотрудник'))
 
-            if not recipient_email:
-                print(f"⚠️ Recipient has no email, skipping: {recipient}")
+            if not recipient_login:
+                print(f"⚠️ Recipient has no portal login, skipping: {recipient}")
                 continue
 
             try:
                 notification_client.send_email(
-                    recipient=recipient_email,
+                    login=recipient_login,
                     subject=subject,
                     body=body
                 )
                 sent_count += 1
-                print(f"📧 Status change notification sent to: {recipient_name} ({recipient_email}) for status {status_display}")
+                print(f"📧 Status change notification sent to: {recipient_name} ({recipient_login}) for status {status_display}")
             except Exception as e:
-                print(f"❌ Failed to send email to {recipient_email}: {str(e)}")
+                print(f"❌ Failed to send email to {recipient_login}: {str(e)}")
 
         print(f"✅ Admin status change notification process completed. Sent to {sent_count}/{len(recipients)} recipients for status {old_status_id} -> {new_status_id}")
 
@@ -842,8 +845,10 @@ def add_deal_to_referal(referal_id):
             from notification_client import get_notification_client
             
             notification_client = get_notification_client()
-            call_center_email = os.getenv('CALL_CENTER_MANAGER_EMAIL')
-            main_admin_email = os.getenv('MAIN_ADMIN_EMAIL')
+            from utils import staff_recipient
+
+            call_center = staff_recipient('CALL_CENTER_MANAGER')
+            main_admin = staff_recipient('MAIN_ADMIN')
             
             # Получаем информацию о рефе��але
             referal_name = referal.referal_data.full_name if referal.referal_data else 'Неизвестно'
@@ -865,22 +870,22 @@ def add_deal_to_referal(referal_id):
 Необходимо связаться с рефералом для назначения встречи."""
 
             # Отправляем менеджеру КЦ
-            if call_center_email:
+            if call_center:
                 notification_client.send_email(
-                    recipient=call_center_email,
                     subject=subject,
-                    body=body
+                    body=body,
+                    **call_center
                 )
-                print(f"✅ Notification sent to call center manager: {call_center_email}")
+                print(f"✅ Notification sent to call center manager: {call_center}")
             
             # Копия главному админу
-            if main_admin_email and main_admin_email != call_center_email:
+            if main_admin and main_admin != call_center:
                 notification_client.send_email(
-                    recipient=main_admin_email,
                     subject=f"[Копия] {subject}",
-                    body=body
+                    body=body,
+                    **main_admin
                 )
-                print(f"✅ Copy sent to main admin: {main_admin_email}")
+                print(f"✅ Copy sent to main admin: {main_admin}")
                 
         except Exception as email_error:
             print(f"⚠️ Failed to send notification for deal add: {str(email_error)}")
@@ -964,22 +969,22 @@ def update_withdrawal_stage(referal_id):
 
     
     if withdrawal_stage == 1:
-         utils.send_email(
-            os.getenv('MAIN_ADMIN_EMAIL'),
+         utils.send_email_to_staff(
+            'MAIN_ADMIN',
             'Реферал поступил на проверку отделом аналитики',
             f'Реферал от {get_user_full_name_from_auth(user)} поступил на проверку отделу аналитики:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
     
     elif withdrawal_stage == 20:
-         utils.send_email(
-            os.getenv('MAIN_ADMIN_EMAIL'),
+         utils.send_email_to_staff(
+            'MAIN_ADMIN',
             'Реферал прошёл проверку колл-центром',
             f'Реферал от {get_user_full_name_from_auth(user)} прошёл проверку колл-центром:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
         
     elif withdrawal_stage == 10:
-         utils.send_email(
-            os.getenv('CALL_CENTER_MANAGER_EMAIL'),
+         utils.send_email_to_staff(
+            'CALL_CENTER_MANAGER',
             'Запрос на проверку реферала',
             f'Пожалуйста созвонитесь с рефералом от {get_user_full_name_from_auth(user)}: ФИО: {referal.referal_data.full_name} Телефон: {referal.referal_data.phone_number} для проверки его данных после чего обязательно измените статус реферала в системе.\n'
         )
@@ -987,8 +992,8 @@ def update_withdrawal_stage(referal_id):
     elif withdrawal_stage == 200:
         payment_email = os.getenv('PAYMENT_MANAGER_EMAIL')
 
-        utils.send_email(
-            os.getenv('PAYMENT_MANAGER_EMAIL'),
+        utils.send_email_to_staff(
+            'PAYMENT_MANAGER',
             'Запрос на выплату рефереру',
             f'{get_user_full_name_from_auth(user)} запросил вывод средств за реферала:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n пожалуйста проверьте меню реферальной программы и подтвердите/отклоните выплату.'
         )
@@ -996,8 +1001,8 @@ def update_withdrawal_stage(referal_id):
 
 
     elif withdrawal_stage == 300:
-        utils.send_email(
-            os.getenv('MAIN_ADMIN_EMAIL'),
+        utils.send_email_to_staff(
+            'MAIN_ADMIN',
             'Реферал был оплачен рефереру',
             f'Реферал от {get_user_full_name_from_auth(user)} был помечен как оплаченый:\nФИО: {referal.referal_data.full_name}\nMacro ID: {referal.contact_id}\n'
         )
@@ -1013,8 +1018,8 @@ def update_withdrawal_stage(referal_id):
             return redirect(url_for('admin.admin_panel', **return_params))
         referal.rejection_reason = rejection_reason
         rejecter_name = get_user_full_name_from_auth(current_user)
-        utils.send_email(
-            os.getenv('MAIN_ADMIN_EMAIL'),
+        utils.send_email_to_staff(
+            'MAIN_ADMIN',
             'Реферал не прошёл проверку',
             f"""
             Реферал от {get_user_full_name_from_auth(user)} не прошёл проверку {referal.status_name}\n
