@@ -36,8 +36,7 @@ class NotificationClient:
     
     @staticmethod
     def _recipient_fields(login: Optional[str] = None,
-                          external_recipient: Optional[str] = None,
-                          recipient: Optional[str] = None) -> dict:
+                          external_recipient: Optional[str] = None) -> dict:
         """
         Собрать поля адресации для notification-service.
 
@@ -48,29 +47,21 @@ class NotificationClient:
         Args:
             login: логин пользователя портала
             external_recipient: адрес получателя вне портала
-            recipient: УСТАРЕЛО, сырой адрес; notification-service пишет предупреждение
 
         Returns:
             dict с одним ключом адресации
         """
-        if sum(1 for v in (login, external_recipient, recipient) if v) != 1:
+        if sum(1 for v in (login, external_recipient) if v) != 1:
             raise ValueError(
-                "Нужно ровно одно поле получателя: login, external_recipient или recipient"
+                "Нужно ровно одно поле получателя: login или external_recipient"
             )
         if login:
             return {"login": login}
-        if external_recipient:
-            return {"external_recipient": external_recipient}
-        logger.warning(
-            "Уведомление отправлено через устаревшее поле recipient=%s — "
-            "переведите вызов на login или external_recipient", recipient
-        )
-        return {"recipient": recipient}
+        return {"external_recipient": external_recipient}
 
     def send_email(self, subject: str, body: str,
                    login: Optional[str] = None,
-                   external_recipient: Optional[str] = None,
-                   recipient: Optional[str] = None) -> bool:
+                   external_recipient: Optional[str] = None) -> bool:
         """
         Отправка одного email уведомления
         
@@ -79,14 +70,13 @@ class NotificationClient:
             body: Тело письма
             login: Логин пользователя портала (предпочтительно)
             external_recipient: Email получателя вне портала
-            recipient: УСТАРЕЛО — сырой email; оставлено для совместимости
             
         Returns:
             True если отправка успешна, False в случае ошибки
         """
         try:
-            addressing = self._recipient_fields(login, external_recipient, recipient)
-            target = login or external_recipient or recipient
+            addressing = self._recipient_fields(login, external_recipient)
+            target = login or external_recipient
 
             notification = {
                 "type": "email",
@@ -133,8 +123,8 @@ class NotificationClient:
         
         Args:
             notifications: Список словарей с ключами 'subject', 'body' и одним полем
-                адресации: 'login' (пользователь портала), 'external_recipient'
-                (получатель вне портала) либо устаревшим 'recipient'
+                адресации: 'login' (пользователь портала) либо 'external_recipient'
+                (получатель вне портала)
             batch_id: Опциональный идентификатор пакета
             
         Returns:
@@ -146,7 +136,6 @@ class NotificationClient:
                 addressing = self._recipient_fields(
                     notif.get('login'),
                     notif.get('external_recipient'),
-                    notif.get('recipient'),
                 )
                 batch_notifications.append({
                     "type": "email",

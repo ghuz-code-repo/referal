@@ -35,29 +35,6 @@ import requests
 logger = logging.getLogger('gunicorn.error')
 
 
-def get_user_email_from_auth_service(auth_user_id):
-    """Получить актуальный email пользователя из auth-service"""
-    try:
-        auth_service_url = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:80')
-        profile_url = f"{auth_service_url}/api/users/{auth_user_id}/profile"
-        
-        api_headers = {'X-API-Key': os.getenv('INTERNAL_API_KEY', '')}
-        response = requests.get(profile_url, headers=api_headers, timeout=5)
-        
-        if response.status_code == 200:
-            profile_data = response.json()
-            email = profile_data.get('email')
-            if email:
-                print(f"✅ Got email from auth-service for user {auth_user_id}: {email}")
-                return email
-            else:
-                print(f"⚠️ No email in auth-service profile for user {auth_user_id}")
-        else:
-            print(f"⚠️ Failed to get profile from auth-service: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Error getting email from auth-service: {str(e)}")
-    
-    return None
 
 
 admin_bp = Blueprint('admin', __name__)
